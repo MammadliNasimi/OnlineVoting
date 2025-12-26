@@ -3,6 +3,7 @@ import axios from 'axios';
 import './App.css';
 
 function App() {
+  const [currentPage, setCurrentPage] = useState('vote');
   const [votes, setVotes] = useState([]);
   const [candidate, setCandidate] = useState('');
 
@@ -17,27 +18,42 @@ function App() {
 
   const submitVote = async () => {
     await axios.post('/api/votes', { voterId: 'user1', candidate });
+    setCandidate('');
     fetchVotes();
   };
 
-  return (
-    <div className="App">
-      <h1>Online Voting System</h1>
+  const renderVotePage = () => (
+    <div>
+      <h2>Cast Your Vote</h2>
       <div>
         <input
           type="text"
-          placeholder="Candidate name"
+          placeholder="Enter candidate name"
           value={candidate}
           onChange={(e) => setCandidate(e.target.value)}
         />
-        <button onClick={submitVote}>Vote</button>
+        <button onClick={submitVote}>Submit Vote</button>
       </div>
-      <h2>Votes</h2>
+      <button onClick={() => setCurrentPage('results')}>View Results</button>
+    </div>
+  );
+
+  const renderResultsPage = () => (
+    <div>
+      <h2>Voting Results</h2>
       <ul>
         {votes.map((vote, index) => (
           <li key={index}>{vote.candidate} - {new Date(vote.timestamp).toLocaleString()}</li>
         ))}
       </ul>
+      <button onClick={() => setCurrentPage('vote')}>Back to Voting</button>
+    </div>
+  );
+
+  return (
+    <div className="App">
+      <h1>Online Voting System</h1>
+      {currentPage === 'vote' ? renderVotePage() : renderResultsPage()}
     </div>
   );
 }

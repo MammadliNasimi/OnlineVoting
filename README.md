@@ -2,6 +2,11 @@
 
 A basic online voting system skeleton with React frontend, Node.js backend, and MongoDB database.
 
+## Prerequisites
+
+- Node.js (version 14 or higher) - Download from https://nodejs.org/
+- MongoDB - Download from https://www.mongodb.com/try/download/community
+
 ## System Architecture
 
 - **Frontend**: React application in `client/` folder
@@ -10,10 +15,14 @@ A basic online voting system skeleton with React frontend, Node.js backend, and 
 
 ## Setup
 
-1. Ensure MongoDB is installed and running on localhost:27017
-2. Install dependencies: `npm install`
-3. Install client dependencies: `cd client && npm install`
-4. Run the application: `npm run dev-full`
+1. Install Node.js from https://nodejs.org/
+2. Install MongoDB from https://www.mongodb.com/try/download/community
+3. Start MongoDB service (usually `mongod` command or MongoDB Compass)
+4. Clone or download this repository
+5. Copy `.env.example` to `.env` and update values if needed
+6. Install dependencies: `npm install`
+7. Install client dependencies: `cd client && npm install`
+8. Run the application: `npm run dev-full`
 
 This will start the backend on port 5000 and frontend on port 3000.
 
