@@ -1,3 +1,28 @@
+@media (max-width: 600px) {
+  .App {
+    padding: 8px;
+  }
+  h1 {
+    font-size: 1.3em;
+  }
+  h2 {
+    font-size: 1.1em;
+  }
+  input, select, button {
+    font-size: 1em;
+    width: 100%;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+  }
+  .chart-container {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .App > div {
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+}
 .App {
   text-align: center;
   font-family: Arial, sans-serif;
