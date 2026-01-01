@@ -11,14 +11,15 @@
     "dev-full": "concurrently \"npm run server\" \"npm run client\""
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "mongoose": "^7.5.3",
+    "bcryptjs": "^3.0.3",
+    "concurrently": "^8.2.1",
     "cors": "^2.8.5",
+    "dayjs": "^1.11.19",
     "dotenv": "^16.3.1",
-    "concurrently": "^8.2.1"
+    "express": "^4.18.2",
+    "mysql2": "^3.6.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   }
-}</content>
-<parameter name="filePath">C:\Users\PC\OnlineVoting\package.json
+}
