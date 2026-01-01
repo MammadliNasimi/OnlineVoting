@@ -100,27 +100,3 @@ This project is a **working skeleton** implementation of a blockchain-based voti
 │  • Vote Status     │         │  • Immutable vote records    │
 └────────────────────┘         └──────────────────────────────┘
 ```
-
-## 🛠️ Technology Stack
-
-### Frontend
-- **React.js** 18.x - UI framework
-- **Chart.js** - Data visualization
-- **Axios** - HTTP client
-- **Day.js** - Date handling
-- **Modern CSS** - Gradient & animations
-
-### Backend
-- **Node.js** 18.x - Runtime environment
-- **Express.js** - Web framework
-- **bcrypt.js** - Password hashing
-- **CORS** - Cross-origin resource sharing
-
-### Blockchain (Future Integration)
-- **Ethereum Testnet** - Sepolia/Hardhat/Ganache
-- **Solidity** - Smart contracts
-- **Web3.js/Ethers.js** - Blockchain interaction
-
-### Database
-- **PostgreSQL** - Relational database (Future)
-- **In-Memory Storage** - Current demo mode
