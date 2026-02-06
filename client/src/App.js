@@ -12,6 +12,7 @@ import {
   Legend,
 } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
+import { formatTxHash } from './utils/crypto';
 
 // Register Chart.js components
 ChartJS.register(
@@ -94,6 +95,8 @@ function App() {
   const [registerMode, setRegisterMode] = useState(false);
   const [form, setForm] = useState({ name: '', password: '' });
   const [newCandidate, setNewCandidate] = useState('');
+  const [txStatus, setTxStatus] = useState('');
+  const [txHash, setTxHash] = useState('');
 
   // Fetch voting history
   const fetchHistory = async () => {
@@ -233,17 +236,46 @@ function App() {
   const submitVote = async () => {
     setError('');
     setInfo('');
+    setTxStatus('');
+    setTxHash('');
+    
     if (!votingOpen) {
       setError('Voting is currently closed.');
       return;
     }
+    
+    const electionId = 1;
+    const candidateId = candidates.indexOf(candidate);
+    
+    if (candidateId === -1) {
+      setError('Geçersiz aday / Invalid candidate');
+      return;
+    }
+    
     try {
-      await axios.post('/api/votes', { candidate }, { headers: { 'x-session-id': sessionId } });
-      setInfo('Vote submitted successfully!');
+      setTxStatus('Oy gönderiliyor... / Sending vote...');
+      
+      const response = await axios.post(
+        '/api/votes',
+        {
+          candidate: candidate,
+          electionId: electionId
+        },
+        {
+          headers: { 'x-session-id': sessionId }
+        }
+      );
+      
+      setTxHash(response.data.transactionHash);
+      setTxStatus('');
+      setInfo(`✅ Oy başarıyla kaydedildi! / Vote submitted successfully! Transaction: ${formatTxHash(response.data.transactionHash)}`);
+      
       fetchVotes();
       fetchHistory();
     } catch (err) {
-      setError(err.response?.data?.message || 'Error submitting vote');
+      setTxStatus('');
+      console.error('Vote error:', err);
+      setError(err.response?.data?.message || 'Oy gönderilirken hata oluştu / Error submitting vote');
     }
   };
 
@@ -306,9 +338,21 @@ function App() {
     </div>
   );
 
+  const handleLogout = async () => {
+    try {
+      await axios.post('/api/logout', {}, { headers: { 'x-session-id': sessionId } });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+    setUser(null);
+    setSessionId('');
+    setCurrentPage('login');
+  };
+
   const renderVotePage = () => (
     <div>
       <h2>{t.castVote}</h2>
+      
       <div>
         <b>{t.user}:</b> {user?.name} <span style={{ marginLeft: 10, color: '#888' }}>({user?.role})</span>
         <span style={{ marginLeft: 20, color: votingOpen ? 'green' : 'red' }}>
@@ -322,9 +366,26 @@ function App() {
             ))}
           </select>
         </label>
-        <button style={{ marginLeft: 10 }} onClick={submitVote} disabled={!votingOpen}>{t.submitVote}</button>
-        <button style={{ marginLeft: 10 }} onClick={() => { setUser(null); setSessionId(''); setCurrentPage('login'); }}>{t.logout}</button>
+        <button 
+          style={{ marginLeft: 10 }} 
+          onClick={submitVote} 
+          disabled={!votingOpen || !!txStatus}
+        >
+          {txStatus || t.submitVote}
+        </button>
+        <button style={{ marginLeft: 10 }} onClick={handleLogout}>{t.logout}</button>
       </div>
+      
+      {/* Transaction status */}
+      {txHash && (
+        <div style={{ marginTop: 10, padding: 10, background: '#e8f5e9', borderRadius: 6, fontSize: 14 }}>
+          <b>Transaction Hash:</b> 
+          <span style={{ marginLeft: 5, fontFamily: 'monospace', color: '#2e7d32' }}>
+            {formatTxHash(txHash)}
+          </span>
+        </div>
+      )}
+      
       {user?.role === 'admin' && (
         <div style={{ marginTop: 20, background: '#f3f3f3', padding: 10, borderRadius: 6 }}>
           <b>{t.addCandidate}:</b>
