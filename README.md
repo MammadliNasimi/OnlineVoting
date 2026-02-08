@@ -6,22 +6,30 @@ TÜBİTAK 2209-A araştırma projesi - Blockchain tabanlı anonim ve güvenli oy
 
 Bu sistem, blockchain teknolojisi kullanarak anonim, şeffaf ve güvenli online oylama sağlar. Commitment-based şifreleme ve backend-managed wallet sistemi ile kullanıcı dostu bir deneyim sunar.
 
-### ✨ Temel Özellikler
+### ✨ Şu An Mevcut Özellikler
 
-- ✅ **Anonim Oylama**: Commitment-based şifreleme ile oylar gizli
+#### Kullanıcı Özellikleri
+- ✅ **Kayıt ve Giriş Sistemi**: Güvenli kullanıcı kimlik doğrulama
+- ✅ **Geçici Cüzdan Yönetimi**: Her giriş'te otomatik cüzdan oluşturma, çıkış'ta silme
+- ✅ **Anonim Oy Kullanma**: Commitment-based şifreleme ile kimlik gizliliği
+- ✅ **Oy Geçmişi Görüntüleme**: Kullanıcının tüm oylarını detaylı görebilme
+- ✅ **Gerçek Zamanlı Sonuçlar**: Canlı oy sayımı ve grafik gösterimi
+- ✅ **Transaction İzleme**: Her oy için blockchain transaction hash
+
+#### Teknik Özellikler
 - ✅ **Blockchain Tabanlı**: Ethereum smart contract ile değiştirilemez kayıt
-- ✅ **Session-based Geçici Cüzdanlar**: Her login'de otomatik cüzdan oluşturma
-- ✅ **Backend Yönetimi**: MetaMask gerekmez, backend tüm blockchain işlemlerini halleder
-- ✅ **Çift Kayıt**: Hem blockchain hem SQLite database
-- ✅ **Admin Yetkisi**: Vote authorization için dijital imza
-- ✅ **Gerçek Zamanlı**: Live vote tracking ve sonuç görüntüleme
+- ✅ **Backend-Managed Wallets**: MetaMask gerekmez, sistem otomatik yönetir
+- ✅ **Çift Kayıt Sistemi**: Hem blockchain hem SQLite database
+- ✅ **Admin İmza Doğrulama**: Vote authorization için ECDSA dijital imza
+- ✅ **Şifreli Cüzdan Saklama**: AES-256-CBC ile private key şifreleme
+- ✅ **Otomatik Cüzdan Fonlama**: Login'de 1 ETH otomatik transfer
 
 ## 🛠️ Teknoloji Stack
 
 ### Frontend
-- **React 18**: Modern UI framework
-- **Axios**: HTTP client
-- **Chart.js**: Oy sonuçları görselleştirme
+- **React 18**: Basit ve sade UI
+- **Axios**: API iletişimi
+- **Chart.js**: Sonuç grafikleri
 
 ### Backend
 - **Node.js + Express**: REST API server
@@ -117,33 +125,62 @@ SESSION_TIMEOUT=3600000
 
 ### Adım 3: Servisleri Başlat
 
-**Terminal 1 - Blockchain:**
-```bash
+#### 🚀 Hızlı Başlatma (Önerilen)
+
+**Windows PowerShell:**
+```powershell
+# 1. Hardhat Blockchain (Terminal 1)
 cd smart-contracts
 npx hardhat node
-```
+# Çıktı: "Started HTTP and WebSocket JSON-RPC server at http://127.0.0.1:8545/"
+# Bu terminal açık kalsın!
 
-**Terminal 2 - Contract Deploy:**
-```bash
+# 2. Smart Contract Deploy (Terminal 2 - tek seferlik)
 cd smart-contracts
 npx hardhat run scripts/deploy.js --network localhost
-```
+# Çıktı: "VotingAnonymous deployed to: 0x5FbDB..."
+# Contract adresi .env dosyasına otomatik yazılır
 
-**Terminal 3 - Backend:**
-```bash
+# 3. Backend Server (Terminal 3)
 node server.js
-```
+# Çıktı: "🚀 Server running on http://localhost:5000"
+# "📡 Connected to blockchain at http://127.0.0.1:8545"
+# Bu terminal açık kalsın!
 
-**Terminal 4 - Frontend:**
-```bash
+# 4. Frontend React (Terminal 4)
 cd client
 npm start
+# Çıktı: "webpack compiled successfully"
+# Tarayıcı otomatik açılır: http://localhost:3000
 ```
 
-### Adım 4: Tarayıcıda Aç
+**Alternatif - Tek Terminal (Background Processes):**
+```powershell
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd smart-contracts; npx hardhat node"
+Start-Sleep -Seconds 3
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "node server.js"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd client; npm start"
 ```
-http://localhost:3000
+
+#### ✅ Servislerin Çalıştığını Kontrol Et
+```powershell
+netstat -an | findstr "3000 5000 8545" | findstr "LISTENING"
 ```
+**Beklenen Çıktı:**
+```
+TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING  # Frontend
+TCP    0.0.0.0:5000           0.0.0.0:0              LISTENING  # Backend
+TCP    0.0.0.0:8545           0.0.0.0:0              LISTENING  # Blockchain
+```
+
+### Adım 4: Tarayıcıda Aç ve Test Et
+
+1. **Tarayıcınızda aç:** http://localhost:3000
+2. **Yeni kullanıcı oluştur:** Kayıt sayfasından kullanıcı adı ve şifre gir
+3. **Giriş yap:** Backend console'da geçici cüzdan oluşturulduğunu göreceksin
+4. **Oy kullan:** Bir aday seç ve oy ver
+5. **Geçmişi gör:** "Oylama Geçmişi" sekmesinden oylarını kontrol et
+6. **Çıkış yap:** Geçici cüzdan otomatik silinir
 
 ## 🔑 Test Kullanıcıları
 
@@ -166,7 +203,7 @@ http://localhost:3000
 ### Voting
 - `POST /api/votes` - Oy kullan (blockchain + DB)
 - `GET /api/votes` - Oy durumu
-- `GET /api/history` - Kişisel oylama geçmişi
+- `GET /api/voting-history` - Kişisel oylama geçmişi (seçim, aday, tarih, tx hash)
 
 ### Election Management
 - `GET /api/candidates` - Aday listesi
@@ -350,35 +387,75 @@ OnlineVoting/
 └── README.md                # Bu dosya
 ```
 
-## 🚧 Gelecek Geliştirmeler
+## 🚧 Eklenecek Özellikler ve İyileştirmeler
 
-- [ ] Vote reveal mechanism
-- [ ] Multi-election support
-- [ ] Real-time WebSocket updates
-- [ ] Mobile responsive design
-- [ ] Admin dashboard
-- [ ] Export results to PDF
-- [ ] Email notifications
-- [ ] 2FA authentication
-- [ ] Audit log viewer
-- [ ] Production deployment guide
+### 🔴 Yüksek Öncelik
+- [ ] **Vote Reveal Mechanism**: Secret ile oy doğrulama sistemi
+- [ ] **Multi-Election Support**: Aynı anda birden fazla seçim
+- [ ] **Rate Limiting**: Login ve vote endpoint'leri için DDoS koruması
+- [ ] **Session Cleanup Job**: Expired session'ları otomatik temizle
+- [ ] **Blockchain Connection Check**: Startup'ta RPC bağlantı testi
+- [ ] **Wallet Funding Error Handling**: Funding başarısız olursa login reddet
 
-## 🤝 Katkıda Bulunma
+### 🟡 Orta Öncelik
+- [ ] **Admin Dashboard**: 
+  - Tüm seçimleri yönetme
+  - Kullanıcı listesi ve rolleri
+  - Sistem istatistikleri (toplam oy, aktif kullanıcı, vb.)
+  - Seçim başlatma/durdurma
+- [ ] **Real-time WebSocket Updates**: 
+  - Canlı oy sayım güncellemesi
+  - Yeni oy bildirim sistemi
+- [ ] **Email Notifications**: 
+  - Seçim başlangıç/bitiş bildirimi
+  - Oy kullanım onayı
+- [ ] **Export Results**: 
+  - PDF rapor oluşturma
+  - CSV export
+  - Blockchain verification link
 
-Bu proje TÜBİTAK 2209-A kapsamında geliştirilmiş bir araştırma prototipidir.
+### 🟢 Düşük Öncelik
+- [ ] **Mobile Responsive Design**: Mobil cihazlar için optimize edilmiş UI
+- [ ] **2FA Authentication**: İki faktörlü kimlik doğrulama
+- [ ] **Audit Log Viewer**: Tüm sistem aktivitelerini izleme
+- [ ] **Dark Mode**: Tema değiştirme özelliği
+- [ ] **Multi-language Support**: Türkçe/İngilizce dışında dil desteği
+- [ ] **Vote Comments**: Oy kullanırken yorum bırakma (opsiyonel)
+- [ ] **Candidate Photos**: Aday fotoğrafı upload sistemi
+- [ ] **Voting Analytics**: 
+  - Oy kullanım zamanı grafikleri
+  - Demografik analiz
+  - Trend göstergeleri
 
-## 📄 Lisans
-
-Bu proje eğitim ve araştırma amaçlıdır.
+### 🔧 Teknik İyileştirmeler
+- [ ] **Production Deployment**: 
+  - Docker containerization
+  - CI/CD pipeline
+  - Cloud deployment guide (AWS/Azure/GCP)
+- [ ] **Database Migration**: SQLite → PostgreSQL
+- [ ] **Logging System**: Winston/Morgan ile detaylı log
+- [ ] **Input Validation**: Joi/Yup ile tüm endpoint validation
+- [ ] **API Documentation**: Swagger/OpenAPI dokümantasyonu
+- [ ] **Unit Tests**: Jest ile backend test coverage
+- [ ] **E2E Tests**: Cypress ile frontend test
+- [ ] **Performance Optimization**: 
+  - Database indexing
+  - Query optimization
+  - Caching stratejisi (Redis)
+- [ ] **Security Hardening**: 
+  - Helmet.js integration
+  - CORS configuration
+  - SQL injection prevention
+  - XSS protection
 
 ## ⚠️ Önemli Notlar
 
-1. **Test Amaçlı**: Bu sistem sadece local development içindir
-2. **Güvenlik**: Production kullanımı için ek önlemler gereklidir
-3. **Hardhat Test Network**: Gerçek blockchain değil, simulate edilmiş network
-4. **Private Keys**: .env dosyasını asla commit etmeyin
-5. **Database**: SQLite production için uygun değil (PostgreSQL önerilir)
+- **Test Amaçlı**: Local development için prototip sistem
+- **Güvenlik**: Production öncesi güvenlik önlemleri alınmalı
+- **Hardhat Network**: Simüle edilmiş test blockchain'i
+- **Private Keys**: .env dosyasını asla commit etme
+- **Database**: SQLite yerine PostgreSQL kullanılmalı
 
 ---
 
-**⚠️ DISCLAIMER**: This is a prototype for research and educational purposes only. Not production-ready. Do not use with real, sensitive data or in production environments.
+**TÜBİTAK 2209-A Araştırma Projesi** - Eğitim ve araştırma amaçlı prototip

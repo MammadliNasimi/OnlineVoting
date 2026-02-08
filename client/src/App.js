@@ -328,12 +328,20 @@ function App() {
   const renderHistory = () => (
     <div>
       <h2>Oylama Geçmişi / Voting History</h2>
-      <ul>
-        {history.length === 0 && <li>Hiç oy kullanmadınız / No votes yet.</li>}
-        {history.map((v, i) => (
-          <li key={i}>{v.candidate} ({dayjs(v.timestamp).format('YYYY-MM-DD HH:mm')})</li>
-        ))}
-      </ul>
+      {history.length === 0 ? (
+        <p>Hiç oy kullanmadınız / No votes yet.</p>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0 }}>
+          {history.map((v, i) => (
+            <li key={i} style={{ marginBottom: 20, padding: 15, border: '1px solid #ddd', borderRadius: 8 }}>
+              <div><strong>Seçim / Election:</strong> {v.election_title}</div>
+              <div><strong>Aday / Candidate:</strong> {v.candidate_name}</div>
+              <div><strong>Tarih / Date:</strong> {dayjs(v.voted_at).format('YYYY-MM-DD HH:mm')}</div>
+              <div><strong>Transaction Hash:</strong> <code style={{ fontSize: 11 }}>{v.transaction_hash}</code></div>
+            </li>
+          ))}
+        </ul>
+      )}
       <button onClick={() => setCurrentPage('vote')}>{t.backToVoting}</button>
     </div>
   );

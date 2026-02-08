@@ -345,6 +345,22 @@ app.post('/api/votes', async (req, res) => {
   }
 });
 
+// Get voting history for current user
+app.get('/api/voting-history', async (req, res) => {
+  try {
+    const user = await getUserFromSession(req);
+    if (!user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const history = await db.getUserVotingHistory(user.id);
+    res.json(history);
+  } catch (error) {
+    console.error('Get voting history error:', error);
+    res.status(500).json({ message: 'Failed to fetch voting history' });
+  }
+});
+
 // ========== BLOCKCHAIN ANONYMOUS VOTING ==========
 
 /**

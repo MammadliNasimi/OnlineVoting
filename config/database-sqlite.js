@@ -309,6 +309,22 @@ class DatabaseService {
     return { success: true };
   }
 
+  async getUserVotingHistory(userId) {
+    return this.db.prepare(
+      `SELECT 
+        vs.voted_at,
+        vs.transaction_hash,
+        e.title as election_title,
+        c.name as candidate_name
+       FROM vote_status vs
+       JOIN elections e ON vs.election_id = e.id
+       JOIN votes v ON vs.election_id = v.election_id AND vs.transaction_hash = v.transaction_hash
+       JOIN candidates c ON v.candidate_id = c.id
+       WHERE vs.user_id = ?
+       ORDER BY vs.voted_at DESC`
+    ).all(userId);
+  }
+
   // ========== SESSIONS ==========
 
   async createSession(sessionId, userId, expiresAt) {
