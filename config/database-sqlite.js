@@ -42,26 +42,9 @@ class DatabaseService {
         password TEXT NOT NULL,
         role TEXT DEFAULT 'user',
         student_id TEXT UNIQUE,
-        wallet_address TEXT UNIQUE,
-        wallet_private_key_encrypted TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    
-    // Migration: Add wallet columns if they don't exist
-    try {
-      this.db.exec(`ALTER TABLE users ADD COLUMN wallet_address TEXT UNIQUE`);
-      console.log('   🔄 Added wallet_address column to users table');
-    } catch (e) {
-      // Column already exists
-    }
-    
-    try {
-      this.db.exec(`ALTER TABLE users ADD COLUMN wallet_private_key_encrypted TEXT`);
-      console.log('   🔄 Added wallet_private_key_encrypted column to users table');
-    } catch (e) {
-      // Column already exists
-    }
 
     // Elections table
     this.db.exec(`
@@ -156,26 +139,13 @@ class DatabaseService {
     const adminExists = this.db.prepare('SELECT id FROM users WHERE name = ?').get('admin');
     if (!adminExists) {
       const bcrypt = require('bcryptjs');
-      const crypto = require('crypto');
-      const { ethers } = require('ethers');
-      
-      // Create wallet for admin
-      const wallet = ethers.Wallet.createRandom();
-      const ENCRYPTION_KEY = process.env.WALLET_ENCRYPTION_KEY || 'default-32-char-encryption-key!!!';
-      const iv = crypto.randomBytes(16);
-      const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
-      const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-      let encrypted = cipher.update(wallet.privateKey, 'utf8', 'hex');
-      encrypted += cipher.final('hex');
-      const encryptedPrivateKey = iv.toString('hex') + ':' + encrypted;
       
       const hashedPassword = bcrypt.hashSync('admin123', 10);
       this.db.prepare(
-        'INSERT INTO users (name, password, role, student_id, wallet_address, wallet_private_key_encrypted) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run('admin', hashedPassword, 'admin', 'ADMIN001', wallet.address, encryptedPrivateKey);
+        'INSERT INTO users (name, password, role, student_id) VALUES (?, ?, ?, ?)'
+      ).run('admin', hashedPassword, 'admin', 'ADMIN001');
       
       console.log('   ✅ Default admin user created (admin/admin123)');
-      console.log(`   🦊 Admin wallet: ${wallet.address}`);
     }
 
     // Insert sample election if not exists
@@ -225,10 +195,10 @@ class DatabaseService {
     return this.db.prepare('SELECT * FROM users WHERE name = ?').get(name);
   }
 
-  async createUser(name, hashedPassword, role = 'user', studentId = null, walletAddress = null, walletPrivateKeyEncrypted = null) {
+  async createUser(name, hashedPassword, role = 'user', studentId = null) {
     const info = this.db.prepare(
-      'INSERT INTO users (name, password, role, student_id, wallet_address, wallet_private_key_encrypted) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(name, hashedPassword, role, studentId, walletAddress, walletPrivateKeyEncrypted);
+      'INSERT INTO users (name, password, role, student_id) VALUES (?, ?, ?, ?)'
+    ).run(name, hashedPassword, role, studentId);
     return this.db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
   }
 

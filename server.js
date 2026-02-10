@@ -1,13 +1,14 @@
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
 const { ethers } = require('ethers');
 const VoteAuthService = require('./services/authService');
-const db = require('./config/database-sqlite'); // SQLite version
+const { createWallet, encryptPrivateKey, decryptPrivateKey } = require('./utils/walletUtils');
+const db = require('./config/database-sqlite');
 require('dotenv').config();
 
 const app = express();
+const path = require('path');
 
 // Initialize services
 let authService;
@@ -38,42 +39,6 @@ async function initializeServices() {
 
 // Call initialization
 initializeServices();
-
-// Wallet utility functions
-const ENCRYPTION_KEY = process.env.WALLET_ENCRYPTION_KEY || 'default-32-char-encryption-key!!!'; // Should be 32 chars
-const ENCRYPTION_ALGORITHM = 'aes-256-cbc';
-
-function createWallet() {
-  const wallet = ethers.Wallet.createRandom();
-  return {
-    address: wallet.address,
-    privateKey: wallet.privateKey
-  };
-}
-
-function encryptPrivateKey(privateKey) {
-  const iv = crypto.randomBytes(16);
-  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
-  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
-  
-  let encrypted = cipher.update(privateKey, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  
-  return iv.toString('hex') + ':' + encrypted;
-}
-
-function decryptPrivateKey(encryptedData) {
-  const parts = encryptedData.split(':');
-  const iv = Buffer.from(parts[0], 'hex');
-  const encrypted = parts[1];
-  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
-  const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv);
-  
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  
-  return decrypted;
-}
 
 app.use(cors());
 app.use(express.json());
@@ -131,16 +96,13 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
     
-    // Create wallet automatically for user
-    const wallet = createWallet();
-    const encryptedPrivateKey = encryptPrivateKey(wallet.privateKey);
+    // User created without wallet - wallet will be created during login session
+    await db.createUser(name, hashedPassword, 'user', studentId);
     
-    console.log(`🦊 Created wallet for user ${name}: ${wallet.address}`);
+    console.log(`✅ User registered: ${name}`);
     
-    await db.createUser(name, hashedPassword, 'user', studentId, wallet.address, encryptedPrivateKey);
     res.json({ 
-      message: 'Registered successfully',
-      walletAddress: wallet.address
+      message: 'Registered successfully'
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -252,9 +214,8 @@ app.get('/api/candidates', async (req, res) => {
   }
 });
 
-// GET /api/votes - Tüm oyları getir (currently empty - votes stored on blockchain)
+// GET /api/votes - Get vote counts
 app.get('/api/votes', async (req, res) => {
-  // TODO: Fetch vote counts from blockchain or database
   res.json([]);
 });
 
@@ -490,6 +451,56 @@ app.post('/api/voting-period', async (req, res) => {
   votingPeriod.start = start ? new Date(start).toISOString() : null;
   votingPeriod.end = end ? new Date(end).toISOString() : null;
   res.json({ message: 'Voting period updated', votingPeriod });
+});
+
+// ========== ADMIN PANEL ==========
+
+// Admin panel HTML (must be before static middleware)
+app.get('/admin/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// Database API for admin panel
+app.get('/api/admin/database', async (req, res) => {
+  try {
+    const data = {
+      users: [],
+      sessions: [],
+      elections: [],
+      candidates: [],
+      votes: [],
+      vote_status: []
+    };
+
+    // Get users
+    const users = db.db.prepare('SELECT id, name, role, created_at FROM users').all();
+    data.users = users;
+
+    // Get sessions
+    const sessions = db.db.prepare('SELECT id, user_id, temp_wallet_address, created_at, expires_at FROM sessions').all();
+    data.sessions = sessions;
+
+    // Get elections
+    const elections = db.db.prepare('SELECT id, title, description, start_date, end_date, is_active FROM elections').all();
+    data.elections = elections;
+
+    // Get candidates
+    const candidates = db.db.prepare('SELECT id, election_id, name, description, vote_count FROM candidates').all();
+    data.candidates = candidates;
+
+    // Get votes
+    const votes = db.db.prepare('SELECT id, election_id, candidate_id, commitment, transaction_hash, created_at FROM votes').all();
+    data.votes = votes;
+
+    // Get vote status
+    const vote_status = db.db.prepare('SELECT id, user_id, election_id, has_voted, voted_at, transaction_hash, commitment FROM vote_status').all();
+    data.vote_status = vote_status;
+
+    res.json(data);
+  } catch (error) {
+    console.error('Admin database error:', error);
+    res.status(500).json({ message: 'Failed to fetch database data' });
+  }
 });
 
 

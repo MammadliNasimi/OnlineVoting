@@ -423,6 +423,14 @@ function App() {
       {error && <div style={{ color: 'red', marginTop: 10 }}>{error}</div>}
       <button onClick={() => setCurrentPage('results')} style={{ marginTop: 20 }}>{t.viewResults}</button>
       <button onClick={() => setCurrentPage('history')} style={{ marginTop: 20 }}>Oylama Geçmişi</button>
+      {user?.role === 'admin' && (
+        <button 
+          onClick={() => window.open('http://localhost:5000/admin/dashboard', '_blank')} 
+          style={{ marginTop: 20, background: '#667eea', color: 'white' }}
+        >
+          🗄️ Database Monitor (Admin)
+        </button>
+      )}
     </div>
   );
 

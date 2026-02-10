@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Monitor - Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            color: #667eea;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-card .number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card .label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .table-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .table-section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        tr:hover {
+            background: #f8f9ff;
+        }
+        
+        .empty {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            font-style: italic;
+        }
+        
+        .auto-refresh {
+            background: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        
+        .auto-refresh.active {
+            background: #f44336;
+        }
+        
+        .refresh-info {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .hash {
+            font-family: monospace;
+            font-size: 11px;
+            color: #666;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗄️ Database Monitor</h1>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span class="refresh-info" id="lastUpdate">Son güncelleme: -</span>
+                <button class="auto-refresh" id="toggleRefresh" onclick="toggleAutoRefresh()">
+                    🔄 Otomatik Yenileme: KAPALI
+                </button>
+            </div>
+        </div>
+
+        <div class="stats" id="stats"></div>
+
+        <div class="table-section">
+            <h2>👥 Kullanıcılar</h2>
+            <div id="usersTable"></div>
+        </div>
+
+        <div class="table-section">
+            <h2>🔑 Aktif Session'lar</h2>
+            <div id="sessionsTable"></div>
+        </div>
+
+        <div class="table-section">
+            <h2>📋 Seçimler</h2>
+            <div id="electionsTable"></div>
+        </div>
+
+        <div class="table-section">
+            <h2>👤 Adaylar</h2>
+            <div id="candidatesTable"></div>
+        </div>
+
+        <div class="table-section">
+            <h2>✅ Oylar</h2>
+            <div id="votesTable"></div>
+        </div>
+
+        <div class="table-section">
+            <h2>📝 Oy Durumu</h2>
+            <div id="voteStatusTable"></div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefresh = false;
+        let refreshInterval;
+
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            const btn = document.getElementById('toggleRefresh');
+            
+            if (autoRefresh) {
+                btn.textContent = '🔄 Otomatik Yenileme: AÇIK';
+                btn.classList.add('active');
+                refreshInterval = setInterval(loadDatabase, 2000);
+                loadDatabase();
+            } else {
+                btn.textContent = '🔄 Otomatik Yenileme: KAPALI';
+                btn.classList.remove('active');
+                clearInterval(refreshInterval);
+            }
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('tr-TR');
+        }
+
+        function truncateHash(hash) {
+            if (!hash) return '-';
+            return hash.substring(0, 10) + '...' + hash.substring(hash.length - 8);
+        }
+
+        async function loadDatabase() {
+            try {
+                const response = await fetch('/api/admin/database');
+                const data = await response.json();
+                
+                // Update stats
+                document.getElementById('stats').innerHTML = `
+                    <div class="stat-card">
+                        <div class="number">${data.users.length}</div>
+                        <div class="label">Toplam Kullanıcı</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.sessions.length}</div>
+                        <div class="label">Aktif Session</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.elections.length}</div>
+                        <div class="label">Seçimler</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.candidates.length}</div>
+                        <div class="label">Adaylar</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.votes.length}</div>
+                        <div class="label">Toplam Oy</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.vote_status.length}</div>
+                        <div class="label">Oy Durumu</div>
+                    </div>
+                `;
+
+                // Users table
+                renderTable('usersTable', data.users, ['id', 'name', 'role', 'created_at']);
+
+                // Sessions table
+                renderTable('sessionsTable', data.sessions, ['id', 'user_id', 'temp_wallet_address', 'created_at', 'expires_at']);
+
+                // Elections table
+                renderTable('electionsTable', data.elections, ['id', 'title', 'start_date', 'end_date', 'is_active']);
+
+                // Candidates table
+                renderTable('candidatesTable', data.candidates, ['id', 'name', 'description', 'vote_count']);
+
+                // Votes table (with hash truncation)
+                renderTable('votesTable', data.votes, ['id', 'election_id', 'candidate_id', 'transaction_hash', 'created_at'], true);
+
+                // Vote Status table
+                renderTable('voteStatusTable', data.vote_status, ['id', 'user_id', 'election_id', 'has_voted', 'voted_at'], true);
+
+                document.getElementById('lastUpdate').textContent = 
+                    'Son güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
+            } catch (error) {
+                console.error('Error loading database:', error);
+            }
+        }
+
+        function renderTable(elementId, data, columns, truncateHashes = false) {
+            const container = document.getElementById(elementId);
+            
+            if (data.length === 0) {
+                container.innerHTML = '<div class="empty">Kayıt bulunamadı</div>';
+                return;
+            }
+
+            let html = '<table><thead><tr>';
+            columns.forEach(col => {
+                html += `<th>${col.toUpperCase()}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            data.forEach(row => {
+                html += '<tr>';
+                columns.forEach(col => {
+                    let value = row[col];
+                    
+                    if (col.includes('_at') || col.includes('date')) {
+                        value = formatDate(value);
+                    } else if (truncateHashes && (col.includes('hash') || col.includes('commitment'))) {
+                        value = `<span class="hash" title="${value}">${truncateHash(value)}</span>`;
+                    } else if (col === 'has_voted') {
+                        value = value ? '✅' : '❌';
+                    } else if (col === 'is_active') {
+                        value = value ? '🟢 Aktif' : '🔴 Pasif';
+                    }
+                    
+                    html += `<td>${value !== null && value !== undefined ? value : '-'}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // Initial load
+        loadDatabase();
+    </script>
+</body>
+</html>
