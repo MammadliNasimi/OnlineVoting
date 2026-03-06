@@ -93,7 +93,9 @@ function App() {
   const [sessionId, setSessionId] = useState('');
   const [user, setUser] = useState(null);
   const [registerMode, setRegisterMode] = useState(false);
-  const [form, setForm] = useState({ name: '', password: '' });
+  const [registerStep, setRegisterStep] = useState(0); // 0=form, 1=OTP
+  const [registerOtp, setRegisterOtp] = useState('');
+  const [form, setForm] = useState({ name: '', password: '', email: '' });
   const [newCandidate, setNewCandidate] = useState('');
   const [txStatus, setTxStatus] = useState('');
   const [txHash, setTxHash] = useState('');
@@ -201,24 +203,52 @@ function App() {
   const handleLogin = async () => {
     setError('');
     try {
-      const res = await axios.post('/api/login', form);
+      const res = await axios.post('/api/login', { name: form.name, password: form.password });
       setSessionId(res.data.sessionId);
       setUser(res.data.user);
+      setForm({ name: '', password: '', email: '' });
+      if (res.data.user?.role === 'admin') {
+        localStorage.setItem('adminSession', res.data.sessionId);
+        localStorage.setItem('adminName', res.data.user.name);
+        // Admin directly goes to the admin panel
+        window.location.href = `http://localhost:5000/admin/dashboard?session=${res.data.sessionId}&name=${encodeURIComponent(res.data.user.name)}`;
+        return;
+      }
       setCurrentPage('vote');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.message || 'Giriş başarısız');
+    }
+  };
+
+  const handleSendRegisterOtp = async () => {
+    setError('');
+    if (!form.email) { setError('OTP için e-posta adresi giriniz'); return; }
+    try {
+      const res = await axios.post('/api/register/send-otp', { email: form.email });
+      setRegisterStep(1);
+      setInfo(res.data.message);
+      if (res.data.devOtp) setRegisterOtp(res.data.devOtp); // dev mode prefill
+    } catch (err) {
+      setError(err.response?.data?.message || 'OTP gönderilemedi');
     }
   };
 
   const handleRegister = async () => {
     setError('');
     try {
-      await axios.post('/api/register', { name: form.name, password: form.password });
+      await axios.post('/api/register', {
+        name: form.name,
+        password: form.password,
+        email: form.email || undefined,
+        otp: form.email ? registerOtp : undefined
+      });
       setRegisterMode(false);
-      setForm({ name: '', password: '' });
-      setInfo('Registration successful, you can now login.');
+      setRegisterStep(0);
+      setRegisterOtp('');
+      setForm({ name: '', password: '', email: '' });
+      setInfo('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Register failed');
+      setError(err.response?.data?.message || 'Kayıt başarısız');
     }
   };
 
@@ -292,38 +322,190 @@ function App() {
     }
   };
 
-  const renderLogin = () => (
-    <div>
-      <h2>{registerMode ? t.register : t.login}</h2>
-      <input
-        type="text"
-        placeholder={t.name}
-        value={form.name}
-        onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-      />
-      <input
-        type="password"
-        placeholder={t.password}
-        value={form.password}
-        onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-      />
-      <div>
-        {registerMode ? (
-          <>
-            <button onClick={handleRegister}>{t.registerAsUser}</button>
-            <button onClick={() => setRegisterMode(false)}>{t.login}</button>
-          </>
-        ) : (
-          <>
-            <button onClick={handleLogin}>{t.login}</button>
-            <button onClick={() => setRegisterMode(true)}>{t.register}</button>
-          </>
-        )}
+  const renderLogin = () => {
+    const cardStyle = {
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: "'Segoe UI', sans-serif",
+    };
+    const boxStyle = {
+      background: 'rgba(255,255,255,0.06)',
+      backdropFilter: 'blur(16px)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: 24,
+      padding: '48px 40px',
+      width: 420,
+      boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+      color: '#fff',
+    };
+    const tabStyle = (active) => ({
+      flex: 1,
+      padding: '10px 0',
+      background: active ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'transparent',
+      border: 'none',
+      borderRadius: 10,
+      color: active ? '#fff' : 'rgba(255,255,255,0.5)',
+      fontWeight: active ? 700 : 400,
+      fontSize: 15,
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+    });
+    const inputStyle = {
+      width: '100%',
+      padding: '13px 16px',
+      background: 'rgba(255,255,255,0.08)',
+      border: '1px solid rgba(255,255,255,0.15)',
+      borderRadius: 12,
+      color: '#fff',
+      fontSize: 15,
+      outline: 'none',
+      boxSizing: 'border-box',
+      marginBottom: 14,
+    };
+    const labelStyle = {
+      display: 'block',
+      fontSize: 12,
+      color: 'rgba(255,255,255,0.55)',
+      marginBottom: 5,
+      marginTop: 2,
+      letterSpacing: '0.05em',
+      textTransform: 'uppercase',
+    };
+    const btnStyle = {
+      width: '100%',
+      padding: '14px',
+      background: 'linear-gradient(135deg, #667eea, #764ba2)',
+      border: 'none',
+      borderRadius: 12,
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: 700,
+      cursor: 'pointer',
+      marginTop: 8,
+      letterSpacing: '0.03em',
+      boxShadow: '0 4px 20px rgba(102,126,234,0.4)',
+    };
+
+    return (
+      <div style={cardStyle}>
+        <div style={boxStyle}>
+          {/* Logo */}
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{ fontSize: 42, marginBottom: 6 }}>🗳️</div>
+            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px' }}>SSI Blockchain Oylama</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
+              ZK-Email • EIP-712 • Anonim Kimlik
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 4, marginBottom: 28 }}>
+            <button style={tabStyle(!registerMode)} onClick={() => { setRegisterMode(false); setRegisterStep(0); setRegisterOtp(''); setError(''); setInfo(''); }}>
+              Giriş Yap
+            </button>
+            <button style={tabStyle(registerMode)} onClick={() => { setRegisterMode(true); setRegisterStep(0); setRegisterOtp(''); setError(''); setInfo(''); }}>
+              Kayıt Ol
+            </button>
+          </div>
+
+          {/* Fields */}
+          <div>
+            <label style={labelStyle}>Kullanıcı Adı</label>
+            <input
+              style={inputStyle}
+              type="text"
+              placeholder="kullanici_adi"
+              value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              onKeyDown={e => e.key === 'Enter' && (registerMode ? handleRegister() : handleLogin())}
+            />
+
+            {registerMode && registerStep === 0 && (
+              <>
+                <label style={labelStyle}>Kurumsal E-posta (ZK-Email için)</label>
+                <input
+                  style={{ ...inputStyle, borderColor: form.email ? 'rgba(102,126,234,0.6)' : 'rgba(255,255,255,0.15)' }}
+                  type="email"
+                  placeholder="ad.soyad@akdeniz.edu.tr"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && handleSendRegisterOtp()}
+                />
+              </>
+            )}
+
+            {registerMode && registerStep === 1 && (
+              <>
+                <label style={labelStyle}>E-posta: <span style={{ color: '#a5d6a7' }}>{form.email}</span></label>
+                <label style={labelStyle}>Doğrulama Kodu (OTP)</label>
+                <input
+                  style={{ ...inputStyle, letterSpacing: 6, fontSize: 22, textAlign: 'center', fontWeight: 700 }}
+                  type="text"
+                  placeholder="123456"
+                  maxLength={6}
+                  value={registerOtp}
+                  onChange={e => setRegisterOtp(e.target.value.replace(/\D/g, ''))}
+                  onKeyDown={e => e.key === 'Enter' && handleRegister()}
+                  autoFocus
+                />
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>📧 {form.email} adresine 6 haneli kod gönderildi</div>
+              </>
+            )}
+
+            {(!registerMode || registerStep === 0) && (
+              <>
+                <label style={labelStyle}>Şifre</label>
+                <input
+                  style={inputStyle}
+                  type="password"
+                  placeholder="••••••••"
+                  value={form.password}
+                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && (registerMode ? handleSendRegisterOtp() : handleLogin())}
+                />
+              </>
+            )}
+          </div>
+
+          {/* Error / Info */}
+          {error && (
+            <div style={{ background: 'rgba(244,67,54,0.15)', border: '1px solid rgba(244,67,54,0.35)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#ff8a80', marginBottom: 12 }}>
+              ⚠️ {error}
+            </div>
+          )}
+          {info && (
+            <div style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.35)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#a5d6a7', marginBottom: 12 }}>
+              ✅ {info}
+            </div>
+          )}
+
+          {/* Submit */}
+          {registerMode && registerStep === 1 && (
+            <button style={{ ...btnStyle, background: 'rgba(255,255,255,0.08)', marginBottom: 8 }}
+              onClick={() => { setRegisterStep(0); setRegisterOtp(''); setError(''); setInfo(''); }}>
+              ← Geri
+            </button>
+          )}
+          <button
+            style={btnStyle}
+            onClick={registerMode ? (registerStep === 0 ? handleSendRegisterOtp : handleRegister) : handleLogin}
+          >
+            {!registerMode ? 'Giriş Yap' : registerStep === 0 ? 'Kod Gönder →' : 'Hesabı Oluştur ✓'}
+          </button>
+
+          {/* ZK-Email info badge on register */}
+          {registerMode && (
+            <div style={{ marginTop: 18, padding: '12px 16px', background: 'rgba(102,126,234,0.1)', border: '1px solid rgba(102,126,234,0.25)', borderRadius: 12, fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
+              🔐 <strong style={{ color: 'rgba(255,255,255,0.8)' }}>ZK-Email oylama özelliği</strong> için kurumsal e-posta adresinizi girin. Oy kullanma ekranında OTP kodu ile kimliğinizi anonim olarak doğrulayacaksınız.
+            </div>
+          )}
+        </div>
       </div>
-      {error && <div style={{ color: 'red', marginTop: 10 }}>{error}</div>}
-      {info && <div style={{ color: 'green', marginTop: 10 }}>{info}</div>}
-    </div>
-  );
+    );
+  };
 
   const renderHistory = () => (
     <div>
@@ -352,8 +534,13 @@ function App() {
     } catch (err) {
       console.error('Logout error:', err);
     }
+    localStorage.removeItem('adminSession');
+    localStorage.removeItem('adminName');
     setUser(null);
     setSessionId('');
+    setForm({ name: '', password: '', email: '' });
+    setError('');
+    setInfo('');
     setCurrentPage('login');
   };
 
@@ -425,7 +612,7 @@ function App() {
       <button onClick={() => setCurrentPage('history')} style={{ marginTop: 20 }}>Oylama Geçmişi</button>
       {user?.role === 'admin' && (
         <button 
-          onClick={() => window.open('http://localhost:5000/admin/dashboard', '_blank')} 
+          onClick={() => window.open(`http://localhost:5000/admin/dashboard?session=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(user.name)}`, '_blank')} 
           style={{ marginTop: 20, background: '#667eea', color: 'white' }}
         >
           🗄️ Database Monitor (Admin)
@@ -530,7 +717,7 @@ function App() {
 
   // Main return for App
   return (
-    <div style={{ padding: 20 }}>
+    <div style={currentPage === 'login' ? {} : { padding: 20 }}>
       {currentPage === 'login' && renderLogin()}
       {currentPage === 'vote' && renderVotePage()}
       {currentPage === 'results' && renderResults()}

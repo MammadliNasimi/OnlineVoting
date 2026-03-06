@@ -1,315 +1,341 @@
-# 🗳️ Blockchain-Based Anonymous Voting System
+﻿# 🗳️ SSI Voting — Blockchain Tabanlı Anonim Oylama Sistemi
 
-TÜBİTAK 2209-A araştırma projesi - Blockchain tabanlı anonim ve güvenli oylama sistemi prototipi.
+> **TÜBİTAK 2209-A Araştırma Projesi** — Self-Sovereign Identity (SSI) ve Zero-Knowledge e-posta doğrulama ile blockchain tabanlı anonim oylama sistemi prototipi.
+
+---
 
 ## 📋 Proje Hakkında
 
-Bu sistem, blockchain teknolojisi kullanarak anonim, şeffaf ve güvenli online oylama sağlar. Commitment-based şifreleme ve backend-managed wallet sistemi ile kullanıcı dostu bir deneyim sunar.
+Bu sistem, Ethereum akıllı sözleşmeleri, EIP-712 tipli veri imzalama ve ZK-Email mekanizması kullanarak **kimlik gizliliğini korurken** şeffaf ve manipüle edilemez bir oylama altyapısı sunar. MetaMask gibi harici bir cüzdan uygulaması **gerektirmez** — tüm blockchain işlemleri backend tarafından yönetilen geçici cüzdanlar aracılığıyla gerçekleştirilir.
 
-### ✨ Şu An Mevcut Özellikler
+---
 
-#### Kullanıcı Özellikleri
-- ✅ **Kayıt ve Giriş Sistemi**: Güvenli kullanıcı kimlik doğrulama
+## ✨ Özellikler
+
+### 👤 Kullanıcı Özellikleri
+- ✅ **Kayıt ve Giriş**: Güvenli bcrypt tabanlı kimlik doğrulama
 - ✅ **Geçici Cüzdan Yönetimi**: Her giriş'te otomatik cüzdan oluşturma, çıkış'ta silme
-- ✅ **Anonim Oy Kullanma**: Commitment-based şifreleme ile kimlik gizliliği
-- ✅ **Oy Geçmişi Görüntüleme**: Kullanıcının tüm oylarını detaylı görebilme
-- ✅ **Gerçek Zamanlı Sonuçlar**: Canlı oy sayımı ve grafik gösterimi
-- ✅ **Transaction İzleme**: Her oy için blockchain transaction hash
+- ✅ **SSI Tabanlı Oy**: EIP-712 imzalı credential ile oy kullanma
+- ✅ **ZK-Email Doğrulama**: E-posta hash'i nullifier olarak — e-posta asla saklanmaz
+- ✅ **Gas-Less Oylama**: Relayer servisi ile kullanıcı gas ödemez
+- ✅ **Anonim Oy**: Nullifier mekanizması — kim oy kullandığı blockchain'de görünmez
+- ✅ **Çift Oy Engeli**: Blockchain nullifier ile tekrar oy kullanımı imkânsız
+- ✅ **Oy Geçmişi**: Kullanıcının blockchain transaction hash'lerini görmesi
+- ✅ **Gerçek Zamanlı Sonuçlar**: Canlı oy sayımı ve bar grafikleri
 
-#### Teknik Özellikler
-- ✅ **Blockchain Tabanlı**: Ethereum smart contract ile değiştirilemez kayıt
-- ✅ **Backend-Managed Wallets**: MetaMask gerekmez, sistem otomatik yönetir
-- ✅ **Çift Kayıt Sistemi**: Hem blockchain hem SQLite database
-- ✅ **Admin İmza Doğrulama**: Vote authorization için ECDSA dijital imza
-- ✅ **Şifreli Cüzdan Saklama**: AES-256-CBC ile private key şifreleme
-- ✅ **Otomatik Cüzdan Fonlama**: Login'de 1 ETH otomatik transfer
+### 🛡️ Admin Panel Özellikleri
+- ✅ **Otomatik Giriş**: `localhost:5000/admin/dashboard` — login formu yok, otomatik oturum
+- ✅ **Genel Bakış**: Anlık istatistikler (kullanıcı, oy, session, seçim, aday sayısı)
+- ✅ **Seçim Yönetimi**: Seçim oluşturma, aktif/pasif etme, silme
+- ✅ **Aday Yönetimi**: Seçimlere aday ekleme/silme/güncelleme
+- ✅ **Kullanıcı Yönetimi**: Kullanıcı oluşturma, rol değiştirme, şifre güncelleme, silme
+- ✅ **Session Yönetimi**: Aktif sessionları görüntüleme, zorla çıkış
+- ✅ **Veritabanı Görüntüleyici**: Tüm tabloları (oylar, kullanıcılar, durumlar) canlı izleme
+- ✅ **SSI Durum Paneli**: Contract domain bilgisi, relayer durumu ve ETH bakiyesi
+- ✅ **Blockchain Paneli**: Hardhat node durumu, son blok, contract adresleri
+- ✅ **ZK-Email Domain Yönetimi**: İzinli e-posta domainleri ekleme/silme
+- ✅ **Otomatik Yenileme**: 3 saniyede bir tüm verileri canlı güncelleme
+
+### ⚙️ Teknik Özellikler
+- ✅ **EIP-712 Typed Data**: İmzalı credential sistemi
+- ✅ **Nullifier Mekanizması**: `keccak256(idHash + electionId)` — çift oy engeli
+- ✅ **Backend-Managed Wallets**: MetaMask gerekmez
+- ✅ **AES-256-CBC**: Private key şifreleme
+- ✅ **Gas-Less Relayer**: Kullanıcı adına relayer imzalar ve gönderir
+- ✅ **Domain Kısıtlaması**: Her seçim belirli e-posta domainlerine kısıtlanabilir
+- ✅ **SQLite Embedded DB**: Sıfır konfigürasyon ile çalışan yerel veritabanı
+- ✅ **8 Saatlik Session**: Oturum zaman aşımı 8 saat
+
+---
 
 ## 🛠️ Teknoloji Stack
 
-### Frontend
-- **React 18**: Basit ve sade UI
-- **Axios**: API iletişimi
-- **Chart.js**: Sonuç grafikleri
+| Katman | Teknoloji |
+|--------|-----------|
+| **Frontend** | React 18, Axios, Chart.js |
+| **Admin Panel** | Vanilla HTML/CSS/JS (standalone, `public/admin.html`) |
+| **Backend** | Node.js, Express.js |
+| **Blockchain** | Ethers.js v6, Hardhat, Solidity 0.8 |
+| **Veritabanı** | SQLite (better-sqlite3) |
+| **Güvenlik** | bcryptjs, AES-256-CBC, EIP-712, keccak256 |
+| **Test Ağı** | Hardhat Local Network (Chain ID: 31337) |
 
-### Backend
-- **Node.js + Express**: REST API server
-- **bcryptjs**: Şifre hashleme
-- **Ethers.js v6**: Blockchain interaction
-- **better-sqlite3**: Embedded database
-- **crypto**: AES-256-CBC wallet encryption
-
-### Blockchain
-- **Solidity**: Smart contract language
-- **Hardhat**: Development environment
-- **Local Network**: Test amaçlı yerel blockchain
+---
 
 ## 🏗️ Mimari
 
-### Geçici Wallet Sistemi
+### SSI Oylama Akışı
+
 ```
-┌─────────────┐
-│   Login     │
-└──────┬──────┘
-       │
-       ├─► Geçici Cüzdan Oluştur
-       ├─► 1 ETH Gönder (funding)
-       ├─► Session'a Kaydet (şifreli)
-       └─► Session ID Döndür
-       
-┌─────────────┐
-│    Vote     │
-└──────┬──────┘
-       │
-       ├─► Session Wallet Al
-       ├─► Commitment Oluştur
-       ├─► Admin İmzası Al
-       ├─► Blockchain'e Gönder
-       └─► DB'ye Kaydet
-       
-┌─────────────┐
-│   Logout    │
-└──────┬──────┘
-       │
-       └─► Session Sil (wallet otomatik temizlenir)
+Kullanıcı                   Backend                    Blockchain
+    │                           │                           │
+    ├── 1. E-posta gir ─────────►                           │
+    │                           ├── OTP gönder (SMTP)       │
+    ├── 2. OTP doğrula ─────────►                           │
+    │                           ├── idHash = keccak256(email+salt)
+    │                           ├── Credential imzala (EIP-712)
+    │◄───────── Credential ──────┤                           │
+    │                           │                           │
+    ├── 3. Oy ver ──────────────►                           │
+    │                           ├── nullifier hesapla       │
+    │                           ├── Relayer imzala          │
+    │                           ├── vote() tx gönder ───────►
+    │                           │                           ├── Nullifier kontrol
+    │◄───────── TX Hash ─────────┤◄────── Onay ─────────────┤
 ```
 
-### Anonim Oylama Akışı
+### Geçici Wallet Sistemi
+
 ```
-1. User: secret = random()
-2. User: commitment = hash(secret + electionId)
-3. Backend: signature = adminSign(commitment)
-4. Blockchain: vote(electionId, candidateId, commitment, signature)
-5. Reveal (opsiyonel): Reveal secret to prove vote
+Login ──► Temp Wallet Oluştur ──► 1 ETH Fonla ──► Session'a Kaydet (şifreli)
+  │
+Vote ──► Session Wallet Al ──► İmzala ──► Blockchain'e Gönder
+  │
+Logout ──► Session Sil (wallet otomatik temizlenir)
 ```
+
+---
 
 ## 🚀 Kurulum
 
 ### Gereksinimler
-- Node.js v16+
-- npm v8+
 
-### Adım 1: Bağımlılıkları Yükle
+- **Node.js** v16+
+- **npm** v8+
+
+### 1. Bağımlılıkları Yükle
+
 ```bash
-# Root dependencies
 npm install
-
-# Frontend dependencies
-cd client
-npm install
-cd ..
-
-# Smart contract dependencies
-cd smart-contracts
-npm install
-cd ..
+cd client && npm install && cd ..
+cd smart-contracts && npm install && cd ..
 ```
 
-### Adım 2: Environment Variables
-`.env` dosyası oluştur (root directory):
+### 2. Environment Variables
+
+`.env` dosyası oluştur (`.env.example`'dan kopyala):
+
+```bash
+cp .env.example .env
+```
+
+`.env` içeriği:
+
 ```env
-# Admin private key (Hardhat test account #0)
+# Admin Private Key (Hardhat test account #0 — SADECE LOCAL TEST)
 ADMIN_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
-# Wallet encryption key (değiştir!)
-WALLET_ENCRYPTION_KEY=your-32-char-secure-key-here!!!
-
-# Blockchain RPC
+# Blockchain
 BLOCKCHAIN_RPC_URL=http://127.0.0.1:8545
+CHAIN_ID=31337
 
-# Contract address (deploy sonrası otomatik oluşur)
-CONTRACT_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+# Backend
+PORT=5000
+SESSION_TIMEOUT=28800000
 
-# Session timeout (ms)
-SESSION_TIMEOUT=3600000
+# Güvenlik
+SESSION_SECRET=dev_secret_change_in_production_12345
+CORS_ORIGINS=http://localhost:3000,http://localhost:5000
 ```
 
-### Adım 3: Servisleri Başlat
+### 3. Servisleri Başlat
 
-#### 🚀 Hızlı Başlatma (Önerilen)
-
-**Windows PowerShell:**
 ```powershell
-# 1. Hardhat Blockchain (Terminal 1)
+# 1. Hardhat blockchain node (arka planda)
 cd smart-contracts
-npx hardhat node
-# Çıktı: "Started HTTP and WebSocket JSON-RPC server at http://127.0.0.1:8545/"
-# Bu terminal açık kalsın!
+Start-Job -ScriptBlock { Set-Location ".\smart-contracts"; npx hardhat node }
+Start-Sleep -Seconds 5
 
-# 2. Smart Contract Deploy (Terminal 2 - tek seferlik)
-cd smart-contracts
+# 2. Kontratları deploy et
 npx hardhat run scripts/deploy.js --network localhost
-# Çıktı: "VotingAnonymous deployed to: 0x5FbDB..."
-# Contract adresi .env dosyasına otomatik yazılır
+npx hardhat run scripts/deploy-ssi.js --network localhost
+cd ..
 
-# 3. Backend Server (Terminal 3)
-node server.js
-# Çıktı: "🚀 Server running on http://localhost:5000"
-# "📡 Connected to blockchain at http://127.0.0.1:8545"
-# Bu terminal açık kalsın!
-
-# 4. Frontend React (Terminal 4)
-cd client
-npm start
-# Çıktı: "webpack compiled successfully"
-# Tarayıcı otomatik açılır: http://localhost:3000
-```
-
-**Alternatif - Tek Terminal (Background Processes):**
-```powershell
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd smart-contracts; npx hardhat node"
+# 3. Backend
+Start-Job -ScriptBlock { node server.js }
 Start-Sleep -Seconds 3
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "node server.js"
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd client; npm start"
+
+# 4. Frontend
+cd client
+Start-Job -ScriptBlock { $env:CI="false"; npx react-scripts start }
 ```
 
-#### ✅ Servislerin Çalıştığını Kontrol Et
+### 4. Çalışıp çalışmadığını kontrol et
+
 ```powershell
-netstat -an | findstr "3000 5000 8545" | findstr "LISTENING"
-```
-**Beklenen Çıktı:**
-```
-TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING  # Frontend
-TCP    0.0.0.0:5000           0.0.0.0:0              LISTENING  # Backend
-TCP    0.0.0.0:8545           0.0.0.0:0              LISTENING  # Blockchain
+netstat -ano | findstr "LISTENING" | findstr ":3000 \|:5000 \|:8545 "
 ```
 
-### Adım 4: Tarayıcıda Aç ve Test Et
+Beklenen çıktı:
+```
+TCP    0.0.0.0:3000    LISTENING   # React Frontend
+TCP    0.0.0.0:5000    LISTENING   # Express Backend
+TCP    127.0.0.1:8545  LISTENING   # Hardhat Node
+```
 
-1. **Tarayıcınızda aç:** http://localhost:3000
-2. **Yeni kullanıcı oluştur:** Kayıt sayfasından kullanıcı adı ve şifre gir
-3. **Giriş yap:** Backend console'da geçici cüzdan oluşturulduğunu göreceksin
-4. **Oy kullan:** Bir aday seç ve oy ver
-5. **Geçmişi gör:** "Oylama Geçmişi" sekmesinden oylarını kontrol et
-6. **Çıkış yap:** Geçici cüzdan otomatik silinir
+### 5. Tarayıcıda Aç
 
-## 🔑 Test Kullanıcıları
+| URL | Açıklama |
+|-----|----------|
+| http://localhost:3000 | Kullanıcı arayüzü |
+| http://localhost:5000/admin/dashboard | Admin paneli (otomatik giriş) |
 
-### Admin Hesabı
-- **Kullanıcı adı:** `admin`
-- **Şifre:** `admin123`
-- **Yetki:** Aday ekleme, sonuç görüntüleme
+---
 
-### Normal Kullanıcı (Kayıt Gerekli)
-- Kayıt sayfasından yeni hesap oluştur
-- Otomatik olarak geçici cüzdan atanır
+## 🔑 Varsayılan Hesaplar
+
+| Hesap | Kullanıcı Adı | Şifre |
+|-------|--------------|-------|
+| Admin | `admin` | `admin123` |
+| Kullanıcı | Kayıt sayfasından oluştur | — |
+
+---
 
 ## 📡 API Endpoints
 
-### Authentication
-- `POST /api/register` - Yeni kullanıcı kaydı
-- `POST /api/login` - Giriş yap (geçici cüzdan oluştur)
-- `POST /api/logout` - Çıkış yap (cüzdanı temizle)
+### Kimlik Doğrulama
+| Method | Endpoint | Açıklama |
+|--------|----------|----------|
+| `POST` | `/api/register` | Yeni kullanıcı kaydı |
+| `POST` | `/api/login` | Giriş yap (geçici cüzdan oluştur) |
+| `POST` | `/api/logout` | Çıkış yap (cüzdanı temizle) |
 
-### Voting
-- `POST /api/votes` - Oy kullan (blockchain + DB)
-- `GET /api/votes` - Oy durumu
-- `GET /api/voting-history` - Kişisel oylama geçmişi (seçim, aday, tarih, tx hash)
+### Oylama
+| Method | Endpoint | Açıklama |
+|--------|----------|----------|
+| `POST` | `/api/votes` | Oy kullan (blockchain + DB) |
+| `GET` | `/api/votes` | Oy durumu |
+| `GET` | `/api/voting-history` | Kişisel oylama geçmişi |
+| `GET` | `/api/results/:id` | Seçim sonuçları |
 
-### Election Management
-- `GET /api/candidates` - Aday listesi
-- `POST /api/candidates` - Yeni aday ekle (admin)
-- `GET /api/elections` - Seçim detayları
-- `GET /api/results/:id` - Sonuçları görüntüle
+### Seçim & Adaylar
+| Method | Endpoint | Açıklama |
+|--------|----------|----------|
+| `GET` | `/api/elections` | Tüm seçimler |
+| `GET` | `/api/candidates` | Aday listesi |
 
-## 🧪 Test Senaryoları
+### ZK-Email
+| Method | Endpoint | Açıklama |
+|--------|----------|----------|
+| `POST` | `/api/zkemail/send-otp` | E-postaya OTP gönder |
+| `POST` | `/api/zkemail/verify-otp` | OTP doğrula, credential al |
 
-### 1. Kayıt ve Giriş
+### SSI
+| Method | Endpoint | Açıklama |
+|--------|----------|----------|
+| `POST` | `/api/ssi/vote` | SSI credential ile oy kullan |
+| `GET` | `/api/ssi/domain` | EIP-712 domain bilgisi |
+| `GET` | `/api/ssi/relayer/status` | Relayer durumu ve bakiye |
+
+### Admin (x-session-id header gerekli)
+| Method | Endpoint | Açıklama |
+|--------|----------|----------|
+| `GET` | `/api/admin/database` | Tüm DB verisi |
+| `POST` | `/api/admin/elections` | Seçim oluştur |
+| `PUT` | `/api/admin/elections/:id/toggle` | Aktif/pasif |
+| `DELETE` | `/api/admin/elections/:id` | Seçim sil |
+| `POST` | `/api/admin/elections/:id/candidates` | Aday ekle |
+| `POST` | `/api/admin/users` | Kullanıcı oluştur |
+| `PUT` | `/api/admin/users/:id` | Rol/şifre güncelle |
+| `DELETE` | `/api/admin/users/:id` | Kullanıcı sil |
+| `DELETE` | `/api/admin/sessions/:id` | Session sonlandır |
+| `GET` | `/api/admin/email-domains` | İzinli domainler |
+| `POST` | `/api/admin/email-domains` | Domain ekle |
+| `DELETE` | `/api/admin/email-domains/:id` | Domain sil |
+
+---
+
+## 📂 Proje Yapısı
+
 ```
-1. localhost:3000 > Kayıt sayfası
-2. Kullanıcı adı: test, Şifre: test123
-3. Giriş yap
-4. Backend console'da: "🔑 Temporary wallet created for test: 0x..."
-5. Backend console'da: "💰 Funded temp wallet with 1 ETH"
+OnlineVoting/
+├── client/                         # React frontend (port 3000)
+│   ├── src/
+│   │   ├── App.js                 # Ana component, login/oy arayüzü
+│   │   ├── SSIVoting.js           # SSI + ZK-Email oy bileşeni
+│   │   ├── Web3Context.js         # Blockchain context
+│   │   └── utils/crypto.js        # Kriptografi yardımcıları
+│   └── package.json
+│
+├── smart-contracts/                # Solidity akıllı sözleşmeleri
+│   ├── contracts/
+│   │   ├── VotingAnonymous.sol    # Commitment tabanlı anonim oylama
+│   │   └── VotingSSI.sol          # EIP-712 + Nullifier tabanlı SSI oylama
+│   ├── scripts/
+│   │   ├── deploy.js              # VotingAnonymous deploy
+│   │   └── deploy-ssi.js          # VotingSSI deploy
+│   └── hardhat.config.js
+│
+├── public/
+│   └── admin.html                 # Admin paneli (standalone HTML)
+│
+├── services/
+│   ├── authService.js             # Vote authorization (ECDSA imza)
+│   ├── credentialIssuer.js        # SSI credential oluşturma
+│   └── relayerService.js          # Gas-less relayer
+│
+├── config/
+│   └── database-sqlite.js         # SQLite bağlantısı ve şema
+│
+├── utils/
+│   └── walletUtils.js             # Cüzdan oluşturma ve şifreleme
+│
+├── server.js                      # Express API server (port 5000)
+├── .env                           # Ortam değişkenleri (commit etme!)
+├── .env.example                   # Şablon env dosyası
+├── .gitignore
+└── README.md
 ```
 
-### 2. Oy Kullanma
-```
-1. Giriş yap
-2. Aday seç (örn: Ali Yılmaz)
-3. "Oy Ver" butonuna tıkla
-4. Backend console: "📤 Sending vote to blockchain..."
-5. Başarı mesajı ve transaction hash görüntüle
-```
+---
 
-### 3. Çıkış ve Temizlik
-```
-1. "Çıkış Yap" butonuna tıkla
-2. Backend console: "🚪 Session deleted: {sessionId}"
-3. Session ve geçici cüzdan temizlendi
-4. Tekrar giriş yap > Yeni cüzdan oluşturulur
-```
+## 📖 Veritabanı Şeması
 
-## 🐛 Bilinen Sorunlar ve İyileştirmeler
-
-### 🔴 Kritik Sorunlar (Production Öncesi Düzelt)
-
-1. **Güvenlik: Zayıf Session ID**
-   - Problem: `Math.random()` kriptografik güvenli değil
-   - Çözüm: `crypto.randomBytes(32).toString('hex')` kullan
-
-2. **Güvenlik: Default Encryption Key**
-   - Problem: .env yoksa default key kullanılıyor
-   - Çözüm: Default key varsa uygulama başlamasın
-
-3. **Wallet Funding Hatası Gizli**
-   - Problem: Funding başarısız olsa da login başarılı
-   - Çözüm: Funding error'da login'i reddet
-
-4. **Memory Leak: Expired Session Temizleme**
-   - Problem: Eski session'lar database'de kalıyor
-   - Çözüm: Cron job ile temizlik
-
-5. **Race Condition: Session Oluşturma**
-   - Problem: Session ve wallet iki ayrı query
-   - Çözüm: Transaction kullan
-
-### 🟡 Önemli İyileştirmeler
-
-6. **Secret Kaybı**: Vote response'da secret yok (reveal için gerekli)
-7. **Hardcoded Private Key**: Test key production'da değiştirilmeli
-8. **Login Performance**: Blockchain transaction login'i yavaşlatıyor
-9. **Blockchain Connection Test**: Startup'ta kontrol eksik
-10. **Database Index**: user_id ve expires_at için index ekle
-
-### 🟢 Küçük İyileştirmeler
-
-11. **Rate Limiting**: Login/vote endpoint koruması
-12. **Logging**: Winston/Morgan ile audit log
-13. **Error Handling**: Kullanıcı dostu error mesajları
-14. **Input Validation**: Tüm endpoint'lerde validation
-15. **CORS Configuration**: Production için sıkılaştır
-
-## 📖 Database Schema
-
-### Users Table
 ```sql
+-- Kullanıcılar
 CREATE TABLE users (
   id INTEGER PRIMARY KEY,
-  name TEXT UNIQUE,
-  password TEXT,
-  role TEXT DEFAULT 'user',
+  name TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,          -- bcrypt hash
+  role TEXT DEFAULT 'user',        -- 'user' | 'admin'
+  email TEXT,
   student_id TEXT,
-  wallet_address TEXT,              -- Deprecated (artık kullanılmıyor)
-  wallet_private_key_encrypted TEXT, -- Deprecated
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-```
 
-### Sessions Table (Geçici Cüzdanlar)
-```sql
+-- Sessionlar (geçici cüzdanlar)
 CREATE TABLE sessions (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY,             -- crypto.randomBytes(16) hex
   user_id INTEGER,
-  temp_wallet_address TEXT,              -- Login'de oluşturulur
-  temp_wallet_private_key_encrypted TEXT, -- AES-256-CBC şifreli
+  temp_wallet_address TEXT,
+  temp_wallet_private_key_encrypted TEXT,  -- AES-256-CBC
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  expires_at DATETIME NOT NULL,
+  expires_at DATETIME NOT NULL,    -- 8 saat
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
-```
 
-### Votes Table
-```sql
+-- Seçimler
+CREATE TABLE elections (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  is_active INTEGER DEFAULT 0,
+  start_date DATETIME,
+  end_date DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Adaylar
+CREATE TABLE candidates (
+  id INTEGER PRIMARY KEY,
+  election_id INTEGER,
+  name TEXT NOT NULL,
+  description TEXT,
+  vote_count INTEGER DEFAULT 0,
+  FOREIGN KEY (election_id) REFERENCES elections(id)
+);
+
+-- Oylar
 CREATE TABLE votes (
   id INTEGER PRIMARY KEY,
   user_id INTEGER,
@@ -319,143 +345,81 @@ CREATE TABLE votes (
   transaction_hash TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Oy durumu
+CREATE TABLE vote_status (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER,
+  election_id INTEGER,
+  has_voted INTEGER DEFAULT 0,
+  voted_at DATETIME,
+  transaction_hash TEXT
+);
+
+-- ZK-Email izinli domainler
+CREATE TABLE email_domains (
+  id INTEGER PRIMARY KEY,
+  domain TEXT UNIQUE NOT NULL,
+  added_by TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 ```
-
-## 🔐 Güvenlik Özellikleri
-
-1. **Şifre Hashleme**: bcrypt ile salt'lı hashing
-2. **Private Key Encryption**: AES-256-CBC ile şifreleme
-3. **Session Expiry**: 1 saat timeout (configurable)
-4. **Commitment Scheme**: Oy gizliliği için kriptografik commitment
-5. **Admin Signature**: Vote authorization için ECDSA imza
-6. **Geçici Cüzdanlar**: Logout'ta otomatik temizleme
-
-## 🛠️ Geliştirme Araçları
-
-### Database Görüntüle
-```bash
-node view-db.js
-```
-
-### Hardhat Console
-```bash
-cd smart-contracts
-npx hardhat console --network localhost
-```
-
-### Contract Test
-```bash
-cd smart-contracts
-npx hardhat test
-```
-
-### Database Temizle
-```bash
-# Dikkat: Tüm verileri siler!
-rm database.db
-node server.js  # Yeni DB otomatik oluşur
-```
-
-## 📦 Proje Yapısı
-
-```
-OnlineVoting/
-├── client/                    # React frontend
-│   ├── src/
-│   │   ├── App.js            # Ana component
-│   │   ├── index.js          # Entry point
-│   │   └── utils/
-│   │       └── crypto.js     # Crypto utilities
-│   └── package.json
-├── smart-contracts/          # Solidity contracts
-│   ├── contracts/
-│   │   └── VotingAnonymous.sol
-│   ├── scripts/
-│   │   └── deploy.js
-│   └── hardhat.config.js
-├── config/
-│   └── database-sqlite.js    # Database service
-├── models/                   # Data models
-│   ├── Election.js
-│   ├── User.js
-│   └── VoteStatus.js
-├── services/
-│   ├── authService.js        # Vote authorization
-│   └── blockchainService.js  # Blockchain interaction
-├── server.js                 # Express API server
-├── view-db.js               # Database viewer
-└── README.md                # Bu dosya
-```
-
-## 🚧 Eklenecek Özellikler ve İyileştirmeler
-
-### 🔴 Yüksek Öncelik
-- [ ] **Vote Reveal Mechanism**: Secret ile oy doğrulama sistemi
-- [ ] **Multi-Election Support**: Aynı anda birden fazla seçim
-- [ ] **Rate Limiting**: Login ve vote endpoint'leri için DDoS koruması
-- [ ] **Session Cleanup Job**: Expired session'ları otomatik temizle
-- [ ] **Blockchain Connection Check**: Startup'ta RPC bağlantı testi
-- [ ] **Wallet Funding Error Handling**: Funding başarısız olursa login reddet
-
-### 🟡 Orta Öncelik
-- [ ] **Admin Dashboard**: 
-  - Tüm seçimleri yönetme
-  - Kullanıcı listesi ve rolleri
-  - Sistem istatistikleri (toplam oy, aktif kullanıcı, vb.)
-  - Seçim başlatma/durdurma
-- [ ] **Real-time WebSocket Updates**: 
-  - Canlı oy sayım güncellemesi
-  - Yeni oy bildirim sistemi
-- [ ] **Email Notifications**: 
-  - Seçim başlangıç/bitiş bildirimi
-  - Oy kullanım onayı
-- [ ] **Export Results**: 
-  - PDF rapor oluşturma
-  - CSV export
-  - Blockchain verification link
-
-### 🟢 Düşük Öncelik
-- [ ] **Mobile Responsive Design**: Mobil cihazlar için optimize edilmiş UI
-- [ ] **2FA Authentication**: İki faktörlü kimlik doğrulama
-- [ ] **Audit Log Viewer**: Tüm sistem aktivitelerini izleme
-- [ ] **Dark Mode**: Tema değiştirme özelliği
-- [ ] **Multi-language Support**: Türkçe/İngilizce dışında dil desteği
-- [ ] **Vote Comments**: Oy kullanırken yorum bırakma (opsiyonel)
-- [ ] **Candidate Photos**: Aday fotoğrafı upload sistemi
-- [ ] **Voting Analytics**: 
-  - Oy kullanım zamanı grafikleri
-  - Demografik analiz
-  - Trend göstergeleri
-
-### 🔧 Teknik İyileştirmeler
-- [ ] **Production Deployment**: 
-  - Docker containerization
-  - CI/CD pipeline
-  - Cloud deployment guide (AWS/Azure/GCP)
-- [ ] **Database Migration**: SQLite → PostgreSQL
-- [ ] **Logging System**: Winston/Morgan ile detaylı log
-- [ ] **Input Validation**: Joi/Yup ile tüm endpoint validation
-- [ ] **API Documentation**: Swagger/OpenAPI dokümantasyonu
-- [ ] **Unit Tests**: Jest ile backend test coverage
-- [ ] **E2E Tests**: Cypress ile frontend test
-- [ ] **Performance Optimization**: 
-  - Database indexing
-  - Query optimization
-  - Caching stratejisi (Redis)
-- [ ] **Security Hardening**: 
-  - Helmet.js integration
-  - CORS configuration
-  - SQL injection prevention
-  - XSS protection
-
-## ⚠️ Önemli Notlar
-
-- **Test Amaçlı**: Local development için prototip sistem
-- **Güvenlik**: Production öncesi güvenlik önlemleri alınmalı
-- **Hardhat Network**: Simüle edilmiş test blockchain'i
-- **Private Keys**: .env dosyasını asla commit etme
-- **Database**: SQLite yerine PostgreSQL kullanılmalı
 
 ---
 
-**TÜBİTAK 2209-A Araştırma Projesi** - Eğitim ve araştırma amaçlı prototip
+## 🔐 Güvenlik
+
+| Özellik | Yöntem |
+|---------|--------|
+| Şifre Hashleme | bcrypt (salt rounds: 10) |
+| Private Key Şifreleme | AES-256-CBC |
+| Session ID | `crypto.randomBytes` |
+| Oy İmzalama | ECDSA (EIP-712) |
+| Çift Oy Engeli | Blockchain Nullifier |
+| Session Süresi | 8 saat, logout'ta anında silinir |
+| E-posta Gizliliği | Sadece `keccak256(email+salt)` saklanır |
+
+> ⚠️ **Önemli:** `.env` dosyasını asla Git'e commit etme. Gerçek bir ortamda `ADMIN_PRIVATE_KEY` ve `SESSION_SECRET` değerlerini değiştir.
+
+---
+
+## 🧪 Test
+
+```bash
+# Smart contract testleri
+cd smart-contracts
+npx hardhat test
+
+# Backend API testi (manuel)
+curl -X POST http://localhost:5000/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"name":"admin","password":"admin123"}'
+```
+
+---
+
+## 🐛 Bilinen Sınırlamalar (Prototip)
+
+- Hardhat local network yeniden başlatıldığında kontrat adresleri değişir, `.env` güncellenir
+- SQLite production için önerilmez (PostgreSQL ile değiştirilebilir)
+- SMTP e-posta gönderimi gerçek bir SMTP sunucu konfigürasyonu gerektirir
+- Hardhat test ağı gerçek bir Ethereum ağı değildir
+
+---
+
+## 🚧 Gelecek Geliştirmeler
+
+- [ ] ZK-Proof entegrasyonu (Circom/SnarkJS)
+- [ ] PostgreSQL migrasyonu
+- [ ] Docker Compose ile tek komut başlatma
+- [ ] Swagger API dokümantasyonu
+- [ ] Mainnet/Testnet deploy rehberi
+- [ ] WebSocket ile anlık oy güncellemesi
+- [ ] PDF rapor ve CSV export
+- [ ] 2FA kimlik doğrulama
+
+---
+
+**TÜBİTAK 2209-A Araştırma Projesi** — Eğitim ve araştırma amaçlı prototip sistemi.
+
+

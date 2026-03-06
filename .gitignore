@@ -3,38 +3,42 @@ node_modules/
 client/node_modules/
 smart-contracts/node_modules/
 
-# Environment variables
+# Environment variables (sensitive!)
 .env
 
 # Database
 database.db
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
 # Runtime data
-pids
+pids/
 *.pid
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+# Coverage
 coverage/
+.nyc_output/
 
 # Build outputs
 client/build/
 smart-contracts/artifacts/
 smart-contracts/cache/
-
-# Hardhat
 smart-contracts/typechain/
 smart-contracts/typechain-types/
+
+# Hardhat
+smart-contracts/cache/solidity-files-cache*.json
 
 # OS generated files
 .DS_Store
@@ -51,3 +55,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Temp
+tmp/
+temp/
