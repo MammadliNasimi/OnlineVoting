@@ -23,6 +23,16 @@ const { ethers } = require('ethers');
 const path = require('path');
 const fs = require('fs');
 
+// EIP-712 types for VoteProof — single source of truth (shared with credentialIssuer)
+const VOTE_PROOF_TYPES = {
+    VoteProof: [
+        { name: 'emailHash', type: 'bytes32' },
+        { name: 'electionID', type: 'uint256' },
+        { name: 'candidateID', type: 'uint256' },
+        { name: 'timestamp', type: 'uint256' }
+    ]
+};
+
 class RelayerService {
     constructor(relayerPrivateKey, contractAddress, rpcUrl = 'http://127.0.0.1:8545') {
         // Initialize relayer wallet
@@ -106,14 +116,7 @@ class RelayerService {
             };
             
             // EIP-712 types
-            const types = {
-                VoteProof: [
-                    { name: 'emailHash', type: 'bytes32' },
-                    { name: 'electionID', type: 'uint256' },
-                    { name: 'candidateID', type: 'uint256' },
-                    { name: 'timestamp', type: 'uint256' }
-                ]
-            };
+            const types = VOTE_PROOF_TYPES;
             
             // Prepare data for verification
             const voteProof = {

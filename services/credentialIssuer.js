@@ -15,6 +15,16 @@
 const { ethers } = require('ethers');
 const crypto = require('crypto');
 
+// EIP-712 types for VoteProof — single source of truth (shared with relayerService)
+const VOTE_PROOF_TYPES = {
+    VoteProof: [
+        { name: 'emailHash', type: 'bytes32' },
+        { name: 'electionID', type: 'uint256' },
+        { name: 'candidateID', type: 'uint256' },
+        { name: 'timestamp', type: 'uint256' }
+    ]
+};
+
 class CredentialIssuer {
     constructor(issuerPrivateKey, contractAddress, chainId = 31337) {
         // Initialize issuer wallet
@@ -31,14 +41,7 @@ class CredentialIssuer {
         };
         
         // EIP-712 Types for VoteProof (ZK-Email model)
-        this.types = {
-            VoteProof: [
-                { name: 'emailHash', type: 'bytes32' },
-                { name: 'electionID', type: 'uint256' },
-                { name: 'candidateID', type: 'uint256' },
-                { name: 'timestamp', type: 'uint256' }
-            ]
-        };
+        this.types = VOTE_PROOF_TYPES;
         
         console.log('✅ Credential Issuer initialized');
         console.log('   Issuer Address:', this.issuerWallet.address);

@@ -6,9 +6,9 @@ import { ethers } from 'ethers';
  * SSI + ZK-Email Voting Component
  * 
  * ZK-Email Flow:
- * 0. User enters e-mail → backend checks domain whitelist → sends OTP
- * 1. User enters OTP → backend verifies → issues EIP-712 credential (email hash = nullifier)
- * 2. User selects candidate → credential already in hand
+ * 0. User enters e-mail â†’ backend checks domain whitelist â†’ sends OTP
+ * 1. User enters OTP â†’ backend verifies â†’ issues EIP-712 credential (email hash = nullifier)
+ * 2. User selects candidate â†’ credential already in hand
  * 3. Submit via Relayer (gas-less) or MetaMask
  *
  * Privacy guarantee: raw email is NEVER stored on-chain. Only keccak256(email+salt) is used.
@@ -76,7 +76,7 @@ function SSIVoting({ user, sessionId, onLogout }) {
     }
   };
 
-  // ── STEP 0: Send OTP to email ──────────────────────────────────────────────
+  // â”€â”€ STEP 0: Send OTP to email â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const sendOtp = async () => {
     setLoading(true); setError(''); setSuccess('');
     try {
@@ -89,15 +89,15 @@ function SSIVoting({ user, sessionId, onLogout }) {
       setSuccess(res.data.message);
       setStep(1);
     } catch (err) {
-      setError(err.response?.data?.message || 'OTP gönderilemedi');
+      setError(err.response?.data?.message || 'OTP gÃ¶nderilemedi');
     } finally {
       setLoading(false);
     }
   };
 
-  // ── STEP 1: Verify OTP + issue credential ──────────────────────────────────
+  // â”€â”€ STEP 1: Verify OTP + issue credential â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const verifyOtpAndGetCredential = async () => {
-    if (!selectedCandidate) { setError('Lütfen önce aday seçin'); return; }
+    if (!selectedCandidate) { setError('LÃ¼tfen Ã¶nce aday seÃ§in'); return; }
     setLoading(true); setError(''); setSuccess('');
     try {
       const res = await axios.post(
@@ -111,16 +111,16 @@ function SSIVoting({ user, sessionId, onLogout }) {
         { headers: { 'x-session-id': sessionId } }
       );
       setCredential(res.data.credential);
-      setSuccess('✅ E-posta doğrulandı! Credential hazır.');
+      setSuccess('âœ… E-posta doÄŸrulandÄ±! Credential hazÄ±r.');
       setStep(3);
     } catch (err) {
-      setError(err.response?.data?.message || 'OTP doğrulanamadı');
+      setError(err.response?.data?.message || 'OTP doÄŸrulanamadÄ±');
     } finally {
       setLoading(false);
     }
   };
 
-  // ── STEP 3B: Submit via Relayer ────────────────────────────────────────────
+  // â”€â”€ STEP 3B: Submit via Relayer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const submitViaRelayer = async () => {
     setLoading(true); setError(''); setSuccess('');
     try {
@@ -130,20 +130,20 @@ function SSIVoting({ user, sessionId, onLogout }) {
         { headers: { 'x-session-id': sessionId } }
       );
       setTxHash(response.data.txHash);
-      setSuccess(`✅ Oy relayer ile gönderildi!`);
+      setSuccess(`âœ… Oy relayer ile gÃ¶nderildi!`);
       setStep(4);
     } catch (err) {
-      setError(err.response?.data?.message || 'Relayer hatası');
+      setError(err.response?.data?.message || 'Relayer hatasÄ±');
     } finally {
       setLoading(false);
     }
   };
 
-  // ── STEP 3A: Submit via MetaMask ───────────────────────────────────────────
+  // â”€â”€ STEP 3A: Submit via MetaMask â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const submitDirectTransaction = async () => {
     setLoading(true); setError(''); setSuccess('');
     try {
-      if (!window.ethereum) throw new Error('MetaMask kurulu değil');
+      if (!window.ethereum) throw new Error('MetaMask kurulu deÄŸil');
       const provider = new ethers.BrowserProvider(window.ethereum);
       await provider.send('eth_requestAccounts', []);
       const signer = await provider.getSigner();
@@ -161,10 +161,10 @@ function SSIVoting({ user, sessionId, onLogout }) {
       const tx = await contract.vote(voteProof);
       await tx.wait();
       setTxHash(tx.hash);
-      setSuccess(`✅ Oy kaydedildi! TX: ${tx.hash.slice(0, 10)}...`);
+      setSuccess(`âœ… Oy kaydedildi! TX: ${tx.hash.slice(0, 10)}...`);
       setStep(4);
     } catch (err) {
-      setError(`İşlem başarısız: ${err.message}`);
+      setError(`Ä°ÅŸlem baÅŸarÄ±sÄ±z: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -175,7 +175,7 @@ function SSIVoting({ user, sessionId, onLogout }) {
     setTxHash(''); setError(''); setSuccess(''); setOtp(''); setDevOtp('');
   };
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const cardStyle = { padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '16px' };
 
   const btnStyle = (color) => ({
@@ -188,23 +188,23 @@ function SSIVoting({ user, sessionId, onLogout }) {
     borderRadius: '6px', fontSize: '14px', marginTop: '6px', boxSizing: 'border-box'
   };
 
-  // ── Steps indicator ────────────────────────────────────────────────────────
+  // â”€â”€ Steps indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const steps = [
-    { icon: '📧', label: 'E-posta' },
-    { icon: '🔑', label: 'OTP + Aday' },
-    { icon: '🚀', label: 'Gönder' },
-    { icon: '✅', label: 'Tamam' }
+    { icon: 'ðŸ“§', label: 'E-posta' },
+    { icon: 'ðŸ”‘', label: 'OTP + Aday' },
+    { icon: 'ðŸš€', label: 'GÃ¶nder' },
+    { icon: 'âœ…', label: 'Tamam' }
   ];
 
   return (
     <div style={{ padding: '20px', maxWidth: '700px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>🔐 ZK-Email SSI Oylama</h2>
-        <button onClick={onLogout} style={{ padding: '8px 16px', cursor: 'pointer' }}>Çıkış</button>
+        <h2>ðŸ” ZK-Email SSI Oylama</h2>
+        <button onClick={onLogout} style={{ padding: '8px 16px', cursor: 'pointer' }}>Ã‡Ä±kÄ±ÅŸ</button>
       </div>
 
       <div style={{ marginBottom: '16px', padding: '12px', background: '#f0f0f0', borderRadius: '8px' }}>
-        <strong>{user.name}</strong> — {user.role}
+        <strong>{user.name}</strong> â€” {user.role}
       </div>
 
       {/* Progress Steps */}
@@ -217,18 +217,18 @@ function SSIVoting({ user, sessionId, onLogout }) {
         ))}
       </div>
 
-      {error && <div style={{ padding: '12px', background: '#fee', border: '1px solid #fcc', borderRadius: '6px', marginBottom: '14px', color: '#c33' }}>❌ {error}</div>}
+      {error && <div style={{ padding: '12px', background: '#fee', border: '1px solid #fcc', borderRadius: '6px', marginBottom: '14px', color: '#c33' }}>âŒ {error}</div>}
       {success && <div style={{ padding: '12px', background: '#efe', border: '1px solid #cfc', borderRadius: '6px', marginBottom: '14px', color: '#363' }}>{success}</div>}
 
       {/* STEP 0: Enter email */}
       {step === 0 && (
         <div style={cardStyle}>
-          <h3>Adım 1: E-posta Doğrulama</h3>
+          <h3>AdÄ±m 1: E-posta DoÄŸrulama</h3>
           <p style={{ fontSize: '14px', color: '#666', marginBottom: '12px' }}>
-            Admin tarafından izin verilen bir e-posta girin. 6 haneli OTP kodunuz gönderilecek.
-            E-postanız <strong>kesinlikle saklanmaz</strong> — sadece hash'i nullifier olarak kullanılır.
+            Admin tarafÄ±ndan izin verilen bir e-posta girin. 6 haneli OTP kodunuz gÃ¶nderilecek.
+            E-postanÄ±z <strong>kesinlikle saklanmaz</strong> â€” sadece hash'i nullifier olarak kullanÄ±lÄ±r.
           </p>
-          <label><strong>Seçim:</strong></label>
+          <label><strong>SeÃ§im:</strong></label>
           <select
             value={selectedElection?.id || ''}
             onChange={(e) => { const el = elections.find(x => x.id === parseInt(e.target.value)); setSelectedElection(el); }}
@@ -245,12 +245,12 @@ function SSIVoting({ user, sessionId, onLogout }) {
             style={inputStyle}
           />
           <button onClick={sendOtp} disabled={loading || !email || !selectedElection} style={btnStyle('#7c3aed')}>
-            {loading ? 'Gönderiliyor...' : '📧 OTP Gönder'}
+            {loading ? 'GÃ¶nderiliyor...' : 'ðŸ“§ OTP GÃ¶nder'}
           </button>
           <div style={{ marginTop: '14px', padding: '12px', background: '#f9f9f9', borderRadius: '6px', fontSize: '13px' }}>
-            <strong>🔐 ZK-Email Gizlilik Modeli:</strong> E-postanız hiç saklanmaz.
-            OTP doğrulandıktan sonra <code>keccak256(email + salt)</code> hesaplanır ve bu hash blockchain'e nullifier olarak yazılır.
-            <em> Hangi e-postanın oy kullandığı kimse tarafından görülemez.</em>
+            <strong>ðŸ” ZK-Email Gizlilik Modeli:</strong> E-postanÄ±z hiÃ§ saklanmaz.
+            OTP doÄŸrulandÄ±ktan sonra <code>keccak256(email + salt)</code> hesaplanÄ±r ve bu hash blockchain'e nullifier olarak yazÄ±lÄ±r.
+            <em> Hangi e-postanÄ±n oy kullandÄ±ÄŸÄ± kimse tarafÄ±ndan gÃ¶rÃ¼lemez.</em>
           </div>
         </div>
       )}
@@ -258,10 +258,10 @@ function SSIVoting({ user, sessionId, onLogout }) {
       {/* STEP 1: OTP + Candidate selection */}
       {step === 1 && (
         <div style={cardStyle}>
-          <h3>Adım 2: OTP Girin + Aday Seçin</h3>
+          <h3>AdÄ±m 2: OTP Girin + Aday SeÃ§in</h3>
           {devOtp && (
             <div style={{ padding: '10px', background: '#fffde7', border: '1px solid #f9a825', borderRadius: '6px', marginBottom: '12px', fontSize: '13px' }}>
-              🛠 <strong>Dev Modu (SMTP yok) — OTP: <code style={{ fontSize: '20px', letterSpacing: '4px' }}>{devOtp}</code></strong>
+              ðŸ›  <strong>Dev Modu (SMTP yok) â€” OTP: <code style={{ fontSize: '20px', letterSpacing: '4px' }}>{devOtp}</code></strong>
             </div>
           )}
           <label><strong>OTP Kodu (6 hane):</strong></label>
@@ -272,10 +272,10 @@ function SSIVoting({ user, sessionId, onLogout }) {
             style={{ ...inputStyle, letterSpacing: '8px', fontSize: '22px', textAlign: 'center', fontWeight: 'bold' }}
           />
 
-          <label style={{ marginTop: '16px', display: 'block' }}><strong>Aday Seçin:</strong></label>
+          <label style={{ marginTop: '16px', display: 'block' }}><strong>Aday SeÃ§in:</strong></label>
           {candidates.length === 0 && (
             <button onClick={() => loadCandidates(selectedElection.id)} style={{ ...btnStyle('#555'), marginBottom: '10px' }}>
-              Adayları Yükle
+              AdaylarÄ± YÃ¼kle
             </button>
           )}
           {candidates.map(c => (
@@ -289,7 +289,7 @@ function SSIVoting({ user, sessionId, onLogout }) {
               }}
             >
               <strong>{c.name}</strong>
-              {selectedCandidate?.id === c.id && <span style={{ float: 'right', color: '#7c3aed' }}>✓</span>}
+              {selectedCandidate?.id === c.id && <span style={{ float: 'right', color: '#7c3aed' }}>âœ“</span>}
             </div>
           ))}
 
@@ -298,43 +298,43 @@ function SSIVoting({ user, sessionId, onLogout }) {
             disabled={loading || !otp || !selectedCandidate}
             style={btnStyle('#2196F3')}
           >
-            {loading ? 'Doğrulanıyor...' : '🔑 OTP Doğrula + Credential Al'}
+            {loading ? 'DoÄŸrulanÄ±yor...' : 'ðŸ”‘ OTP DoÄŸrula + Credential Al'}
           </button>
-          <button onClick={() => setStep(0)} style={{ ...btnStyle('#999'), marginLeft: '10px' }}>← Geri</button>
+          <button onClick={() => setStep(0)} style={{ ...btnStyle('#999'), marginLeft: '10px' }}>â† Geri</button>
         </div>
       )}
 
       {/* STEP 3: Submit */}
       {step === 3 && (
         <div style={cardStyle}>
-          <h3>Adım 3: Oyu Gönder</h3>
-          <p style={{ fontSize: '14px', marginBottom: '16px' }}>Credential hazır. Nasıl göndermek istiyorsunuz?</p>
+          <h3>AdÄ±m 3: Oyu GÃ¶nder</h3>
+          <p style={{ fontSize: '14px', marginBottom: '16px' }}>Credential hazÄ±r. NasÄ±l gÃ¶ndermek istiyorsunuz?</p>
 
           <div style={{ padding: '14px', background: '#f9f9f9', borderRadius: '8px', marginBottom: '12px' }}>
-            <strong>🚀 Seçenek A: Relayer (Önerilen — Gas'sız)</strong>
+            <strong>ðŸš€ SeÃ§enek A: Relayer (Ã–nerilen â€” Gas'sÄ±z)</strong>
             <ul style={{ fontSize: '13px', marginTop: '8px', lineHeight: '1.7' }}>
-              <li>✅ ETH gerekmez — relayer öder</li>
-              <li>✅ Daha iyi anonimlik — gönderen cüzdan sizin değil</li>
+              <li>âœ… ETH gerekmez â€” relayer Ã¶der</li>
+              <li>âœ… Daha iyi anonimlik â€” gÃ¶nderen cÃ¼zdan sizin deÄŸil</li>
             </ul>
             <button onClick={submitViaRelayer} disabled={loading} style={btnStyle('#4CAF50')}>
-              {loading ? 'Gönderiliyor...' : '🚀 Relayer ile Gönder'}
+              {loading ? 'GÃ¶nderiliyor...' : 'ðŸš€ Relayer ile GÃ¶nder'}
             </button>
           </div>
 
           <div style={{ padding: '14px', background: '#f9f9f9', borderRadius: '8px' }}>
-            <strong>🦊 Seçenek B: MetaMask (Direkt)</strong>
+            <strong>ðŸ¦Š SeÃ§enek B: MetaMask (Direkt)</strong>
             <ul style={{ fontSize: '13px', marginTop: '8px', lineHeight: '1.7' }}>
-              <li>⚠️ Gas gerektirir</li>
-              <li>⚠️ Cüzdan adresiniz görünür</li>
+              <li>âš ï¸ Gas gerektirir</li>
+              <li>âš ï¸ CÃ¼zdan adresiniz gÃ¶rÃ¼nÃ¼r</li>
             </ul>
             <button onClick={submitDirectTransaction} disabled={loading} style={btnStyle('#FF9800')}>
-              {loading ? 'Gönderiliyor...' : '🦊 MetaMask ile Gönder'}
+              {loading ? 'GÃ¶nderiliyor...' : 'ðŸ¦Š MetaMask ile GÃ¶nder'}
             </button>
           </div>
 
           {credential && (
             <details style={{ marginTop: '16px' }}>
-              <summary style={{ cursor: 'pointer', color: '#555', fontSize: '13px' }}>🔍 Credential'ı göster (teknik)</summary>
+              <summary style={{ cursor: 'pointer', color: '#555', fontSize: '13px' }}>ðŸ” Credential'Ä± gÃ¶ster (teknik)</summary>
               <pre style={{ marginTop: '8px', background: '#f0f0f0', padding: '12px', borderRadius: '6px', fontSize: '11px', overflow: 'auto' }}>
                 {JSON.stringify(credential, null, 2)}
               </pre>
@@ -346,412 +346,28 @@ function SSIVoting({ user, sessionId, onLogout }) {
       {/* STEP 4: Success */}
       {step === 4 && (
         <div style={{ ...cardStyle, textAlign: 'center' }}>
-          <div style={{ fontSize: '64px', margin: '10px 0' }}>✅</div>
-          <h3>Oy Başarıyla Kaydedildi!</h3>
-          <p style={{ color: '#555' }}>Oyunuz anonim olarak blockchain'e yazıldı.</p>
+          <div style={{ fontSize: '64px', margin: '10px 0' }}>âœ…</div>
+          <h3>Oy BaÅŸarÄ±yla Kaydedildi!</h3>
+          <p style={{ color: '#555' }}>Oyunuz anonim olarak blockchain'e yazÄ±ldÄ±.</p>
           {txHash && (
             <div style={{ marginTop: '16px', padding: '12px', background: '#f0f0f0', borderRadius: '6px', wordBreak: 'break-all', fontSize: '12px' }}>
               <strong>TX Hash:</strong> {txHash}
             </div>
           )}
-          <button onClick={resetFlow} style={btnStyle('#7c3aed')}>🔄 Başka Seçimde Oy Ver</button>
+          <button onClick={resetFlow} style={btnStyle('#7c3aed')}>ðŸ”„ BaÅŸka SeÃ§imde Oy Ver</button>
         </div>
       )}
 
       {/* Info box */}
       <div style={{ marginTop: '24px', padding: '14px', background: '#e8f4fd', borderRadius: '8px', fontSize: '13px' }}>
-        <strong>📚 ZK-Email SSI Nasıl Çalışır?</strong>
+        <strong>ðŸ“š ZK-Email SSI NasÄ±l Ã‡alÄ±ÅŸÄ±r?</strong>
         <ol style={{ lineHeight: '1.9', marginTop: '8px' }}>
-          <li><strong>Domain Whitelist:</strong> Admin panelinden izin verilen e-posta domainleri yönetilir</li>
-          <li><strong>OTP Gönder:</strong> Girilen e-posta domaini whitelist'teyse OTP kodu e-postaya gider</li>
-          <li><strong>ZK Kanıt:</strong> OTP doğrulanınca e-posta hash'i → EIP-712 credential imzalanır</li>
-          <li><strong>Nullifier:</strong> <code>keccak256(email+salt)</code> blockchain'e yazılır — raw e-posta asla saklanmaz</li>
-          <li><strong>Çift Oy:</strong> Aynı e-posta hash'i tekrar kullanılmaya çalışılınca kontrat reddeder</li>
+          <li><strong>Domain Whitelist:</strong> Admin panelinden izin verilen e-posta domainleri yÃ¶netilir</li>
+          <li><strong>OTP GÃ¶nder:</strong> Girilen e-posta domaini whitelist'teyse OTP kodu e-postaya gider</li>
+          <li><strong>ZK KanÄ±t:</strong> OTP doÄŸrulanÄ±nca e-posta hash'i â†’ EIP-712 credential imzalanÄ±r</li>
+          <li><strong>Nullifier:</strong> <code>keccak256(email+salt)</code> blockchain'e yazÄ±lÄ±r â€” raw e-posta asla saklanmaz</li>
+          <li><strong>Ã‡ift Oy:</strong> AynÄ± e-posta hash'i tekrar kullanÄ±lmaya Ã§alÄ±ÅŸÄ±lÄ±nca kontrat reddeder</li>
         </ol>
-      </div>
-    </div>
-  );
-}
-
-export default SSIVoting;
-
-
-  /**
-   * STEP 2: Issue Verifiable Credential
-   * After user selects candidate, request signed credential
-   */
-  const issueCredential = async () => {
-    if (!selectedCandidate) {
-      setError('Please select a candidate');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const response = await axios.post(
-        `${API_BASE}/ssi/issue-credential`,
-        {
-          electionID: selectedElection.id,
-          candidateID: selectedCandidate.id
-        },
-        { headers: { 'x-session-id': sessionId } }
-      );
-
-      setCredential(response.data.credential);
-      setSuccess('✅ Credential issued! Choose how to submit your vote.');
-      setStep(3);
-
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to issue credential');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * STEP 3A: Submit via Direct Transaction (Gas Required)
-   * User's wallet pays gas fee - identity could be theoretically traced
-   */
-  const submitDirectTransaction = async () => {
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      // Connect to MetaMask or injected provider
-      if (!window.ethereum) {
-        throw new Error('MetaMask not installed');
-      }
-
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-
-      // Load contract ABI (simplified - you'd load the full ABI)
-      const contractABI = [
-        "function vote(tuple(bytes32 studentIDHash, uint256 electionID, uint256 candidateID, uint256 timestamp, bytes signature) proof)"
-      ];
-
-      const contract = new ethers.Contract(contractAddress, contractABI, signer);
-
-      // Prepare VoteProof struct
-      const voteProof = {
-        studentIDHash: credential.studentIDHash,
-        electionID: credential.electionID,
-        candidateID: credential.candidateID,
-        timestamp: credential.timestamp,
-        signature: credential.signature
-      };
-
-      // Submit transaction
-      const tx = await contract.vote(voteProof);
-      setSuccess(`⏳ Transaction submitted: ${tx.hash}`);
-      
-      // Wait for confirmation
-      await tx.wait();
-      setTxHash(tx.hash);
-      setSuccess(`✅ Vote recorded! TX: ${tx.hash.slice(0, 10)}...`);
-      setStep(4);
-
-    } catch (err) {
-      setError(`Transaction failed: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * STEP 3B: Submit via Relayer (Gas-less, More Anonymous)
-   * Relayer pays gas fee - better anonymity as submission wallet differs from authorization
-   * 
-   * NOTE: This requires a relayer backend service to be implemented
-   */
-  const submitViaRelayer = async () => {
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      // Send credential to relayer backend
-      const response = await axios.post(
-        `${API_BASE}/ssi/relayer/submit`,
-        { credential },
-        { headers: { 'x-session-id': sessionId } }
-      );
-
-      setTxHash(response.data.txHash);
-      setSuccess(`✅ Vote submitted via relayer! TX: ${response.data.txHash.slice(0, 10)}...`);
-      setStep(4);
-
-    } catch (err) {
-      setError(err.response?.data?.message || 'Relayer submission failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Reset to start new vote
-   */
-  const resetFlow = () => {
-    setStep(1);
-    setAuthToken(null);
-    setCredential(null);
-    setSelectedCandidate(null);
-    setTxHash('');
-    setError('');
-    setSuccess('');
-  };
-
-  return (
-    <div className="ssi-voting-container" style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>🔐 Self-Sovereign Identity Voting</h2>
-        <button onClick={onLogout} style={{ padding: '8px 16px' }}>Logout</button>
-      </div>
-
-      <div style={{ marginBottom: '20px', padding: '15px', background: '#f0f0f0', borderRadius: '8px' }}>
-        <p><strong>User:</strong> {user.name}</p>
-        <p><strong>Role:</strong> {user.role}</p>
-      </div>
-
-      {/* Progress Steps */}
-      <div style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-around' }}>
-        <div style={{ textAlign: 'center', opacity: step >= 1 ? 1 : 0.3 }}>
-          <div style={{ fontSize: '24px' }}>🎫</div>
-          <div>Authorization</div>
-        </div>
-        <div style={{ textAlign: 'center', opacity: step >= 2 ? 1 : 0.3 }}>
-          <div style={{ fontSize: '24px' }}>🗳️</div>
-          <div>Select Candidate</div>
-        </div>
-        <div style={{ textAlign: 'center', opacity: step >= 3 ? 1 : 0.3 }}>
-          <div style={{ fontSize: '24px' }}>📝</div>
-          <div>Get Credential</div>
-        </div>
-        <div style={{ textAlign: 'center', opacity: step >= 4 ? 1 : 0.3 }}>
-          <div style={{ fontSize: '24px' }}>✅</div>
-          <div>Submit Vote</div>
-        </div>
-      </div>
-
-      {/* Error/Success Messages */}
-      {error && (
-        <div style={{ padding: '15px', background: '#fee', border: '1px solid #fcc', borderRadius: '8px', marginBottom: '20px', color: '#c33' }}>
-          ❌ {error}
-        </div>
-      )}
-      {success && (
-        <div style={{ padding: '15px', background: '#efe', border: '1px solid #cfc', borderRadius: '8px', marginBottom: '20px', color: '#3c3' }}>
-          {success}
-        </div>
-      )}
-
-      {/* STEP 1: Request Authorization */}
-      {step === 1 && (
-        <div style={{ padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #ddd' }}>
-          <h3>Step 1: Request Voting Authorization</h3>
-          <p>First, request authorization to vote without revealing your candidate choice.</p>
-          
-          <div style={{ marginTop: '15px' }}>
-            <label><strong>Select Election:</strong></label>
-            <select 
-              value={selectedElection?.id || ''} 
-              onChange={(e) => {
-                const election = elections.find(el => el.id === parseInt(e.target.value));
-                setSelectedElection(election);
-              }}
-              style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-            >
-              {elections.map(election => (
-                <option key={election.id} value={election.id}>{election.title}</option>
-              ))}
-            </select>
-          </div>
-
-          <button 
-            onClick={requestAuthorization}
-            disabled={loading || !selectedElection}
-            style={{ 
-              marginTop: '20px', 
-              padding: '12px 24px', 
-              background: '#4CAF50', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px',
-              cursor: loading ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {loading ? 'Requesting...' : '🎫 Request Authorization'}
-          </button>
-
-          <div style={{ marginTop: '20px', padding: '15px', background: '#f9f9f9', borderRadius: '4px' }}>
-            <strong>ℹ️ Privacy Note:</strong>
-            <p style={{ marginTop: '5px', fontSize: '14px' }}>
-              This step only verifies your eligibility to vote. Your candidate choice remains private at this stage.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 2: Select Candidate */}
-      {step === 2 && (
-        <div style={{ padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #ddd' }}>
-          <h3>Step 2: Select Your Candidate</h3>
-          <p>Choose who you want to vote for. This will be included in your verifiable credential.</p>
-
-          <div style={{ marginTop: '15px' }}>
-            {candidates.map(candidate => (
-              <div 
-                key={candidate.id}
-                onClick={() => setSelectedCandidate(candidate)}
-                style={{
-                  padding: '15px',
-                  margin: '10px 0',
-                  border: selectedCandidate?.id === candidate.id ? '2px solid #4CAF50' : '1px solid #ddd',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  background: selectedCandidate?.id === candidate.id ? '#e8f5e9' : '#fff'
-                }}
-              >
-                <strong>{candidate.name}</strong>
-                {selectedCandidate?.id === candidate.id && <span style={{ float: 'right' }}>✓</span>}
-              </div>
-            ))}
-          </div>
-
-          <button 
-            onClick={issueCredential}
-            disabled={loading || !selectedCandidate}
-            style={{ 
-              marginTop: '20px', 
-              padding: '12px 24px', 
-              background: '#2196F3', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px',
-              cursor: loading || !selectedCandidate ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {loading ? 'Issuing...' : '📝 Get Signed Credential'}
-          </button>
-        </div>
-      )}
-
-      {/* STEP 3: Submit Vote */}
-      {step === 3 && (
-        <div style={{ padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #ddd' }}>
-          <h3>Step 3: Submit Your Vote</h3>
-          <p>Choose how to submit your signed credential to the blockchain:</p>
-
-          <div style={{ marginTop: '20px' }}>
-            <div style={{ padding: '15px', background: '#f9f9f9', borderRadius: '8px', marginBottom: '15px' }}>
-              <h4>Option A: Direct Transaction (MetaMask)</h4>
-              <p style={{ fontSize: '14px' }}>
-                ✅ Immediate confirmation<br/>
-                ⚠️ Requires ETH for gas<br/>
-                ⚠️ Transaction from your wallet (less anonymous)
-              </p>
-              <button 
-                onClick={submitDirectTransaction}
-                disabled={loading}
-                style={{ 
-                  marginTop: '10px', 
-                  padding: '10px 20px', 
-                  background: '#FF9800', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: '4px',
-                  cursor: loading ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {loading ? 'Submitting...' : '🦊 Submit via MetaMask'}
-              </button>
-            </div>
-
-            <div style={{ padding: '15px', background: '#f9f9f9', borderRadius: '8px' }}>
-              <h4>Option B: Relayer Service (Recommended)</h4>
-              <p style={{ fontSize: '14px' }}>
-                ✅ No gas fees required<br/>
-                ✅ Better anonymity (relayer wallet submits)<br/>
-                ⚠️ Requires relayer backend service
-              </p>
-              <button 
-                onClick={submitViaRelayer}
-                disabled={loading}
-                style={{ 
-                  marginTop: '10px', 
-                  padding: '10px 20px', 
-                  background: '#4CAF50', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: '4px',
-                  cursor: loading ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {loading ? 'Submitting...' : '🚀 Submit via Relayer'}
-              </button>
-            </div>
-          </div>
-
-          {credential && (
-            <div style={{ marginTop: '20px', padding: '15px', background: '#f0f0f0', borderRadius: '8px', fontSize: '12px', wordBreak: 'break-all' }}>
-              <strong>Your Credential:</strong>
-              <pre style={{ marginTop: '10px', overflow: 'auto' }}>
-                {JSON.stringify(credential, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* STEP 4: Success */}
-      {step === 4 && (
-        <div style={{ padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #ddd', textAlign: 'center' }}>
-          <div style={{ fontSize: '64px', marginBottom: '20px' }}>✅</div>
-          <h3>Vote Successfully Recorded!</h3>
-          <p>Your vote has been anonymously recorded on the blockchain.</p>
-          
-          {txHash && (
-            <div style={{ marginTop: '20px', padding: '15px', background: '#f0f0f0', borderRadius: '8px' }}>
-              <strong>Transaction Hash:</strong>
-              <p style={{ wordBreak: 'break-all', marginTop: '5px' }}>{txHash}</p>
-            </div>
-          )}
-
-          <button 
-            onClick={resetFlow}
-            style={{ 
-              marginTop: '20px', 
-              padding: '12px 24px', 
-              background: '#4CAF50', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            🔄 Vote in Another Election
-          </button>
-        </div>
-      )}
-
-      {/* Info Section */}
-      <div style={{ marginTop: '30px', padding: '15px', background: '#e3f2fd', borderRadius: '8px' }}>
-        <h4>📚 How SSI Voting Works:</h4>
-        <ol style={{ fontSize: '14px', lineHeight: '1.8' }}>
-          <li><strong>Request Authorization:</strong> Backend verifies you're eligible (database check)</li>
-          <li><strong>Receive Token:</strong> You get a hashed student ID (preserves privacy)</li>
-          <li><strong>Choose Candidate:</strong> Select who to vote for</li>
-          <li><strong>Get Credential:</strong> Backend signs your choice with EIP-712 (verifiable proof)</li>
-          <li><strong>Submit to Contract:</strong> Smart contract verifies signature and prevents double voting</li>
-        </ol>
-        <p style={{ marginTop: '10px', fontSize: '14px' }}>
-          <strong>🔐 Privacy:</strong> Your student ID is never stored on-chain. Only a nullifier (hash) is recorded to prevent double voting.
-        </p>
       </div>
     </div>
   );

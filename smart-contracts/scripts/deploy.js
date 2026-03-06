@@ -27,6 +27,13 @@ if (result.error) {
   process.exit(1);
 }
 
+function updateEnvVar(content, name, value) {
+  if (content.includes(`${name}=`)) {
+    return content.replace(new RegExp(`${name}=.*`), `${name}=${value}`);
+  }
+  return content + `\n${name}=${value}\n`;
+}
+
 async function main() {
   console.log("\n🚀 DEPLOYING VOTINGANONYMOUS CONTRACT...\n");
 
@@ -62,13 +69,7 @@ async function main() {
   // Update .env file with contract address
   const rootEnvPath = path.resolve(__dirname, "../..", ".env");
   let envContent = fs.readFileSync(rootEnvPath, "utf8");
-  
-  // Replace VOTING_CONTRACT_ADDRESS value
-  envContent = envContent.replace(
-    /VOTING_CONTRACT_ADDRESS=.*/,
-    `VOTING_CONTRACT_ADDRESS=${contractAddress}`
-  );
-  
+  envContent = updateEnvVar(envContent, 'VOTING_CONTRACT_ADDRESS', contractAddress);
   fs.writeFileSync(rootEnvPath, envContent);
   console.log("📄 Updated .env with contract address");
   console.log("");

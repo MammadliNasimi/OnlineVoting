@@ -29,36 +29,6 @@ export const generateCommitment = (secret, electionId) => {
 };
 
 /**
- * Store secret in localStorage for later verification
- * @param {number} electionId - Election ID
- * @param {string} secret - User's secret
- */
-export const storeSecret = (electionId, secret) => {
-  const key = `voting_secret_${electionId}`;
-  localStorage.setItem(key, secret);
-  console.log(`🔐 Secret stored for election ${electionId}`);
-};
-
-/**
- * Retrieve stored secret
- * @param {number} electionId - Election ID
- * @returns {string|null} Stored secret or null
- */
-export const getStoredSecret = (electionId) => {
-  const key = `voting_secret_${electionId}`;
-  return localStorage.getItem(key);
-};
-
-/**
- * Check if user has a secret for this election
- * @param {number} electionId - Election ID
- * @returns {boolean}
- */
-export const hasStoredSecret = (electionId) => {
-  return getStoredSecret(electionId) !== null;
-};
-
-/**
  * Format Ethereum address for display
  * @param {string} address - Full address
  * @returns {string} Shortened address (0x1234...5678)

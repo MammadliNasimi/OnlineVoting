@@ -29,6 +29,13 @@ if (result.error) {
   process.exit(1);
 }
 
+function updateEnvVar(content, name, value) {
+  if (content.includes(`${name}=`)) {
+    return content.replace(new RegExp(`${name}=.*`), `${name}=${value}`);
+  }
+  return content + `\n${name}=${value}\n`;
+}
+
 async function main() {
   console.log("\n🚀 DEPLOYING VOTINGSSI CONTRACT (Self-Sovereign Identity)...\n");
 
@@ -76,27 +83,8 @@ async function main() {
   // Update .env file with contract address
   const rootEnvPath = path.resolve(__dirname, "../..", ".env");
   let envContent = fs.readFileSync(rootEnvPath, "utf8");
-  
-  // Update or add CONTRACT_ADDRESS
-  if (envContent.includes('CONTRACT_ADDRESS=')) {
-    envContent = envContent.replace(
-      /CONTRACT_ADDRESS=.*/,
-      `CONTRACT_ADDRESS=${contractAddress}`
-    );
-  } else {
-    envContent += `\nCONTRACT_ADDRESS=${contractAddress}\n`;
-  }
-  
-  // Update or add VOTING_CONTRACT_ADDRESS for backward compatibility
-  if (envContent.includes('VOTING_CONTRACT_ADDRESS=')) {
-    envContent = envContent.replace(
-      /VOTING_CONTRACT_ADDRESS=.*/,
-      `VOTING_CONTRACT_ADDRESS=${contractAddress}`
-    );
-  } else {
-    envContent += `VOTING_CONTRACT_ADDRESS=${contractAddress}\n`;
-  }
-  
+  envContent = updateEnvVar(envContent, 'CONTRACT_ADDRESS', contractAddress);
+  envContent = updateEnvVar(envContent, 'VOTING_CONTRACT_ADDRESS', contractAddress);
   fs.writeFileSync(rootEnvPath, envContent);
   console.log("📄 Updated .env with contract address");
   console.log("");

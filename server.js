@@ -116,7 +116,12 @@ async function getUserFromSession(req) {
   };
 }
 
-
+// E-posta hash yardımcı fonksiyon — ZK-Email nullifier tohumu
+function hashEmail(email) {
+  return credentialIssuer
+    ? credentialIssuer.hashEmail(email)
+    : ethers.keccak256(ethers.toUtf8Bytes(email.toLowerCase() + 'ZKEMAIL_VOTING_SSI_2026'));
+}
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -142,8 +147,7 @@ app.post('/api/register/send-otp', async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpHash = crypto.createHash('sha256').update(otp + email.toLowerCase()).digest('hex');
-    const emailHash = credentialIssuer ? credentialIssuer.hashEmail(email) :
-      ethers.keccak256(ethers.toUtf8Bytes(email.toLowerCase() + 'ZKEMAIL_VOTING_SSI_2026'));
+    const emailHash = hashEmail(email);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     db.createEmailVerification(email, emailHash, otpHash, expiresAt);
 
@@ -939,14 +943,6 @@ app.get('/api/blockchain/info', (req, res) => {
 
 // ========== END BLOCKCHAIN ENDPOINTS ==========
 
-// Get voting history for logged-in user
-app.get('/api/voting-history', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user) return res.status(401).json({ message: 'Unauthorized' });
-  // TODO: Fetch user's voting history from database
-  res.json([]);
-});
-
 // Voting period endpoints
 app.get('/api/voting-period', (req, res) => {
   res.json(votingPeriod);
@@ -1037,8 +1033,7 @@ app.post('/api/zkemail/send-otp', async (req, res) => {
     const otpHash = crypto.createHash('sha256').update(otp + email.toLowerCase()).digest('hex');
     
     // emailHash = ZK-Email nullifier seed (keccak256 like contract expects)
-    const emailHash = credentialIssuer ? credentialIssuer.hashEmail(email) : 
-      ethers.keccak256(ethers.toUtf8Bytes(email.toLowerCase() + 'ZKEMAIL_VOTING_SSI_2026'));
+    const emailHash = hashEmail(email);
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
     db.createEmailVerification(email, emailHash, otpHash, expiresAt);

@@ -212,15 +212,6 @@ class DatabaseService {
     }
   }
 
-  query(sql, params = []) {
-    if (sql.trim().toUpperCase().startsWith('SELECT')) {
-      return { rows: this.db.prepare(sql).all(...params) };
-    } else {
-      this.db.prepare(sql).run(...params);
-      return { rows: [] };
-    }
-  }
-
   async close() {
     if (this.db) {
       this.db.close();
@@ -412,14 +403,15 @@ class DatabaseService {
     return this.db.prepare('SELECT * FROM allowed_email_domains ORDER BY created_at DESC').all();
   }
 
-  addEmailDomain(domain, addedBy = 'admin') {
-    // Accept both full email (user@domain.com) and plain domain (domain.com)
+  _cleanDomain(domain) {
     let clean = domain.trim().toLowerCase();
-    if (clean.includes('@')) {
-      // Extract the domain part after @
-      clean = clean.split('@').pop();
-    }
-    clean = clean.replace(/^\./, ''); // remove leading dot if any
+    if (clean.includes('@')) clean = clean.split('@').pop();
+    clean = clean.replace(/^\./, '');
+    return clean || null;
+  }
+
+  addEmailDomain(domain, addedBy = 'admin') {
+    const clean = this._cleanDomain(domain);
     if (!clean) return null;
     this.db.prepare(
       'INSERT OR IGNORE INTO allowed_email_domains (domain, added_by) VALUES (?, ?)'
@@ -534,9 +526,7 @@ class DatabaseService {
   }
 
   addElectionDomainRestriction(electionId, domain) {
-    let clean = domain.trim().toLowerCase();
-    if (clean.includes('@')) clean = clean.split('@').pop();
-    clean = clean.replace(/^\./, '');
+    const clean = this._cleanDomain(domain);
     if (!clean) return null;
     this.db.prepare(
       'INSERT OR IGNORE INTO election_domain_restrictions (election_id, domain) VALUES (?, ?)'
