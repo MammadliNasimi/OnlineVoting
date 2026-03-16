@@ -25,7 +25,7 @@ Sistem, seçmenlerin kimliğini tamamen gizli tutarken (anonimlik), kullanılan 
 Sistemin her bir yapı taşı, güvenlik ve kullanıcı deneyimi gözetilerek özel olarak tasarlanmıştır.
 
 ### 1. 🎭 ZK-Email & Nullifier Mekanizması (Tam Anonimlik)
-- **Nasıl Çalışır?** Kullanıcı sisteme kurumsal e-posta adresiyle kayıt olur. Kullanıcı oy kullanırken e-posta bilgisi doğrudan blockchain'e gönderilmez. Bunun yerine, e-posta adresi, arka planda kriptografik olarak hashlenir ve seçim ile birleştirilerek tekil bir **Nullifier** (Gizli Kimlik Özeti) oluşturulur keccak256(idHash + electionId).
+- **Nasıl Çalışır?** Kullanıcı sisteme kurumsal e-posta adresiyle kayıt olur. Kullanıcı oy kullanırken e-posta bilgisi doğrudan blockchain'e gönderilmez. Bunun yerine, e-posta adresi, arka planda kriptografik olarak hashlenir ve seçim ile birleştirilerek tekil bir **Nullifier** (Gizli Kimlik Özeti) oluşturulur `keccak256(idHash + electionId)`.
 - **Faydası:** Blockchain üzerindeki işlemler incelense bile, oyun kime ait olduğu (e-posta veya isim) asla geriye dönük olarak tespit edilemez. Çift oy kullanmaya çalışan bir kişinin "Nullifier"ı zaten kayıtlı olacağından sistem oyu otomatik reddeder.
 
 ### 2. ⛽ Walletless Oylama & Relayer Servisi (Gasless Oylama)
@@ -70,7 +70,7 @@ graph TD;
 1. **Autentikasyon Phase:** Kullanıcı giriş yapar, Backend kullanıcıyı yetkilendirir ve oturum oluşturur.
 2. **Retrieve Phase:** Kullanıcının görmeye yetkili olduğu (domain filtresine uygun) aktif seçimler frontend'e gönderilir.
 3. **Voting Phase:** E-posta verisi kullanarak özel bir SSI Credential'ı JSON olarak hazırlanır ve geçici cüzdan ile imzalanıp Relayer'a verilir.
-4. **On-Chain Phase:** Smart contract, imzayı denetler; kimlik ve Nullifier temiz ise ote() fonksiyonunu işletir.
+4. **On-Chain Phase:** Smart contract, imzayı denetler; kimlik ve Nullifier temiz ise `vote()` fonksiyonunu işletir.
 
 ---
 
@@ -92,7 +92,7 @@ Projeyi bilgisayarınızda çalıştırmak oldukça basittir. Node.js (v16+) ve 
 
 ### 1. Repoyu Klonlayın ve Bağımlılıkları Yükleyin
 
-`ash
+```bash
 git clone https://github.com/yourusername/OnlineVoting.git
 cd OnlineVoting
 
@@ -104,13 +104,13 @@ cd client && npm install && cd ..
 
 # Blockchain (Smart Contract) bağımlılıkları
 cd smart-contracts && npm install && cd ..
-`
+```
 
 ### 2. Ortam Değişkenleri (Environment Config)
 
-Ana dizinde .env isimli yeni bir dosya oluşturun ve içerisine aşağıdaki değişkenleri yapıştırın:
+Ana dizinde `.env` isimli yeni bir dosya oluşturun ve içerisine aşağıdaki değişkenleri yapıştırın:
 
-`env
+```env
 # Admin/Deployer Private Key (Hardhat Test Account #0)
 ADMIN_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
@@ -120,41 +120,41 @@ PORT=5000
 SESSION_TIMEOUT=28800000
 SESSION_SECRET=local_development_secret_key_1234
 CORS_ORIGINS=http://localhost:3000,http://localhost:5000
-`
+```
 
 ### 3. Sistemi Başlatma Süreci
 
 Uygulamanın farklı katmanlarını başlatmak için 3 ayrı terminal penceresi açmalısınız:
 
 **Terminal 1 (Blockchain Test Ağı):**
-`ash
+```bash
 cd smart-contracts
 npx hardhat node
-`
+```
 
 **Terminal 2 (Sözleşmeleri Dağıtma ve Backend'i Başlatma):**  
 *(Sadece ilk seferde contract dağıtılır)*
-`ash
+```bash
 cd smart-contracts
 npx hardhat run scripts/deploy.js --network localhost
 cd ..
 node server.js
-`
+```
 
 **Terminal 3 (Frontend İstemcisi):**
-`ash
+```bash
 cd client
 npm start
-`
-*Frontend adresi:* http://localhost:3000  
-*Admin Paneli adresi:* http://localhost:5000/admin.html
+```
+*Frontend adresi:* `http://localhost:3000`  
+*Admin Paneli adresi:* `http://localhost:5000/admin.html`
 
 ---
 
 ## 📈 Proje Durumu / Sürüm Notları (Mart 2026)
-* 🚀 Karmaşık SSIVoting akışı sadeleştirilerek tamamen SimpleVoting komponentinin kararlılığı sağlandı.
-* 🧹 Kullanılmayan legacy SSI API endpointleri tamamen temizlendi, sistem ote() fonksiyonuna yönlendirildi.
-* 📊 ?electionId query yapısı ile seçimlere özel anlık durum getirme mekanizması geliştirildi.
+* 🚀 Karmaşık `SSIVoting` akışı sadeleştirilerek tamamen `SimpleVoting` komponentinin kararlılığı sağlandı.
+* 🧹 Kullanılmayan legacy SSI API endpointleri tamamen temizlendi, sistem `vote()` fonksiyonuna yönlendirildi.
+* 📊 `?electionId` query yapısı ile seçimlere özel anlık durum getirme mekanizması geliştirildi.
 * 🔐 Admin kullanıcı oluşumu standardize edildi.
 
 ---
