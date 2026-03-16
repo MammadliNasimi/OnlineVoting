@@ -53,7 +53,7 @@ Oylama sisteminin yönetimi, kullanımı kolay gelişmiş araçlarla desteklenmi
 
 ## 🏗️ Sistem Mimarisi & Oylama İş Akışı (Workflow)
 
-`mermaid
+```mermaid
 graph TD;
     A[Kullanıcı Login Olur] -->|1. JWT + Şifreli Ephemeral Cüzdan| B(Backend Session Başlar);
     B --> C{Seçimleri ve Adayları Görüntüle};
@@ -65,7 +65,7 @@ graph TD;
     H -- EVET --> I[Tx İptal Edilir REVERT];
     H -- HAYIR --> J[Oy Sayacı Artar & Nullifier Kaydedilir];
     J --> K[Oylama Başarılı! TxHash Dönülür];
-`
+```
 
 1. **Autentikasyon Phase:** Kullanıcı giriş yapar, Backend kullanıcıyı yetkilendirir ve oturum oluşturur.
 2. **Retrieve Phase:** Kullanıcının görmeye yetkili olduğu (domain filtresine uygun) aktif seçimler frontend'e gönderilir.
