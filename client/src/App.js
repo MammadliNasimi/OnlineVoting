@@ -1,212 +1,240 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import dayjs from 'dayjs';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-import { Bar, Pie } from 'react-chartjs-2';
-import { formatTxHash } from './utils/crypto';
+import SimpleVoting from './SimpleVoting';
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
+const cameraPriority = (label = '') => {
+  const text = label.toLowerCase();
+  if (text.includes('droidcam') || text.includes('ivcam') || text.includes('iriun') || text.includes('epoccam')) return 100;
+  if (text.includes('android') || text.includes('iphone') || text.includes('phone') || text.includes('telefon')) return 80;
+  if (text.includes('usb') || text.includes('webcam') || text.includes('camera')) return 40;
+  return 10;
+};
 
-const translations = {
-  tr: {
-    login: 'Giriş Yap',
-    register: 'Kayıt Ol',
-    registerAsUser: 'Kullanıcı Olarak Kayıt Ol',
-    name: 'İsim',
-    password: 'Şifre',
-    user: 'Kullanıcı',
-    candidate: 'Aday',
-    castVote: 'Oy Kullan',
-    submitVote: 'Oy Gönder',
-    logout: 'Çıkış Yap',
-    addCandidate: 'Aday Ekle',
-    votingPeriod: 'Oylama Dönemi',
-    start: 'Başlangıç',
-    end: 'Bitiş',
-    clear: 'Temizle',
-    votingOpen: 'Oylama Açık',
-    votingClosed: 'Oylama Kapalı',
-    viewResults: 'Sonuçları Görüntüle',
-    backToVoting: 'Oy Verme Sayfasına Dön',
-    votingResults: 'Oylama Sonuçları',
-    barChart: 'Bar Grafik',
-    pieChart: 'Pasta Grafik'
-  },
-  en: {
-    login: 'Login',
-    register: 'Register',
-    registerAsUser: 'Register as User',
-    name: 'Name',
-    password: 'Password',
-    user: 'User',
-    candidate: 'Candidate',
-    castVote: 'Cast Vote',
-    submitVote: 'Submit Vote',
-    logout: 'Logout',
-    addCandidate: 'Add Candidate',
-    votingPeriod: 'Voting Period',
-    start: 'Start',
-    end: 'End',
-    clear: 'Clear',
-    votingOpen: 'Voting Open',
-    votingClosed: 'Voting Closed',
-    viewResults: 'View Results',
-    backToVoting: 'Back to Voting',
-    votingResults: 'Voting Results',
-    barChart: 'Bar Chart',
-    pieChart: 'Pie Chart'
-  }
+const pickPreferredCameraId = (videoInputs, currentSelectedId = '') => {
+  if (!videoInputs || videoInputs.length === 0) return '';
+  const exists = videoInputs.some(v => v.deviceId === currentSelectedId);
+  if (exists) return currentSelectedId;
+  const sorted = [...videoInputs].sort((a, b) => cameraPriority(b.label) - cameraPriority(a.label));
+  return sorted[0].deviceId;
 };
 
 function App() {
-  const [lang, setLang] = useState('tr');
-  const t = translations[lang];
   const [currentPage, setCurrentPage] = useState('login');
-  const [history, setHistory] = useState([]);
-  const [feedbacks, setFeedbacks] = useState({});
-  const [feedbackInput, setFeedbackInput] = useState({});
-  const [votes, setVotes] = useState([]);
-  const [candidate, setCandidate] = useState('');
-  const [candidates, setCandidates] = useState([]);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
-  const [votingPeriod, setVotingPeriod] = useState({ start: null, end: null });
-  const [votingOpen, setVotingOpen] = useState(true);
   const [sessionId, setSessionId] = useState('');
   const [user, setUser] = useState(null);
   const [registerMode, setRegisterMode] = useState(false);
   const [registerStep, setRegisterStep] = useState(0); // 0=form, 1=OTP
   const [registerOtp, setRegisterOtp] = useState('');
   const [form, setForm] = useState({ name: '', password: '', email: '' });
-  const [newCandidate, setNewCandidate] = useState('');
-  const [txStatus, setTxStatus] = useState('');
-  const [txHash, setTxHash] = useState('');
+  const [faceEnabled, setFaceEnabled] = useState(false);
+  const [faceLoading, setFaceLoading] = useState(false);
+  const [faceBusy, setFaceBusy] = useState(false);
+  const [faceMessage, setFaceMessage] = useState('');
+  const [registerFaceEnabled, setRegisterFaceEnabled] = useState(false);
+  const [registerFaceDescriptor, setRegisterFaceDescriptor] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState('');
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
-  // Fetch voting history
-  const fetchHistory = async () => {
-    try {
-      const res = await axios.get('/api/voting-history', { headers: { 'x-session-id': sessionId } });
-      setHistory(res.data);
-    } catch {}
-  };
-
-  // Fetch feedbacks for all candidates
-  const fetchAllFeedbacks = async () => {
-    let all = {};
-    for (const c of candidates) {
-      try {
-        const res = await axios.get(`/api/feedback/${c}`);
-        all[c] = res.data;
-      } catch {}
+  const stopFaceCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
-    setFeedbacks(all);
-  };
-
-  const fetchVotingPeriod = async () => {
-    try {
-      const res = await axios.get('/api/voting-period');
-      setVotingPeriod(res.data);
-    } catch {}
-  };
-
-  const fetchVotes = async () => {
-    try {
-      const res = await axios.get('/api/votes');
-      setVotes(res.data);
-    } catch {}
-  };
-
-  const fetchCandidates = async () => {
-    try {
-      const res = await axios.get('/api/candidates');
-      setCandidates(res.data);
-      if (res.data.length > 0) setCandidate(res.data[0]);
-    } catch {}
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
   };
 
   useEffect(() => {
-    fetchVotes();
-    fetchCandidates();
-    fetchVotingPeriod();
-    // Subscribe to candidate updates
-    const eventSource = new window.EventSource('/api/candidates/subscribe');
-    eventSource.onmessage = (e) => {
-      try {
-        const updatedCandidates = JSON.parse(e.data);
-        setCandidates(updatedCandidates);
-        if (!updatedCandidates.includes(candidate)) {
-          setCandidate(updatedCandidates[0] || '');
-        }
-      } catch {}
-    };
-    return () => eventSource.close();
+    return () => stopFaceCamera();
   }, []);
 
   useEffect(() => {
-    if (candidates.length > 0) {
-      fetchAllFeedbacks();
+    if (currentPage !== 'login') {
+      stopFaceCamera();
     }
-  }, [candidates]);
+  }, [currentPage]);
+
+  const loadFaceModels = async () => {
+    if (faceEnabled) return;
+    setFaceLoading(true);
+    setFaceMessage('Yüz modelleri yükleniyor...');
+    try {
+      const ensureFaceApiLoaded = async () => {
+        if (window.faceapi) return window.faceapi;
+        await new Promise((resolve, reject) => {
+          const existing = document.querySelector('script[data-faceapi="1"]');
+          if (existing) {
+            existing.addEventListener('load', resolve, { once: true });
+            existing.addEventListener('error', reject, { once: true });
+            return;
+          }
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+          script.async = true;
+          script.dataset.faceapi = '1';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.body.appendChild(script);
+        });
+        return window.faceapi;
+      };
+
+      const faceapi = await ensureFaceApiLoaded();
+      const modelBase = 'https://justadudewhohacks.github.io/face-api.js/models';
+      await faceapi.nets.tinyFaceDetector.loadFromUri(modelBase);
+      await faceapi.nets.faceLandmark68Net.loadFromUri(modelBase);
+      await faceapi.nets.faceRecognitionNet.loadFromUri(modelBase);
+      setFaceEnabled(true);
+      setFaceMessage('Yüz doğrulama hazır.');
+    } catch (err) {
+      setFaceMessage('Yüz modeli yüklenemedi. İnternet bağlantısını kontrol edin.');
+    } finally {
+      setFaceLoading(false);
+    }
+  };
+
+  const refreshCameras = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      setCameras(videoInputs);
+      const bestId = pickPreferredCameraId(videoInputs, selectedCameraId);
+      if (bestId) setSelectedCameraId(bestId);
+    } catch {
+      setFaceMessage('Kamera listesi alınamadı.');
+    }
+  }, [selectedCameraId]);
 
   useEffect(() => {
-    if (currentPage === 'history' && sessionId) {
-      fetchHistory();
-    }
-  }, [currentPage, sessionId]);
+    const onDeviceChange = async () => {
+      await refreshCameras();
+      setFaceMessage('Yeni kamera algılandı. Gerekirse listeden telefon kamerasını seçin.');
+    };
 
-  useEffect(() => {
-    // Check voting open/closed status
-    if (!votingPeriod.start && !votingPeriod.end) {
-      setVotingOpen(true);
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', onDeviceChange);
+    }
+
+    return () => {
+      if (navigator.mediaDevices && navigator.mediaDevices.removeEventListener) {
+        navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange);
+      }
+    };
+  }, [refreshCameras]);
+
+  const requestCameraPermissionAndRefresh = async () => {
+    try {
+      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      tempStream.getTracks().forEach(track => track.stop());
+      await refreshCameras();
+      setFaceMessage('Kamera izni verildi. Telefon kamerası bağlıysa listede görünecektir.');
+      return true;
+    } catch (err) {
+      setFaceMessage('Kamera izni reddedildi veya cihaz bulunamadı. Tarayıcı izinlerini kontrol edin.');
+      return false;
+    }
+  };
+
+  const startFaceCamera = async () => {
+    setFaceMessage('');
+    try {
+      const granted = await requestCameraPermissionAndRefresh();
+      if (!granted) return;
+
+      stopFaceCamera();
+      const constraints = {
+        audio: false,
+        video: selectedCameraId
+          ? { deviceId: { exact: selectedCameraId }, width: { ideal: 640 }, height: { ideal: 480 } }
+          : { width: { ideal: 640 }, height: { ideal: 480 } }
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      await refreshCameras();
+    } catch (err) {
+      if (err && err.name === 'NotFoundError') {
+        setFaceMessage('Kamera bulunamadı. Telefonu webcam uygulamasıyla bağlayıp tekrar deneyin.');
+      } else if (err && err.name === 'NotAllowedError') {
+        setFaceMessage('Kamera izni verilmedi. Tarayıcıdan kamera iznini açın.');
+      } else {
+        setFaceMessage('Kamera açılamadı. Telefon kamerasını webcam olarak bağlayıp tekrar deneyin.');
+      }
+    }
+  };
+
+  const captureFaceDescriptor = async () => {
+    if (!videoRef.current) {
+      throw new Error('Kamera hazır değil');
+    }
+    if (!window.faceapi) {
+      throw new Error('Yüz modeli hazır değil. Önce kamerayı başlatın.');
+    }
+    const faceapi = window.faceapi;
+    const detection = await faceapi
+      .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (!detection) {
+      throw new Error('Yüz algılanamadı. Kameraya daha net bakın.');
+    }
+
+    return Array.from(detection.descriptor);
+  };
+
+  const handleFaceLogin = async () => {
+    setError('');
+    if (!form.name) {
+      setFaceMessage('Hızlı yüz girişi için kullanıcı adı girin.');
       return;
     }
-    const now = new Date();
-    const start = votingPeriod.start ? new Date(votingPeriod.start) : null;
-    const end = votingPeriod.end ? new Date(votingPeriod.end) : null;
-    if ((start && now < start) || (end && now > end)) {
-      setVotingOpen(false);
-    } else {
-      setVotingOpen(true);
-    }
-  }, [votingPeriod]);
 
-  const handleSetVotingPeriod = async (start, end) => {
-    setError('');
-    setInfo('');
+    setFaceBusy(true);
+    setFaceMessage('Yüz doğrulanıyor...');
     try {
-      await axios.post('/api/voting-period', { start, end }, { headers: { 'x-session-id': sessionId } });
-      setInfo('Voting period updated');
-      fetchVotingPeriod();
+      const descriptor = await captureFaceDescriptor();
+      const res = await axios.post('/api/face/login', { name: form.name, descriptor });
+      setSessionId(res.data.sessionId);
+      setUser(res.data.user);
+      setForm(f => ({ ...f, password: '' }));
+      if (res.data.walletFundingWarning) {
+        setInfo(`⚠️ ${res.data.walletFundingWarning}`);
+      }
+      setFaceMessage(`Hızlı giriş başarılı (distance: ${res.data.faceDistance})`);
+      if (res.data.user?.role === 'admin') {
+        localStorage.setItem('adminSession', res.data.sessionId);
+        localStorage.setItem('adminName', res.data.user.name);
+        window.location.href = `http://localhost:5000/admin/dashboard?session=${res.data.sessionId}&name=${encodeURIComponent(res.data.user.name)}`;
+        return;
+      }
+      setCurrentPage('vote');
     } catch (err) {
-      setError(err.response?.data?.message || 'Voting period update failed');
+      setFaceMessage(err.response?.data?.message || err.message || 'Yüz ile giriş başarısız.');
+    } finally {
+      setFaceBusy(false);
     }
   };
 
   const handleLogin = async () => {
     setError('');
+    setInfo('');
     try {
       const res = await axios.post('/api/login', { name: form.name, password: form.password });
       setSessionId(res.data.sessionId);
       setUser(res.data.user);
       setForm({ name: '', password: '', email: '' });
+      if (res.data.walletFundingWarning) {
+        setInfo(`⚠️ ${res.data.walletFundingWarning}`);
+      }
       if (res.data.user?.role === 'admin') {
         localStorage.setItem('adminSession', res.data.sessionId);
         localStorage.setItem('adminName', res.data.user.name);
@@ -240,11 +268,14 @@ function App() {
         name: form.name,
         password: form.password,
         email: form.email || undefined,
-        otp: form.email ? registerOtp : undefined
+        otp: form.email ? registerOtp : undefined,
+        faceDescriptor: registerFaceEnabled ? (registerFaceDescriptor || undefined) : undefined
       });
       setRegisterMode(false);
       setRegisterStep(0);
       setRegisterOtp('');
+      setRegisterFaceEnabled(false);
+      setRegisterFaceDescriptor(null);
       setForm({ name: '', password: '', email: '' });
       setInfo('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
     } catch (err) {
@@ -252,73 +283,20 @@ function App() {
     }
   };
 
-  const handleAddCandidate = async () => {
-    setError('');
+  const handleCaptureRegisterFace = async () => {
+    setFaceBusy(true);
+    setFaceMessage('Kayıt için yüz verisi alınıyor...');
     try {
-      await axios.post('/api/candidates', { name: newCandidate }, { headers: { 'x-session-id': sessionId } });
-      setNewCandidate('');
-      fetchCandidates();
+      if (!faceEnabled) {
+        await loadFaceModels();
+      }
+      const descriptor = await captureFaceDescriptor();
+      setRegisterFaceDescriptor(descriptor);
+      setFaceMessage('Yüz verisi kayıt için hazır. İsterseniz bu adımı atlayabilirsiniz.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Error adding candidate');
-    }
-  };
-
-  const submitVote = async () => {
-    setError('');
-    setInfo('');
-    setTxStatus('');
-    setTxHash('');
-    
-    if (!votingOpen) {
-      setError('Voting is currently closed.');
-      return;
-    }
-    
-    const electionId = 1;
-    const candidateId = candidates.indexOf(candidate);
-    
-    if (candidateId === -1) {
-      setError('Geçersiz aday / Invalid candidate');
-      return;
-    }
-    
-    try {
-      setTxStatus('Oy gönderiliyor... / Sending vote...');
-      
-      const response = await axios.post(
-        '/api/votes',
-        {
-          candidate: candidate,
-          electionId: electionId
-        },
-        {
-          headers: { 'x-session-id': sessionId }
-        }
-      );
-      
-      setTxHash(response.data.transactionHash);
-      setTxStatus('');
-      setInfo(`✅ Oy başarıyla kaydedildi! / Vote submitted successfully! Transaction: ${formatTxHash(response.data.transactionHash)}`);
-      
-      fetchVotes();
-      fetchHistory();
-    } catch (err) {
-      setTxStatus('');
-      console.error('Vote error:', err);
-      setError(err.response?.data?.message || 'Oy gönderilirken hata oluştu / Error submitting vote');
-    }
-  };
-
-  const handleFeedbackSubmit = async (candidateName) => {
-    const comment = feedbackInput[candidateName];
-    if (!comment || !comment.trim()) return;
-    setError('');
-    try {
-      await axios.post('/api/feedback', { candidate: candidateName, comment }, { headers: { 'x-session-id': sessionId } });
-      setFeedbackInput(f => ({ ...f, [candidateName]: '' }));
-      fetchAllFeedbacks();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error submitting feedback');
+      setFaceMessage(err.message || 'Yüz yakalanamadı.');
+    } finally {
+      setFaceBusy(false);
     }
   };
 
@@ -403,10 +381,10 @@ function App() {
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 4, marginBottom: 28 }}>
-            <button style={tabStyle(!registerMode)} onClick={() => { setRegisterMode(false); setRegisterStep(0); setRegisterOtp(''); setError(''); setInfo(''); }}>
+            <button style={tabStyle(!registerMode)} onClick={() => { setRegisterMode(false); setRegisterStep(0); setRegisterOtp(''); setRegisterFaceEnabled(false); setRegisterFaceDescriptor(null); setError(''); setInfo(''); }}>
               Giriş Yap
             </button>
-            <button style={tabStyle(registerMode)} onClick={() => { setRegisterMode(true); setRegisterStep(0); setRegisterOtp(''); setError(''); setInfo(''); }}>
+            <button style={tabStyle(registerMode)} onClick={() => { setRegisterMode(true); setRegisterStep(0); setRegisterOtp(''); setRegisterFaceEnabled(false); setRegisterFaceDescriptor(null); setError(''); setInfo(''); }}>
               Kayıt Ol
             </button>
           </div>
@@ -452,6 +430,90 @@ function App() {
                   autoFocus
                 />
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>📧 {form.email} adresine 6 haneli kod gönderildi</div>
+
+                <div style={{ marginTop: 10, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, background: 'rgba(255,255,255,0.03)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.85)', marginBottom: registerFaceEnabled ? 10 : 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={registerFaceEnabled}
+                      onChange={e => {
+                        const enabled = e.target.checked;
+                        setRegisterFaceEnabled(enabled);
+                        if (!enabled) {
+                          setRegisterFaceDescriptor(null);
+                        }
+                      }}
+                    />
+                    Kayıtta yüz profilimi de ekle (opsiyonel)
+                  </label>
+
+                  {registerFaceEnabled && (
+                    <>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
+                        Sadece PC kamerası ile yüz doğrulama kullanılabilir.
+                      </div>
+
+                      <button
+                        style={{ ...btnStyle, marginTop: 0, marginBottom: 8, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(67,160,71,0.38)' }}
+                        onClick={requestCameraPermissionAndRefresh}
+                        disabled={faceBusy}
+                        type="button"
+                      >
+                        İzin İste ve Kameraları Yenile
+                      </button>
+
+                      <button
+                        style={{ ...btnStyle, marginTop: 0, marginBottom: 8, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(102,126,234,0.35)' }}
+                        onClick={async () => {
+                          await loadFaceModels();
+                          await refreshCameras();
+                          await startFaceCamera();
+                        }}
+                        disabled={faceLoading || faceBusy}
+                        type="button"
+                      >
+                        {faceLoading ? 'Model Yükleniyor...' : 'Kamerayı Başlat'}
+                      </button>
+
+                      {cameras.length > 0 && (
+                        <select
+                          value={selectedCameraId}
+                          onChange={e => setSelectedCameraId(e.target.value)}
+                          style={{ width: '100%', marginBottom: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff' }}
+                        >
+                          {cameras.map((cam, i) => (
+                            <option key={cam.deviceId || i} value={cam.deviceId}>
+                              {cam.label || `Kamera ${i + 1}`}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        muted
+                        playsInline
+                        style={{ width: '100%', height: 160, borderRadius: 10, background: '#000', objectFit: 'cover', marginBottom: 8 }}
+                      />
+
+                      <button
+                        style={{ ...btnStyle, marginTop: 0, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(255,193,7,0.45)' }}
+                        onClick={handleCaptureRegisterFace}
+                        disabled={faceBusy}
+                        type="button"
+                      >
+                        Yüz Verisini Yakala
+                      </button>
+
+                      {registerFaceDescriptor && (
+                        <div style={{ fontSize: 12, color: '#a5d6a7', marginTop: 8 }}>
+                          ✅ Yüz verisi hazır. Kayıtta otomatik saklanacak.
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </>
             )}
 
@@ -485,7 +547,7 @@ function App() {
           {/* Submit */}
           {registerMode && registerStep === 1 && (
             <button style={{ ...btnStyle, background: 'rgba(255,255,255,0.08)', marginBottom: 8 }}
-              onClick={() => { setRegisterStep(0); setRegisterOtp(''); setError(''); setInfo(''); }}>
+              onClick={() => { setRegisterStep(0); setRegisterOtp(''); setRegisterFaceEnabled(false); setRegisterFaceDescriptor(null); setError(''); setInfo(''); }}>
               ← Geri
             </button>
           )}
@@ -495,6 +557,77 @@ function App() {
           >
             {!registerMode ? 'Giriş Yap' : registerStep === 0 ? 'Kod Gönder →' : 'Hesabı Oluştur ✓'}
           </button>
+
+          {!registerMode && (
+            <div style={{ marginTop: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
+                📷 Hızlı Giriş (Face Control) — Sadece PC kamerası kullanılır
+              </div>
+
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
+                Kamera erişim izni verip listeden PC kamerasını seçin.
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <button
+                  style={{ ...btnStyle, marginTop: 0, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(67,160,71,0.38)' }}
+                  onClick={requestCameraPermissionAndRefresh}
+                  disabled={faceBusy}
+                >
+                  İzin İste ve Kameraları Yenile
+                </button>
+                <button
+                  style={{ ...btnStyle, marginTop: 0, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(102,126,234,0.35)' }}
+                  onClick={async () => {
+                    await loadFaceModels();
+                    await refreshCameras();
+                    await startFaceCamera();
+                  }}
+                  disabled={faceLoading || faceBusy}
+                >
+                  {faceLoading ? 'Model Yükleniyor...' : 'Kamerayı Başlat'}
+                </button>
+              </div>
+
+              {cameras.length > 0 && (
+                <select
+                  value={selectedCameraId}
+                  onChange={e => setSelectedCameraId(e.target.value)}
+                  style={{ width: '100%', marginBottom: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff' }}
+                >
+                  {cameras.map((cam, i) => (
+                    <option key={cam.deviceId || i} value={cam.deviceId}>
+                      {cam.label || `Kamera ${i + 1}`}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                style={{ width: '100%', height: 180, borderRadius: 10, background: '#000', objectFit: 'cover', marginBottom: 8 }}
+              />
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  style={{ ...btnStyle, marginTop: 0, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(56,142,60,0.45)' }}
+                  onClick={handleFaceLogin}
+                  disabled={!faceEnabled || faceBusy}
+                >
+                  Yüz ile Hızlı Giriş
+                </button>
+              </div>
+
+              {!!faceMessage && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>
+                  {faceMessage}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ZK-Email info badge on register */}
           {registerMode && (
@@ -506,27 +639,6 @@ function App() {
       </div>
     );
   };
-
-  const renderHistory = () => (
-    <div>
-      <h2>Oylama Geçmişi / Voting History</h2>
-      {history.length === 0 ? (
-        <p>Hiç oy kullanmadınız / No votes yet.</p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {history.map((v, i) => (
-            <li key={i} style={{ marginBottom: 20, padding: 15, border: '1px solid #ddd', borderRadius: 8 }}>
-              <div><strong>Seçim / Election:</strong> {v.election_title}</div>
-              <div><strong>Aday / Candidate:</strong> {v.candidate_name}</div>
-              <div><strong>Tarih / Date:</strong> {dayjs(v.voted_at).format('YYYY-MM-DD HH:mm')}</div>
-              <div><strong>Transaction Hash:</strong> <code style={{ fontSize: 11 }}>{v.transaction_hash}</code></div>
-            </li>
-          ))}
-        </ul>
-      )}
-      <button onClick={() => setCurrentPage('vote')}>{t.backToVoting}</button>
-    </div>
-  );
 
   const handleLogout = async () => {
     try {
@@ -544,184 +656,17 @@ function App() {
     setCurrentPage('login');
   };
 
-  const renderVotePage = () => (
-    <div>
-      <h2>{t.castVote}</h2>
-      
-      <div>
-        <b>{t.user}:</b> {user?.name} <span style={{ marginLeft: 10, color: '#888' }}>({user?.role})</span>
-        <span style={{ marginLeft: 20, color: votingOpen ? 'green' : 'red' }}>
-          {votingOpen ? t.votingOpen : t.votingClosed}
-        </span>
-        <label style={{ marginLeft: 10 }}>
-          {t.candidate}:
-          <select value={candidate} onChange={e => setCandidate(e.target.value)}>
-            {candidates.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-        <button 
-          style={{ marginLeft: 10 }} 
-          onClick={submitVote} 
-          disabled={!votingOpen || !!txStatus}
-        >
-          {txStatus || t.submitVote}
-        </button>
-        <button style={{ marginLeft: 10 }} onClick={handleLogout}>{t.logout}</button>
-      </div>
-      
-      {/* Transaction status */}
-      {txHash && (
-        <div style={{ marginTop: 10, padding: 10, background: '#e8f5e9', borderRadius: 6, fontSize: 14 }}>
-          <b>Transaction Hash:</b> 
-          <span style={{ marginLeft: 5, fontFamily: 'monospace', color: '#2e7d32' }}>
-            {formatTxHash(txHash)}
-          </span>
-        </div>
-      )}
-      
-      {user?.role === 'admin' && (
-        <div style={{ marginTop: 20, background: '#f3f3f3', padding: 10, borderRadius: 6 }}>
-          <b>{t.addCandidate}:</b>
-          <input
-            type="text"
-            value={newCandidate}
-            onChange={e => setNewCandidate(e.target.value)}
-            placeholder={t.candidate}
-            style={{ marginLeft: 10 }}
-          />
-          <button style={{ marginLeft: 10 }} onClick={handleAddCandidate}>{t.addCandidate}</button>
-          <div style={{ marginTop: 20 }}>
-            <b>{t.votingPeriod}:</b>
-            <div style={{ marginTop: 5 }}>
-              <label>{t.start}: <input type="datetime-local" value={votingPeriod.start ? dayjs(votingPeriod.start).format('YYYY-MM-DDTHH:mm') : ''} onChange={e => handleSetVotingPeriod(e.target.value, votingPeriod.end)} /></label>
-              <label style={{ marginLeft: 10 }}>{t.end}: <input type="datetime-local" value={votingPeriod.end ? dayjs(votingPeriod.end).format('YYYY-MM-DDTHH:mm') : ''} onChange={e => handleSetVotingPeriod(votingPeriod.start, e.target.value)} /></label>
-              <button style={{ marginLeft: 10 }} onClick={() => handleSetVotingPeriod(null, null)}>{t.clear}</button>
-            </div>
-            <div style={{ fontSize: 13, color: '#888', marginTop: 5 }}>
-              {votingPeriod.start && <span>{t.start}: {dayjs(votingPeriod.start).format('YYYY-MM-DD HH:mm')}</span>}
-              {votingPeriod.end && <span style={{ marginLeft: 10 }}>{t.end}: {dayjs(votingPeriod.end).format('YYYY-MM-DD HH:mm')}</span>}
-            </div>
-          </div>
-        </div>
-      )}
-      {info && <div style={{ color: 'green', marginTop: 10 }}>{info}</div>}
-      {error && <div style={{ color: 'red', marginTop: 10 }}>{error}</div>}
-      <button onClick={() => setCurrentPage('results')} style={{ marginTop: 20 }}>{t.viewResults}</button>
-      <button onClick={() => setCurrentPage('history')} style={{ marginTop: 20 }}>Oylama Geçmişi</button>
-      {user?.role === 'admin' && (
-        <button 
-          onClick={() => window.open(`http://localhost:5000/admin/dashboard?session=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(user.name)}`, '_blank')} 
-          style={{ marginTop: 20, background: '#667eea', color: 'white' }}
-        >
-          🗄️ Database Monitor (Admin)
-        </button>
-      )}
-    </div>
-  );
-
-  const renderResults = () => {
-    // Adaylara göre oy sayısı
-    const voteCounts = candidates.reduce((acc, c) => {
-      acc[c] = votes.filter(v => v.candidate === c).length;
-      return acc;
-    }, {});
-
-    const chartData = {
-      labels: candidates,
-      datasets: [
-        {
-          label: 'Votes',
-          data: candidates.map(c => voteCounts[c]),
-          backgroundColor: [
-            '#4caf50', '#2196f3', '#ff9800', '#e91e63', '#9c27b0', '#00bcd4', '#ffc107', '#8bc34a', '#f44336', '#607d8b'
-          ],
-          borderWidth: 1,
-        },
-      ],
-    };
-
-    const pieData = {
-      labels: candidates,
-      datasets: [
-        {
-          data: candidates.map(c => voteCounts[c]),
-          backgroundColor: [
-            '#4caf50', '#2196f3', '#ff9800', '#e91e63', '#9c27b0', '#00bcd4', '#ffc107', '#8bc34a', '#f44336', '#607d8b'
-          ],
-        },
-      ],
-    };
-
-    return (
-      <div>
-        <h2>{t.votingResults}</h2>
-        <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: 30, justifyContent: 'center' }}>
-          <div style={{ width: 280, minWidth: 200 }}>
-            <h4>{t.barChart}</h4>
-            <Bar 
-              key={`bar-${candidates.join('-')}-${votes.length}`}
-              data={chartData} 
-              options={{
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, precision: 0 } }
-              }} 
-            />
-          </div>
-          <div style={{ width: 280, minWidth: 200 }}>
-            <h4>{t.pieChart}</h4>
-            <Pie 
-              key={`pie-${candidates.join('-')}-${votes.length}`}
-              data={pieData} 
-              options={{ 
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { position: 'bottom' } } 
-              }} 
-            />
-          </div>
-        </div>
-        <div style={{ marginTop: 30 }}>
-          <h3>Adaylara Yorumlar / Candidate Feedback</h3>
-          {candidates.map(c => (
-            <div key={c} style={{ marginBottom: 20, background: '#f3f3f3', borderRadius: 6, padding: 10 }}>
-              <b>{c}</b>
-              <ul>
-                {(feedbacks[c] || []).length === 0 && <li>Henüz yorum yok / No feedback yet.</li>}
-                {(feedbacks[c] || []).map((f, i) => (
-                  <li key={i}><span style={{ color: '#888' }}>{f.user}:</span> {f.comment} <span style={{ fontSize: 12, color: '#aaa' }}>({dayjs(f.timestamp).format('YYYY-MM-DD HH:mm')})</span></li>
-                ))}
-              </ul>
-              {user && (
-                <div style={{ marginTop: 5 }}>
-                  <input
-                    type="text"
-                    placeholder="Yorumunuzu yazın / Write feedback"
-                    value={feedbackInput[c] || ''}
-                    onChange={e => setFeedbackInput(f => ({ ...f, [c]: e.target.value }))}
-                    style={{ width: '70%' }}
-                  />
-                  <button onClick={() => handleFeedbackSubmit(c)} style={{ marginLeft: 5 }}>Gönder / Submit</button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        <button style={{ marginTop: 20 }} onClick={() => setCurrentPage('vote')}>{t.backToVoting}</button>
-      </div>
-    );
-  };
-
   // Main return for App
   return (
     <div style={currentPage === 'login' ? {} : { padding: 20 }}>
       {currentPage === 'login' && renderLogin()}
-      {currentPage === 'vote' && renderVotePage()}
-      {currentPage === 'results' && renderResults()}
-      {currentPage === 'history' && renderHistory()}
+      {currentPage === 'vote' && (
+        <SimpleVoting 
+          user={user} 
+          sessionId={sessionId} 
+          onLogout={handleLogout}
+        />
+      )}
     </div>
   );
 }

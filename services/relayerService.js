@@ -118,12 +118,12 @@ class RelayerService {
             // EIP-712 types
             const types = VOTE_PROOF_TYPES;
             
-            // Prepare data for verification
+            // Prepare data for verification (same structure as when signing)
             const voteProof = {
                 emailHash: credential.emailHash,
-                electionID: BigInt(credential.electionID),
-                candidateID: BigInt(credential.candidateID),
-                timestamp: BigInt(credential.timestamp)
+                electionID: credential.electionID,
+                candidateID: credential.candidateID,
+                timestamp: credential.timestamp
             };
             
             // Verify signature

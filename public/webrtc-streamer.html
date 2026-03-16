@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebRTC Streamer</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    .card { background: #111827; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    input, button, select { padding: 10px 12px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; }
+    button { cursor: pointer; background: #2563eb; border: none; }
+    video { width: 100%; max-height: 540px; background: #000; border-radius: 10px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .muted { color: #94a3b8; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Telefon Kamera Streamer</h1>
+    <div class="card">
+      <div class="row">
+        <input id="roomId" placeholder="Oda Kodu (ornek: vote-room-1)" value="vote-room-1" />
+        <button id="joinBtn">Baglan ve Yayina Basla</button>
+      </div>
+      <p class="muted">Telefon tarayicisinda bu sayfayi ac. Receiver sayfasinda ayni oda kodunu gir.</p>
+      <p class="muted" id="status">Durum: Bekleniyor</p>
+    </div>
+
+    <div class="card">
+      <video id="localVideo" autoplay playsinline muted></video>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const peers = new Map();
+    const localVideo = document.getElementById('localVideo');
+    const roomIdInput = document.getElementById('roomId');
+    const statusEl = document.getElementById('status');
+    let localStream = null;
+
+    function setStatus(msg) { statusEl.textContent = 'Durum: ' + msg; }
+
+    async function startLocalStream() {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      localVideo.srcObject = localStream;
+    }
+
+    function createPeer(receiverId) {
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      });
+
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit('webrtc:signal', {
+            to: receiverId,
+            payload: { type: 'ice', candidate: event.candidate }
+          });
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+          peers.delete(receiverId);
+        }
+      };
+
+      peers.set(receiverId, pc);
+      return pc;
+    }
+
+    socket.on('webrtc:receiver-ready', async ({ receiverId }) => {
+      if (!localStream) return;
+      setStatus('Alici baglandi: ' + receiverId.substring(0, 6));
+      const pc = createPeer(receiverId);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('webrtc:signal', {
+        to: receiverId,
+        payload: { type: 'offer', sdp: offer.sdp }
+      });
+    });
+
+    socket.on('webrtc:signal', async ({ from, payload }) => {
+      const pc = peers.get(from);
+      if (!pc) return;
+
+      if (payload.type === 'answer') {
+        await pc.setRemoteDescription({ type: 'answer', sdp: payload.sdp });
+      } else if (payload.type === 'ice' && payload.candidate) {
+        try { await pc.addIceCandidate(payload.candidate); } catch (_) {}
+      }
+    });
+
+    document.getElementById('joinBtn').addEventListener('click', async () => {
+      try {
+        if (!localStream) {
+          setStatus('Kamera izni isteniyor...');
+          await startLocalStream();
+        }
+        const roomId = roomIdInput.value.trim();
+        if (!roomId) return;
+        socket.emit('webrtc:join', { roomId, role: 'streamer' });
+        setStatus('Yayin acildi. Receiver baglanmasi bekleniyor...');
+      } catch (err) {
+        setStatus('Kamera acilamadi: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

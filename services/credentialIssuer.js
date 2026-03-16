@@ -85,12 +85,12 @@ class CredentialIssuer {
             // 2. Create timestamp (credential validity)
             const timestamp = Math.floor(Date.now() / 1000);
             
-            // 3. Create VoteProof data
+            // 3. Create VoteProof data (numbers, not BigInt - will be converted during signing)
             const voteProof = {
                 emailHash: emailHash,
-                electionID: BigInt(electionID),
-                candidateID: BigInt(candidateID),
-                timestamp: BigInt(timestamp)
+                electionID: electionID,
+                candidateID: candidateID,
+                timestamp: timestamp
             };
             
             console.log('\n📝 Issuing ZK-Email Credential:');

@@ -8,6 +8,19 @@
 
 Bu sistem, Ethereum akıllı sözleşmeleri, EIP-712 tipli veri imzalama ve ZK-Email mekanizması kullanarak **kimlik gizliliğini korurken** şeffaf ve manipüle edilemez bir oylama altyapısı sunar. MetaMask gibi harici bir cüzdan uygulaması **gerektirmez** — tüm blockchain işlemleri backend tarafından yönetilen geçici cüzdanlar aracılığıyla gerçekleştirilir.
 
+### 🆕 Son Güncellemeler (Mart 2026)
+
+- Aktif oy akışı tamamen `SimpleVoting` üzerinden birleştirildi.
+- `SSIVoting.js` kaldırıldı (ürün akışı sadeleştirildi).
+- Legacy SSI endpointleri kaldırıldı:
+  - `/api/vote/authorize`
+  - `/api/ssi/request-authorization`
+  - `/api/ssi/issue-credential`
+  - `/api/ssi/verify-credential`
+- `/api/votes` endpointi artık seçim bazlı gerçek sonuç döndürüyor (`?electionId=`).
+- Basit oy akışında aday ID eşleşmesi ve DB hata yutma problemi düzeltildi.
+- Admin kullanıcı oluşturma endpointi yalnızca `admin` rolü oluşturacak şekilde sınırlandı.
+
 ---
 
 ## ✨ Özellikler
@@ -64,24 +77,22 @@ Bu sistem, Ethereum akıllı sözleşmeleri, EIP-712 tipli veri imzalama ve ZK-E
 
 ## 🏗️ Mimari
 
-### SSI Oylama Akışı
+### Güncel Oylama Akışı
 
 ```
-Kullanıcı                   Backend                    Blockchain
-    │                           │                           │
-    ├── 1. E-posta gir ─────────►                           │
-    │                           ├── OTP gönder (SMTP)       │
-    ├── 2. OTP doğrula ─────────►                           │
-    │                           ├── idHash = keccak256(email+salt)
-    │                           ├── Credential imzala (EIP-712)
-    │◄───────── Credential ──────┤                           │
-    │                           │                           │
-    ├── 3. Oy ver ──────────────►                           │
-    │                           ├── nullifier hesapla       │
-    │                           ├── Relayer imzala          │
-    │                           ├── vote() tx gönder ───────►
-    │                           │                           ├── Nullifier kontrol
-    │◄───────── TX Hash ─────────┤◄────── Onay ─────────────┤
+Kullanıcı                   Backend                          Blockchain
+  │                           │                                 │
+  ├── 1. Login ───────────────► Session + temp wallet           │
+  │◄──────── session id ───────┤                                 │
+  │                           │                                 │
+  ├── 2. /api/elections ──────► Domain/session kontrol          │
+  ├── 3. /api/candidates/:id ─► Adayları döndür                 │
+  │                           │                                 │
+  ├── 4. /api/vote/simple ────► Internal credential + relayer   │
+  │                           ├── vote() tx gönder ─────────────►
+  │◄───────── txHash ──────────┤◄────────── onay ────────────────┤
+  │                           │                                 │
+  ├── 5. /api/votes?electionId► Canlı sonuçlar                  │
 ```
 
 ### Geçici Wallet Sistemi
@@ -196,23 +207,27 @@ TCP    127.0.0.1:8545  LISTENING   # Hardhat Node
 ### Kimlik Doğrulama
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
+| `POST` | `/api/register/send-otp` | Kayıt OTP gönder |
 | `POST` | `/api/register` | Yeni kullanıcı kaydı |
 | `POST` | `/api/login` | Giriş yap (geçici cüzdan oluştur) |
+| `POST` | `/api/face/register` | Yüz profili kaydet |
+| `POST` | `/api/face/login` | Yüz ile hızlı giriş |
 | `POST` | `/api/logout` | Çıkış yap (cüzdanı temizle) |
 
 ### Oylama
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
+| `POST` | `/api/vote/simple` | Aktif basit oy akışı |
 | `POST` | `/api/votes` | Oy kullan (blockchain + DB) |
-| `GET` | `/api/votes` | Oy durumu |
+| `GET` | `/api/votes` | Seçim bazlı oy sonuçları (`?electionId=`) |
 | `GET` | `/api/voting-history` | Kişisel oylama geçmişi |
-| `GET` | `/api/results/:id` | Seçim sonuçları |
 
 ### Seçim & Adaylar
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| `GET` | `/api/elections` | Tüm seçimler |
-| `GET` | `/api/candidates` | Aday listesi |
+| `GET` | `/api/elections` | Kullanıcının erişebildiği aktif seçimler |
+| `GET` | `/api/candidates/:electionId` | Seçime ait adaylar |
+| `GET` | `/api/candidates` | Legacy aday adları listesi |
 
 ### ZK-Email
 | Method | Endpoint | Açıklama |
@@ -223,9 +238,11 @@ TCP    127.0.0.1:8545  LISTENING   # Hardhat Node
 ### SSI
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| `POST` | `/api/ssi/vote` | SSI credential ile oy kullan |
 | `GET` | `/api/ssi/domain` | EIP-712 domain bilgisi |
+| `POST` | `/api/ssi/relayer/submit` | Credential ile relayer submit |
 | `GET` | `/api/ssi/relayer/status` | Relayer durumu ve bakiye |
+
+> Not: Aşağıdaki legacy endpointler kaldırılmıştır: `/api/vote/authorize`, `/api/ssi/request-authorization`, `/api/ssi/issue-credential`, `/api/ssi/verify-credential`
 
 ### Admin (x-session-id header gerekli)
 | Method | Endpoint | Açıklama |
@@ -235,7 +252,7 @@ TCP    127.0.0.1:8545  LISTENING   # Hardhat Node
 | `PUT` | `/api/admin/elections/:id/toggle` | Aktif/pasif |
 | `DELETE` | `/api/admin/elections/:id` | Seçim sil |
 | `POST` | `/api/admin/elections/:id/candidates` | Aday ekle |
-| `POST` | `/api/admin/users` | Kullanıcı oluştur |
+| `POST` | `/api/admin/users` | Admin kullanıcı oluştur |
 | `PUT` | `/api/admin/users/:id` | Rol/şifre güncelle |
 | `DELETE` | `/api/admin/users/:id` | Kullanıcı sil |
 | `DELETE` | `/api/admin/sessions/:id` | Session sonlandır |
@@ -252,7 +269,7 @@ OnlineVoting/
 ├── client/                         # React frontend (port 3000)
 │   ├── src/
 │   │   ├── App.js                 # Ana component, login/oy arayüzü
-│   │   ├── SSIVoting.js           # SSI + ZK-Email oy bileşeni
+│   │   ├── SimpleVoting.js        # Aktif oy kullanma arayüzü
 │   │   ├── Web3Context.js         # Blockchain context
 │   │   └── utils/crypto.js        # Kriptografi yardımcıları
 │   └── package.json

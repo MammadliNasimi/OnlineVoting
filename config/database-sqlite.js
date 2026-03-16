@@ -132,8 +132,24 @@ class DatabaseService {
         user_id INTEGER,
         temp_wallet_address TEXT,
         temp_wallet_private_key_encrypted TEXT,
+        wallet_funded INTEGER DEFAULT 0,
+        wallet_funding_error TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         expires_at DATETIME NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    // Add wallet funding columns if they do not exist (migration for existing DBs)
+    try { this.db.exec('ALTER TABLE sessions ADD COLUMN wallet_funded INTEGER DEFAULT 0'); } catch (_) {}
+    try { this.db.exec('ALTER TABLE sessions ADD COLUMN wallet_funding_error TEXT'); } catch (_) {}
+
+    // Face profiles table (one biometric template per user)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS user_face_profiles (
+        user_id INTEGER PRIMARY KEY,
+        descriptor_json TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
@@ -187,26 +203,27 @@ class DatabaseService {
       console.log('   ✅ Default admin user created (admin/admin123)');
     }
 
-    // Insert sample election if not exists
-    const electionExists = this.db.prepare('SELECT id FROM elections WHERE id = 1').get();
-    if (!electionExists) {
-      this.db.prepare(
+    // Insert sample election if database is empty
+    const electionCount = this.db.prepare('SELECT COUNT(*) as c FROM elections').get();
+    if (electionCount.c === 0) {
+      const electionInfo = this.db.prepare(
         `INSERT INTO elections (title, description, start_date, end_date, blockchain_election_id)
          VALUES (?, ?, datetime('now'), datetime('now', '+30 days'), ?)`
       ).run('2026 Öğrenci Başkanı Seçimi', 'Blockchain tabanlı anonim oylama', 1);
+      const sampleElectionId = electionInfo.lastInsertRowid;
 
-      // Insert candidates
+      // Insert candidates for the newly created election id
       this.db.prepare(
         'INSERT INTO candidates (election_id, name, description, blockchain_candidate_id) VALUES (?, ?, ?, ?)'
-      ).run(1, 'Ali Yılmaz', 'Deneyimli lider', 0);
+      ).run(sampleElectionId, 'Ali Yılmaz', 'Deneyimli lider', 0);
       
       this.db.prepare(
         'INSERT INTO candidates (election_id, name, description, blockchain_candidate_id) VALUES (?, ?, ?, ?)'
-      ).run(1, 'Ayşe Demir', 'Yenilikçi düşünür', 1);
+      ).run(sampleElectionId, 'Ayşe Demir', 'Yenilikçi düşünür', 1);
       
       this.db.prepare(
         'INSERT INTO candidates (election_id, name, description, blockchain_candidate_id) VALUES (?, ?, ?, ?)'
-      ).run(1, 'Mehmet Kaya', 'Topluluk organizatörü', 2);
+      ).run(sampleElectionId, 'Mehmet Kaya', 'Topluluk organizatörü', 2);
 
       console.log('   ✅ Sample election and candidates created');
     }
@@ -329,7 +346,18 @@ class DatabaseService {
       .get(userId, electionId);
   }
 
-  async recordVote(userId, electionId, candidateId, commitment, txHash) {
+  async recordVote(userId, electionId, blockchainCandidateId, commitment, txHash) {
+    // Convert blockchain candidate_id to database candidate id
+    const candidate = this.db.prepare(
+      `SELECT id FROM candidates WHERE election_id = ? AND blockchain_candidate_id = ?`
+    ).get(electionId, blockchainCandidateId);
+    
+    if (!candidate) {
+      throw new Error(`Candidate not found: blockchain_candidate_id=${blockchainCandidateId} for election ${electionId}`);
+    }
+    
+    const databaseCandidateId = candidate.id;
+    
     // Mark user as voted in vote_status
     await this.markUserVoted(userId, electionId, txHash, commitment);
     
@@ -337,12 +365,12 @@ class DatabaseService {
     this.db.prepare(
       `INSERT INTO votes (election_id, candidate_id, commitment, transaction_hash)
        VALUES (?, ?, ?, ?)`
-    ).run(electionId, candidateId, commitment, txHash);
+    ).run(electionId, databaseCandidateId, commitment, txHash);
     
     // Increment candidate vote count
     this.db.prepare(
       `UPDATE candidates SET vote_count = vote_count + 1 WHERE id = ?`
-    ).run(candidateId);
+    ).run(databaseCandidateId);
     
     return { success: true };
   }
@@ -363,12 +391,40 @@ class DatabaseService {
     ).all(userId);
   }
 
+  getVoteResultsByElection(electionId = null) {
+    const whereClause = electionId ? 'WHERE c.election_id = ?' : '';
+    const stmt = this.db.prepare(
+      `SELECT
+         c.election_id,
+         c.id AS candidate_id,
+         c.blockchain_candidate_id,
+         c.name AS candidate,
+         COALESCE(c.vote_count, 0) AS vote_count,
+         e.title AS election_title
+       FROM candidates c
+       JOIN elections e ON e.id = c.election_id
+       ${whereClause}
+       ORDER BY c.election_id ASC, c.blockchain_candidate_id ASC, c.id ASC`
+    );
+    return electionId ? stmt.all(electionId) : stmt.all();
+  }
+
   // ========== SESSIONS ==========
 
-  async createSession(sessionId, userId, expiresAt) {
+  async createSession(sessionId, userId, expiresAt, walletAddress = null, walletPrivateKeyEncrypted = null, walletFunded = false, walletFundingError = null) {
     this.db.prepare(
-      'INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)'
-    ).run(sessionId, userId, expiresAt.toISOString());
+      `INSERT INTO sessions
+       (id, user_id, temp_wallet_address, temp_wallet_private_key_encrypted, wallet_funded, wallet_funding_error, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      sessionId,
+      userId,
+      walletAddress,
+      walletPrivateKeyEncrypted,
+      walletFunded ? 1 : 0,
+      walletFundingError,
+      expiresAt.toISOString()
+    );
     return this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId);
   }
 
@@ -392,9 +448,45 @@ class DatabaseService {
 
   async getSessionWallet(sessionId) {
     const result = this.db.prepare(
-      'SELECT temp_wallet_address, temp_wallet_private_key_encrypted FROM sessions WHERE id = ?'
+      'SELECT temp_wallet_address, temp_wallet_private_key_encrypted, wallet_funded, wallet_funding_error FROM sessions WHERE id = ?'
     ).get(sessionId);
     return result;
+  }
+
+  cleanupExpiredSessions() {
+    const info = this.db.prepare(
+      "DELETE FROM sessions WHERE datetime(expires_at) <= datetime('now')"
+    ).run();
+    return info?.changes || 0;
+  }
+
+  // ========== FACE LOGIN ==========
+
+  setUserFaceProfile(userId, descriptorArray) {
+    const descriptorJson = JSON.stringify(descriptorArray);
+    this.db.prepare(
+      `INSERT INTO user_face_profiles (user_id, descriptor_json, created_at, updated_at)
+       VALUES (?, ?, datetime('now'), datetime('now'))
+       ON CONFLICT(user_id) DO UPDATE SET
+       descriptor_json = excluded.descriptor_json,
+       updated_at = datetime('now')`
+    ).run(userId, descriptorJson);
+  }
+
+  getUserFaceProfile(userId) {
+    const row = this.db.prepare(
+      'SELECT user_id, descriptor_json, created_at, updated_at FROM user_face_profiles WHERE user_id = ?'
+    ).get(userId);
+    if (!row) return null;
+    return {
+      ...row,
+      descriptor: JSON.parse(row.descriptor_json)
+    };
+  }
+
+  hasUserFaceProfile(userId) {
+    const row = this.db.prepare('SELECT user_id FROM user_face_profiles WHERE user_id = ?').get(userId);
+    return !!row;
   }
 
   // ========== ZK-EMAIL: ALLOWED DOMAINS ==========
@@ -473,14 +565,14 @@ class DatabaseService {
     }));
   }
 
-  createElection(title, description, startDate, endDate) {
+  createElection(title, description, startDate, endDate, blockchainElectionId = null) {
+    const blockchainId = blockchainElectionId || 
+      (this.db.prepare('SELECT COALESCE(MAX(blockchain_election_id), 0) + 1 as next FROM elections').get().next);
+    
     const info = this.db.prepare(
       `INSERT INTO elections (title, description, start_date, end_date, is_active, blockchain_election_id)
        VALUES (?, ?, ?, ?, 1, ?)`
-    ).run(title, description || '', startDate, endDate,
-      // Use next available blockchain_election_id
-      (this.db.prepare('SELECT COALESCE(MAX(blockchain_election_id), 0) + 1 as next FROM elections').get().next)
-    );
+    ).run(title, description || '', startDate, endDate, blockchainId);
     return this.db.prepare('SELECT * FROM elections WHERE id = ?').get(info.lastInsertRowid);
   }
 
@@ -500,13 +592,14 @@ class DatabaseService {
     return this.db.prepare('SELECT * FROM elections WHERE id = ?').get(id);
   }
 
-  addCandidateToElection(electionId, name, description) {
-    const nextBlockchainId = this.db.prepare(
-      'SELECT COALESCE(MAX(blockchain_candidate_id), -1) + 1 as next FROM candidates WHERE election_id = ?'
-    ).get(electionId).next;
+  addCandidateToElection(electionId, name, description, blockchainCandidateId = null) {
+    const blockchainId = blockchainCandidateId !== null ? blockchainCandidateId :
+      this.db.prepare(
+        'SELECT COALESCE(MAX(blockchain_candidate_id), -1) + 1 as next FROM candidates WHERE election_id = ?'
+      ).get(electionId).next;
     const info = this.db.prepare(
       'INSERT INTO candidates (election_id, name, description, blockchain_candidate_id) VALUES (?, ?, ?, ?)'
-    ).run(electionId, name, description || '', nextBlockchainId);
+    ).run(electionId, name, description || '', blockchainId);
     return this.db.prepare('SELECT * FROM candidates WHERE id = ?').get(info.lastInsertRowid);
   }
 

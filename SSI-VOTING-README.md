@@ -90,74 +90,27 @@ getStatus()
 checkRateLimit(identifier)
 ```
 
-### 4. Frontend Component (`SSIVoting.js`)
+### 4. Frontend Flow (Current)
 
-**Location:** `client/src/SSIVoting.js`
+`client/src/SSIVoting.js` kaldirildi. Aktif oy akisi `client/src/SimpleVoting.js` uzerinden calisir.
 
-**User Flow:**
-1. **Request Authorization** - Get eligibility token (no candidate choice yet)
-2. **Select Candidate** - Choose who to vote for
-3. **Receive Credential** - Get EIP-712 signed credential
-4. **Submit Vote** - Choose relayer (gas-less) or direct (MetaMask)
+**Guncel User Flow:**
+1. Kullanici aktif secimi ve adayi secer (`/api/elections`, `/api/candidates/:electionId`)
+2. Oy `/api/vote/simple` ile gonderilir
+3. Sonuclar `/api/votes` ile okunur
+4. Oy gecmisi `/api/voting-history` ile listelenir
 
 ## API Endpoints
 
 ### SSI Credential Endpoints
 
-#### POST `/api/ssi/request-authorization`
-Request authorization token for voting
-```json
-{
-  "electionID": 1
-}
-```
+#### Legacy endpoints removed
 
-**Response:**
-```json
-{
-  "success": true,
-  "authToken": {
-    "studentIDHash": "0x...",
-    "electionID": 1,
-    "timestamp": 1234567890,
-    "issuer": "0x...",
-    "validUntil": 1234571490
-  }
-}
-```
-
-#### POST `/api/ssi/issue-credential`
-Issue signed credential with candidate choice
-```json
-{
-  "electionID": 1,
-  "candidateID": 0
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "credential": {
-    "studentIDHash": "0x...",
-    "electionID": 1,
-    "candidateID": 0,
-    "timestamp": 1234567890,
-    "signature": "0x..."
-  },
-  "issuer": "0x...",
-  "issuedAt": "2026-03-03T12:00:00Z"
-}
-```
-
-#### POST `/api/ssi/verify-credential`
-Verify credential signature (testing)
-```json
-{
-  "credential": { /* credential object */ }
-}
-```
+Asagidaki endpointler urun karmasasini azaltmak icin kaldirildi:
+- `POST /api/vote/authorize`
+- `POST /api/ssi/request-authorization`
+- `POST /api/ssi/issue-credential`
+- `POST /api/ssi/verify-credential`
 
 #### GET `/api/ssi/domain`
 Get EIP-712 domain information
@@ -273,60 +226,32 @@ cd client
 npm start
 ```
 
-## Voting Flow (Step-by-Step)
+## Voting Flow (Current)
 
 ### Step 1: User Authentication
 ```
 User logs in → Backend creates session → Temp wallet created
 ```
 
-### Step 2: Request Authorization
+### Step 2: Fetch Elections and Candidates
 ```
-Frontend: POST /api/ssi/request-authorization { electionID: 1 }
-Backend:  - Checks user eligibility
-          - Creates studentIDHash = keccak256(studentID + salt)
-          - Returns authorization token
+Frontend: GET /api/elections (x-session-id required)
+Frontend: GET /api/candidates/:electionId
 ```
 
-### Step 3: Select Candidate
+### Step 3: Cast Vote
 ```
-User selects candidate in UI
-```
-
-### Step 4: Issue Credential
-```
-Frontend: POST /api/ssi/issue-credential { electionID: 1, candidateID: 0 }
-Backend:  - Creates VoteProof struct
-          - Signs with EIP-712
-          - Returns signed credential
+Frontend: POST /api/vote/simple { electionId, candidateId }
+Backend:  - Checks session + domain restrictions
+          - Issues internal credential
+          - Submits through relayer
+          - Writes DB vote record
 ```
 
-### Step 5: Submit Vote (Option A: Relayer)
+### Step 4: Live Results and History
 ```
-Frontend: POST /api/ssi/relayer/submit { credential }
-Backend:  - Verifies credential signature
-          - Checks nullifier not used
-          - Relayer wallet submits tx to contract
-          - Returns txHash
-```
-
-### Step 5: Submit Vote (Option B: Direct)
-```
-Frontend: User connects MetaMask
-          - Calls contract.vote(voteProof)
-          - User pays gas
-          - Returns txHash
-```
-
-### Step 6: Contract Verification
-```
-Smart Contract:
-1. Calculate nullifier = keccak256(studentIDHash, electionID)
-2. Check nullifier not in usedNullifiers mapping
-3. Verify EIP-712 signature from issuer
-4. Record vote: candidates[electionID][candidateID].voteCount++
-5. Mark nullifier as used: usedNullifiers[nullifier] = true
-6. Emit VoteCast event
+Frontend: GET /api/votes?electionId=...
+Frontend: GET /api/voting-history
 ```
 
 ## Privacy Analysis
@@ -349,23 +274,15 @@ Smart Contract:
 
 ## Testing
 
-### Test Credential Issuance
+### Test Simple Voting
 ```bash
-curl -X POST http://localhost:5000/api/ssi/request-authorization \
+curl -X POST http://localhost:5000/api/vote/simple \
   -H "Content-Type: application/json" \
   -H "x-session-id: YOUR_SESSION_ID" \
-  -d '{"electionID": 1}'
+  -d '{"electionId": 1, "candidateId": 1}'
 ```
 
-### Test Credential Signing
-```bash
-curl -X POST http://localhost:5000/api/ssi/issue-credential \
-  -H "Content-Type: application/json" \
-  -H "x-session-id: YOUR_SESSION_ID" \
-  -d '{"electionID": 1, "candidateID": 0}'
-```
-
-### Test Relayer Submission
+### Test Relayer Submission Endpoint (if used)
 ```bash
 curl -X POST http://localhost:5000/api/ssi/relayer/submit \
   -H "Content-Type: application/json" \
@@ -378,18 +295,18 @@ curl -X POST http://localhost:5000/api/ssi/relayer/submit \
 curl http://localhost:5000/api/ssi/relayer/status
 ```
 
-## Comparison: Legacy vs SSI
+## Current Architecture Snapshot
 
-| Feature | Legacy (VotingAnonymous) | SSI (VotingSSI) |
-|---------|-------------------------|-----------------|
-| **Identity Verification** | Backend commitment | EIP-712 credential |
-| **Signature Standard** | Ethereum signed message | EIP-712 typed data |
-| **Double Vote Prevention** | Commitment mapping | Nullifier mechanism |
-| **Privacy Level** | High | Very High |
-| **Gas-less Option** | No | Yes (relayer) |
-| **Standard Compliance** | Custom | EIP-712 (standard) |
-| **Verifiable Credentials** | No | Yes |
-| **Identity Portability** | No | Yes (SSI principle) |
+| Area | Current Implementation |
+|------|------------------------|
+| **Frontend voting flow** | `client/src/SimpleVoting.js` |
+| **Election access control** | Session + allowed email domain checks (`/api/elections`) |
+| **Vote submission** | `POST /api/vote/simple` |
+| **Credential/signature path** | Internal EIP-712 credential issuance + relayer submit on backend |
+| **Double-vote prevention** | Nullifier control on contract + DB vote status checks |
+| **Result visibility** | `GET /api/votes?electionId=...` (live polling) |
+| **Auditability** | Transaction hash + voting history (`/api/voting-history`) |
+| **Gas strategy** | Relayer-backed submission |
 
 ## Security Considerations
 
