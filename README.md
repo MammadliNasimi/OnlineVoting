@@ -1,442 +1,164 @@
-﻿# 🗳️ SSI Voting — Blockchain Tabanlı Anonim Oylama Sistemi
-
-> **TÜBİTAK 2209-A Araştırma Projesi** — Self-Sovereign Identity (SSI) ve Zero-Knowledge e-posta doğrulama ile blockchain tabanlı anonim oylama sistemi prototipi.
-
----
-
-## 📋 Proje Hakkında
-
-Bu sistem, Ethereum akıllı sözleşmeleri, EIP-712 tipli veri imzalama ve ZK-Email mekanizması kullanarak **kimlik gizliliğini korurken** şeffaf ve manipüle edilemez bir oylama altyapısı sunar. MetaMask gibi harici bir cüzdan uygulaması **gerektirmez** — tüm blockchain işlemleri backend tarafından yönetilen geçici cüzdanlar aracılığıyla gerçekleştirilir.
-
-### 🆕 Son Güncellemeler (Mart 2026)
-
-- Aktif oy akışı tamamen `SimpleVoting` üzerinden birleştirildi.
-- `SSIVoting.js` kaldırıldı (ürün akışı sadeleştirildi).
-- Legacy SSI endpointleri kaldırıldı:
-  - `/api/vote/authorize`
-  - `/api/ssi/request-authorization`
-  - `/api/ssi/issue-credential`
-  - `/api/ssi/verify-credential`
-- `/api/votes` endpointi artık seçim bazlı gerçek sonuç döndürüyor (`?electionId=`).
-- Basit oy akışında aday ID eşleşmesi ve DB hata yutma problemi düzeltildi.
-- Admin kullanıcı oluşturma endpointi yalnızca `admin` rolü oluşturacak şekilde sınırlandı.
+﻿<div align="center">
+  <h1>🗳️ SSI Voting - Blockchain Tabnlı Anonim Oylama Sistemi</h1>
+  <p><strong>TÜBİTAK 2209-A Araştırma Projesi Kapsamında Geliştirilmiş, Sıfır Bilgi İspatı (Zero-Knowledge) ve Self-Sovereign Identity (SSI) Destekli Yeni Nesil Oylama Altyapısı</strong></p>
+  
+  [![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg?style=for-the-badge&logo=nodedotjs)](https://nodejs.org/)
+  [![React](https://img.shields.io/badge/React-18.x-blue.svg?style=for-the-badge&logo=react)](https://reactjs.org/)
+  [![Solidity](https://img.shields.io/badge/Solidity-0.8.x-black.svg?style=for-the-badge&logo=solidity)](https://soliditylang.org/)
+  [![Ethers.js](https://img.shields.io/badge/Ethers.js-v6-blueviolet.svg?style=for-the-badge)](https://docs.ethers.io/)
+  [![SQLite](https://img.shields.io/badge/SQLite-3-003B57.svg?style=for-the-badge&logo=sqlite)](https://sqlite.org/)
+  
+</div>
 
 ---
 
-## ✨ Özellikler
+## 📖 Proje Hakkında
 
-### 👤 Kullanıcı Özellikleri
-- ✅ **Kayıt ve Giriş**: Güvenli bcrypt tabanlı kimlik doğrulama
-- ✅ **Geçici Cüzdan Yönetimi**: Her giriş'te otomatik cüzdan oluşturma, çıkış'ta silme
-- ✅ **SSI Tabanlı Oy**: EIP-712 imzalı credential ile oy kullanma
-- ✅ **ZK-Email Doğrulama**: E-posta hash'i nullifier olarak — e-posta asla saklanmaz
-- ✅ **Gas-Less Oylama**: Relayer servisi ile kullanıcı gas ödemez
-- ✅ **Anonim Oy**: Nullifier mekanizması — kim oy kullandığı blockchain'de görünmez
-- ✅ **Çift Oy Engeli**: Blockchain nullifier ile tekrar oy kullanımı imkânsız
-- ✅ **Oy Geçmişi**: Kullanıcının blockchain transaction hash'lerini görmesi
-- ✅ **Gerçek Zamanlı Sonuçlar**: Canlı oy sayımı ve bar grafikleri
+Geleneksel elektronik oylama sistemlerinin şeffaflık ve manipülasyon sorunlarına karşın tasarlanan bu proje, **Ethereum Akıllı Sözleşmeleri**, **ZK-Email Konsepti** ve **Self-Sovereign Identity (SSI)** altyapılarını kullanarak geliştirilmiştir.
 
-### 🛡️ Admin Panel Özellikleri
-- ✅ **Otomatik Giriş**: `localhost:5000/admin/dashboard` — login formu yok, otomatik oturum
-- ✅ **Genel Bakış**: Anlık istatistikler (kullanıcı, oy, session, seçim, aday sayısı)
-- ✅ **Seçim Yönetimi**: Seçim oluşturma, aktif/pasif etme, silme
-- ✅ **Aday Yönetimi**: Seçimlere aday ekleme/silme/güncelleme
-- ✅ **Kullanıcı Yönetimi**: Kullanıcı oluşturma, rol değiştirme, şifre güncelleme, silme
-- ✅ **Session Yönetimi**: Aktif sessionları görüntüleme, zorla çıkış
-- ✅ **Veritabanı Görüntüleyici**: Tüm tabloları (oylar, kullanıcılar, durumlar) canlı izleme
-- ✅ **SSI Durum Paneli**: Contract domain bilgisi, relayer durumu ve ETH bakiyesi
-- ✅ **Blockchain Paneli**: Hardhat node durumu, son blok, contract adresleri
-- ✅ **ZK-Email Domain Yönetimi**: İzinli e-posta domainleri ekleme/silme
-- ✅ **Otomatik Yenileme**: 3 saniyede bir tüm verileri canlı güncelleme
-
-### ⚙️ Teknik Özellikler
-- ✅ **EIP-712 Typed Data**: İmzalı credential sistemi
-- ✅ **Nullifier Mekanizması**: `keccak256(idHash + electionId)` — çift oy engeli
-- ✅ **Backend-Managed Wallets**: MetaMask gerekmez
-- ✅ **AES-256-CBC**: Private key şifreleme
-- ✅ **Gas-Less Relayer**: Kullanıcı adına relayer imzalar ve gönderir
-- ✅ **Domain Kısıtlaması**: Her seçim belirli e-posta domainlerine kısıtlanabilir
-- ✅ **SQLite Embedded DB**: Sıfır konfigürasyon ile çalışan yerel veritabanı
-- ✅ **8 Saatlik Session**: Oturum zaman aşımı 8 saat
+Sistem, seçmenlerin kimliğini tamamen gizli tutarken (anonimlik), kullanılan her oyun sadece bir kez kullanıldığı (çift oy engeli) ve değiştirilemeyeceği (değişmezlik) prensipleriyle çalışır. Harici bir **MetaMask veya Kripto Cüzdanına ihtiyaç duymadan**, Web2 rahatlığında Web3 güvenliği sağlar.
 
 ---
 
-## 🛠️ Teknoloji Stack
+## 🌟 Öne Çıkan Özellikler & Nasıl Çalışır? (Features Deep-Dive)
 
-| Katman | Teknoloji |
-|--------|-----------|
-| **Frontend** | React 18, Axios, Chart.js |
-| **Admin Panel** | Vanilla HTML/CSS/JS (standalone, `public/admin.html`) |
-| **Backend** | Node.js, Express.js |
-| **Blockchain** | Ethers.js v6, Hardhat, Solidity 0.8 |
-| **Veritabanı** | SQLite (better-sqlite3) |
-| **Güvenlik** | bcryptjs, AES-256-CBC, EIP-712, keccak256 |
-| **Test Ağı** | Hardhat Local Network (Chain ID: 31337) |
+Sistemin her bir yapı taşı, güvenlik ve kullanıcı deneyimi gözetilerek özel olarak tasarlanmıştır.
 
----
+### 1. 🎭 ZK-Email & Nullifier Mekanizması (Tam Anonimlik)
+- **Nasıl Çalışır?** Kullanıcı sisteme kurumsal e-posta adresiyle kayıt olur. Kullanıcı oy kullanırken e-posta bilgisi doğrudan blockchain'e gönderilmez. Bunun yerine, e-posta adresi, arka planda kriptografik olarak hashlenir ve seçim ile birleştirilerek tekil bir **Nullifier** (Gizli Kimlik Özeti) oluşturulur keccak256(idHash + electionId).
+- **Faydası:** Blockchain üzerindeki işlemler incelense bile, oyun kime ait olduğu (e-posta veya isim) asla geriye dönük olarak tespit edilemez. Çift oy kullanmaya çalışan bir kişinin "Nullifier"ı zaten kayıtlı olacağından sistem oyu otomatik reddeder.
 
-## 🏗️ Mimari
+### 2. ⛽ Walletless Oylama & Relayer Servisi (Gasless Oylama)
+- **Nasıl Çalışır?** Kullanıcılar (seçmenler) kripto para piyasasından veya cüzdan konfigürasyonlarından (Gas ücreti, Metamask kurulumu vb.) tamamen izoledir. Kullanıcı giriş yaptığında (Login) arka planda geçici, şifrelenmiş bir **Session Wallet** (Oturum Cüzdanı) oluşturulur.
+- **Faydası:** Kullanıcı oylama butonuna bastığında, işlem sistemin merkezi bir **Relayer** (Aktarıcı) servisi aracılığıyla kullanıcı adına ödemesi yapılarak blockchain'e yazılır. Seçmenin hiçbir kripto bilgisi olması gerekmez.
 
-### Güncel Oylama Akışı
+### 3. ✍️ EIP-712 Typed Data Stardardı
+- **Nasıl Çalışır?** Oylama işlemi için standart veri paketleri yerine, doğrulanabilir ve kriptografik olarak yapılandırılmış bir "Oy İmza Paketi" (Credential ve Oy Dağılımı) oluşturulur.
+- **Faydası:** Backend'in, kullanıcının niyetini (hangi adaya oy verdiğini) manipüle etmesini engeller. Akıllı Sözleşme, atılan imzanın tam ve kesin olarak o kişiye ait olduğunu EIP-712 standardında test ederek doğrular.
 
-```
-Kullanıcı                   Backend                          Blockchain
-  │                           │                                 │
-  ├── 1. Login ───────────────► Session + temp wallet           │
-  │◄──────── session id ───────┤                                 │
-  │                           │                                 │
-  ├── 2. /api/elections ──────► Domain/session kontrol          │
-  ├── 3. /api/candidates/:id ─► Adayları döndür                 │
-  │                           │                                 │
-  ├── 4. /api/vote/simple ────► Internal credential + relayer   │
-  │                           ├── vote() tx gönder ─────────────►
-  │◄───────── txHash ──────────┤◄────────── onay ────────────────┤
-  │                           │                                 │
-  ├── 5. /api/votes?electionId► Canlı sonuçlar                  │
-```
-
-### Geçici Wallet Sistemi
-
-```
-Login ──► Temp Wallet Oluştur ──► 1 ETH Fonla ──► Session'a Kaydet (şifreli)
-  │
-Vote ──► Session Wallet Al ──► İmzala ──► Blockchain'e Gönder
-  │
-Logout ──► Session Sil (wallet otomatik temizlenir)
-```
+### 4. 🛡️ Geçici Oturum Cüzdanları (Ephemeral Wallets)
+- **Nasıl Çalışır?** Her başarılı kullanıcı girişinde bellekte rastgele bir cüzdan (Private Key) oluşturulur, AES-256 algoritmasıyla şifrelenir ve oturum süresince saklanır. Çıkış yapıldığında (Logout veya Timeout) cüzdan tamamen yok edilir.
+- **Faydası:** Cihaz çalınsa veya hacklense dahi veritabanında kullanıcının kalıcı bir cüzdanı bulunmadığı için geriye dönük oy sızıntısı riski ortadan kaldırılır.
 
 ---
 
-## 🚀 Kurulum
+## 🛠️ Yönetim ve Admin Paneli
 
-### Gereksinimler
+Oylama sisteminin yönetimi, kullanımı kolay gelişmiş araçlarla desteklenmiş eşzamanlı bir kontrol paneli üzerinden yapılır:
+* **Canlı Monitör:** Sisteme atılan oylar, blockchain blok onayları ve aktif seçimler gerçek zamanlı (%100 Live) izlenir.
+* **Akıllı Seçim ve Aday Yönetimi:** Özel domain bazlı seçim kısıtları tanımlanabilir (Örn: *Sadece "@akdeniz.edu.tr" uzantılı kişiler oy kullanabilir*).
+* **Blockchain Node Takibi:** Hardhat çalışma durumu, Contract adresleri, mevcut gaz kullanım oranları tek ekrandan gözlenir.
 
-- **Node.js** v16+
-- **npm** v8+
+---
 
-### 1. Bağımlılıkları Yükle
+## 🏗️ Sistem Mimarisi & Oylama İş Akışı (Workflow)
 
-```bash
+`mermaid
+graph TD;
+    A[Kullanıcı Login Olur] -->|1. JWT + Şifreli Ephemeral Cüzdan| B(Backend Session Başlar);
+    B --> C{Seçimleri ve Adayları Görüntüle};
+    C -->|2. Aday Seçimi| D[Oy Verme İsteği Tetiklenir];
+    D -->|3. EIP-712 İmzalama| E{Backend: Veri Doğrulama ve Hash Oluşturma};
+    E -->|4. ZK-Email & Nullifier| F[Sistem Cüzdanı / Relayer];
+    F -->|5. Gas Odenerek Tx Gonderilir| G[(Ethereum Akıllı Sözleşmesi)];
+    G -->|6. Akıllı Sözleşme Kontrolü| H{Nullifier Kayıtlı mı?};
+    H -- EVET --> I[Tx İptal Edilir REVERT];
+    H -- HAYIR --> J[Oy Sayacı Artar & Nullifier Kaydedilir];
+    J --> K[Oylama Başarılı! TxHash Dönülür];
+`
+
+1. **Autentikasyon Phase:** Kullanıcı giriş yapar, Backend kullanıcıyı yetkilendirir ve oturum oluşturur.
+2. **Retrieve Phase:** Kullanıcının görmeye yetkili olduğu (domain filtresine uygun) aktif seçimler frontend'e gönderilir.
+3. **Voting Phase:** E-posta verisi kullanarak özel bir SSI Credential'ı JSON olarak hazırlanır ve geçici cüzdan ile imzalanıp Relayer'a verilir.
+4. **On-Chain Phase:** Smart contract, imzayı denetler; kimlik ve Nullifier temiz ise ote() fonksiyonunu işletir.
+
+---
+
+## 💻 Teknoloji Yığıtı (Tech Stack)
+
+| Bileşen | Kullanılan Teknoloji | Görevi / Rolü |
+|---------|----------------------|---------------|
+| **Frontend** | React 18, Chart.js, Tailwind/CS | Etkileşimli Kullanıcı ve Aday Seçim Arayüzü |
+| **Backend** | Node.js, Express.js | API Yönetimi, Oturum işlemleri ve Relayer Servisi |
+| **Veritabanı** | SQLite (better-sqlite3) | Hızlı, gömülü ve ilişkisel data yönetimi |
+| **Blockchain** | Solidity, Hardhat, Ethers.js v6 | Oyların barındırıldığı şeffaf Akıllı Sözleşmeler |
+| **Kriptografi** | keccak256, bcrypt, AES-256-CBC | Kimlik ve ZK veri bütünlüğü güvenliği |
+
+---
+
+## 🚀 Yerel Ortamda Kurulum ve Çalıştırma
+
+Projeyi bilgisayarınızda çalıştırmak oldukça basittir. Node.js (v16+) ve git yüklü olduğundan emin olun.
+
+### 1. Repoyu Klonlayın ve Bağımlılıkları Yükleyin
+
+`ash
+git clone https://github.com/yourusername/OnlineVoting.git
+cd OnlineVoting
+
+# Ana dizin bağımlılıkları (Backend)
 npm install
+
+# İstemci (Frontend) bağımlılıkları
 cd client && npm install && cd ..
+
+# Blockchain (Smart Contract) bağımlılıkları
 cd smart-contracts && npm install && cd ..
-```
+`
 
-### 2. Environment Variables
+### 2. Ortam Değişkenleri (Environment Config)
 
-`.env` dosyası oluştur (`.env.example`'dan kopyala):
+Ana dizinde .env isimli yeni bir dosya oluşturun ve içerisine aşağıdaki değişkenleri yapıştırın:
 
-```bash
-cp .env.example .env
-```
-
-`.env` içeriği:
-
-```env
-# Admin Private Key (Hardhat test account #0 — SADECE LOCAL TEST)
+`env
+# Admin/Deployer Private Key (Hardhat Test Account #0)
 ADMIN_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
-# Blockchain
 BLOCKCHAIN_RPC_URL=http://127.0.0.1:8545
 CHAIN_ID=31337
-
-# Backend
 PORT=5000
 SESSION_TIMEOUT=28800000
-
-# Güvenlik
-SESSION_SECRET=dev_secret_change_in_production_12345
+SESSION_SECRET=local_development_secret_key_1234
 CORS_ORIGINS=http://localhost:3000,http://localhost:5000
-```
+`
 
-### 3. Servisleri Başlat
+### 3. Sistemi Başlatma Süreci
 
-```powershell
-# 1. Hardhat blockchain node (arka planda)
+Uygulamanın farklı katmanlarını başlatmak için 3 ayrı terminal penceresi açmalısınız:
+
+**Terminal 1 (Blockchain Test Ağı):**
+`ash
 cd smart-contracts
-Start-Job -ScriptBlock { Set-Location ".\smart-contracts"; npx hardhat node }
-Start-Sleep -Seconds 5
+npx hardhat node
+`
 
-# 2. Kontratları deploy et
+**Terminal 2 (Sözleşmeleri Dağıtma ve Backend'i Başlatma):**  
+*(Sadece ilk seferde contract dağıtılır)*
+`ash
+cd smart-contracts
 npx hardhat run scripts/deploy.js --network localhost
-npx hardhat run scripts/deploy-ssi.js --network localhost
 cd ..
+node server.js
+`
 
-# 3. Backend
-Start-Job -ScriptBlock { node server.js }
-Start-Sleep -Seconds 3
-
-# 4. Frontend
+**Terminal 3 (Frontend İstemcisi):**
+`ash
 cd client
-Start-Job -ScriptBlock { $env:CI="false"; npx react-scripts start }
-```
-
-### 4. Çalışıp çalışmadığını kontrol et
-
-```powershell
-netstat -ano | findstr "LISTENING" | findstr ":3000 \|:5000 \|:8545 "
-```
-
-Beklenen çıktı:
-```
-TCP    0.0.0.0:3000    LISTENING   # React Frontend
-TCP    0.0.0.0:5000    LISTENING   # Express Backend
-TCP    127.0.0.1:8545  LISTENING   # Hardhat Node
-```
-
-### 5. Tarayıcıda Aç
-
-| URL | Açıklama |
-|-----|----------|
-| http://localhost:3000 | Kullanıcı arayüzü |
-| http://localhost:5000/admin/dashboard | Admin paneli (otomatik giriş) |
+npm start
+`
+*Frontend adresi:* http://localhost:3000  
+*Admin Paneli adresi:* http://localhost:5000/admin.html
 
 ---
 
-## 🔑 Varsayılan Hesaplar
-
-| Hesap | Kullanıcı Adı | Şifre |
-|-------|--------------|-------|
-| Admin | `admin` | `admin123` |
-| Kullanıcı | Kayıt sayfasından oluştur | — |
-
----
-
-## 📡 API Endpoints
-
-### Kimlik Doğrulama
-| Method | Endpoint | Açıklama |
-|--------|----------|----------|
-| `POST` | `/api/register/send-otp` | Kayıt OTP gönder |
-| `POST` | `/api/register` | Yeni kullanıcı kaydı |
-| `POST` | `/api/login` | Giriş yap (geçici cüzdan oluştur) |
-| `POST` | `/api/face/register` | Yüz profili kaydet |
-| `POST` | `/api/face/login` | Yüz ile hızlı giriş |
-| `POST` | `/api/logout` | Çıkış yap (cüzdanı temizle) |
-
-### Oylama
-| Method | Endpoint | Açıklama |
-|--------|----------|----------|
-| `POST` | `/api/vote/simple` | Aktif basit oy akışı |
-| `POST` | `/api/votes` | Oy kullan (blockchain + DB) |
-| `GET` | `/api/votes` | Seçim bazlı oy sonuçları (`?electionId=`) |
-| `GET` | `/api/voting-history` | Kişisel oylama geçmişi |
-
-### Seçim & Adaylar
-| Method | Endpoint | Açıklama |
-|--------|----------|----------|
-| `GET` | `/api/elections` | Kullanıcının erişebildiği aktif seçimler |
-| `GET` | `/api/candidates/:electionId` | Seçime ait adaylar |
-| `GET` | `/api/candidates` | Legacy aday adları listesi |
-
-### ZK-Email
-| Method | Endpoint | Açıklama |
-|--------|----------|----------|
-| `POST` | `/api/zkemail/send-otp` | E-postaya OTP gönder |
-| `POST` | `/api/zkemail/verify-otp` | OTP doğrula, credential al |
-
-### SSI
-| Method | Endpoint | Açıklama |
-|--------|----------|----------|
-| `GET` | `/api/ssi/domain` | EIP-712 domain bilgisi |
-| `POST` | `/api/ssi/relayer/submit` | Credential ile relayer submit |
-| `GET` | `/api/ssi/relayer/status` | Relayer durumu ve bakiye |
-
-> Not: Aşağıdaki legacy endpointler kaldırılmıştır: `/api/vote/authorize`, `/api/ssi/request-authorization`, `/api/ssi/issue-credential`, `/api/ssi/verify-credential`
-
-### Admin (x-session-id header gerekli)
-| Method | Endpoint | Açıklama |
-|--------|----------|----------|
-| `GET` | `/api/admin/database` | Tüm DB verisi |
-| `POST` | `/api/admin/elections` | Seçim oluştur |
-| `PUT` | `/api/admin/elections/:id/toggle` | Aktif/pasif |
-| `DELETE` | `/api/admin/elections/:id` | Seçim sil |
-| `POST` | `/api/admin/elections/:id/candidates` | Aday ekle |
-| `POST` | `/api/admin/users` | Admin kullanıcı oluştur |
-| `PUT` | `/api/admin/users/:id` | Rol/şifre güncelle |
-| `DELETE` | `/api/admin/users/:id` | Kullanıcı sil |
-| `DELETE` | `/api/admin/sessions/:id` | Session sonlandır |
-| `GET` | `/api/admin/email-domains` | İzinli domainler |
-| `POST` | `/api/admin/email-domains` | Domain ekle |
-| `DELETE` | `/api/admin/email-domains/:id` | Domain sil |
+## 📈 Proje Durumu / Sürüm Notları (Mart 2026)
+* 🚀 Karmaşık SSIVoting akışı sadeleştirilerek tamamen SimpleVoting komponentinin kararlılığı sağlandı.
+* 🧹 Kullanılmayan legacy SSI API endpointleri tamamen temizlendi, sistem ote() fonksiyonuna yönlendirildi.
+* 📊 ?electionId query yapısı ile seçimlere özel anlık durum getirme mekanizması geliştirildi.
+* 🔐 Admin kullanıcı oluşumu standardize edildi.
 
 ---
 
-## 📂 Proje Yapısı
-
-```
-OnlineVoting/
-├── client/                         # React frontend (port 3000)
-│   ├── src/
-│   │   ├── App.js                 # Ana component, login/oy arayüzü
-│   │   ├── SimpleVoting.js        # Aktif oy kullanma arayüzü
-│   │   ├── Web3Context.js         # Blockchain context
-│   │   └── utils/crypto.js        # Kriptografi yardımcıları
-│   └── package.json
-│
-├── smart-contracts/                # Solidity akıllı sözleşmeleri
-│   ├── contracts/
-│   │   ├── VotingAnonymous.sol    # Commitment tabanlı anonim oylama
-│   │   └── VotingSSI.sol          # EIP-712 + Nullifier tabanlı SSI oylama
-│   ├── scripts/
-│   │   ├── deploy.js              # VotingAnonymous deploy
-│   │   └── deploy-ssi.js          # VotingSSI deploy
-│   └── hardhat.config.js
-│
-├── public/
-│   └── admin.html                 # Admin paneli (standalone HTML)
-│
-├── services/
-│   ├── authService.js             # Vote authorization (ECDSA imza)
-│   ├── credentialIssuer.js        # SSI credential oluşturma
-│   └── relayerService.js          # Gas-less relayer
-│
-├── config/
-│   └── database-sqlite.js         # SQLite bağlantısı ve şema
-│
-├── utils/
-│   └── walletUtils.js             # Cüzdan oluşturma ve şifreleme
-│
-├── server.js                      # Express API server (port 5000)
-├── .env                           # Ortam değişkenleri (commit etme!)
-├── .env.example                   # Şablon env dosyası
-├── .gitignore
-└── README.md
-```
-
----
-
-## 📖 Veritabanı Şeması
-
-```sql
--- Kullanıcılar
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY,
-  name TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL,          -- bcrypt hash
-  role TEXT DEFAULT 'user',        -- 'user' | 'admin'
-  email TEXT,
-  student_id TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- Sessionlar (geçici cüzdanlar)
-CREATE TABLE sessions (
-  id TEXT PRIMARY KEY,             -- crypto.randomBytes(16) hex
-  user_id INTEGER,
-  temp_wallet_address TEXT,
-  temp_wallet_private_key_encrypted TEXT,  -- AES-256-CBC
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  expires_at DATETIME NOT NULL,    -- 8 saat
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- Seçimler
-CREATE TABLE elections (
-  id INTEGER PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT,
-  is_active INTEGER DEFAULT 0,
-  start_date DATETIME,
-  end_date DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- Adaylar
-CREATE TABLE candidates (
-  id INTEGER PRIMARY KEY,
-  election_id INTEGER,
-  name TEXT NOT NULL,
-  description TEXT,
-  vote_count INTEGER DEFAULT 0,
-  FOREIGN KEY (election_id) REFERENCES elections(id)
-);
-
--- Oylar
-CREATE TABLE votes (
-  id INTEGER PRIMARY KEY,
-  user_id INTEGER,
-  election_id INTEGER,
-  candidate_id INTEGER,
-  commitment TEXT,
-  transaction_hash TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- Oy durumu
-CREATE TABLE vote_status (
-  id INTEGER PRIMARY KEY,
-  user_id INTEGER,
-  election_id INTEGER,
-  has_voted INTEGER DEFAULT 0,
-  voted_at DATETIME,
-  transaction_hash TEXT
-);
-
--- ZK-Email izinli domainler
-CREATE TABLE email_domains (
-  id INTEGER PRIMARY KEY,
-  domain TEXT UNIQUE NOT NULL,
-  added_by TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
-
----
-
-## 🔐 Güvenlik
-
-| Özellik | Yöntem |
-|---------|--------|
-| Şifre Hashleme | bcrypt (salt rounds: 10) |
-| Private Key Şifreleme | AES-256-CBC |
-| Session ID | `crypto.randomBytes` |
-| Oy İmzalama | ECDSA (EIP-712) |
-| Çift Oy Engeli | Blockchain Nullifier |
-| Session Süresi | 8 saat, logout'ta anında silinir |
-| E-posta Gizliliği | Sadece `keccak256(email+salt)` saklanır |
-
-> ⚠️ **Önemli:** `.env` dosyasını asla Git'e commit etme. Gerçek bir ortamda `ADMIN_PRIVATE_KEY` ve `SESSION_SECRET` değerlerini değiştir.
-
----
-
-## 🧪 Test
-
-```bash
-# Smart contract testleri
-cd smart-contracts
-npx hardhat test
-
-# Backend API testi (manuel)
-curl -X POST http://localhost:5000/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"name":"admin","password":"admin123"}'
-```
-
----
-
-## 🐛 Bilinen Sınırlamalar (Prototip)
-
-- Hardhat local network yeniden başlatıldığında kontrat adresleri değişir, `.env` güncellenir
-- SQLite production için önerilmez (PostgreSQL ile değiştirilebilir)
-- SMTP e-posta gönderimi gerçek bir SMTP sunucu konfigürasyonu gerektirir
-- Hardhat test ağı gerçek bir Ethereum ağı değildir
-
----
-
-## 🚧 Gelecek Geliştirmeler
-
-- [ ] ZK-Proof entegrasyonu (Circom/SnarkJS)
-- [ ] PostgreSQL migrasyonu
-- [ ] Docker Compose ile tek komut başlatma
-- [ ] Swagger API dokümantasyonu
-- [ ] Mainnet/Testnet deploy rehberi
-- [ ] WebSocket ile anlık oy güncellemesi
-- [ ] PDF rapor ve CSV export
-- [ ] 2FA kimlik doğrulama
-
----
-
-**TÜBİTAK 2209-A Araştırma Projesi** — Eğitim ve araştırma amaçlı prototip sistemi.
-
-
+<p align="center">
+  <i>Bu proje <b>TÜBİTAK 2209-A</b> araştırma programı tarafından desteklenmiş olup, eğitim ve akademik araştırma bağlamında, blockchain'in anonim kimliklendirme sistemleri üzerindeki kullanılabilirliğini incelemek vizyonuyla hazırlanmıştır. 🎓</i>
+</p>
