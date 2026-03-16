@@ -93,7 +93,7 @@ Projeyi bilgisayarınızda çalıştırmak oldukça basittir. Node.js (v16+) ve 
 ### 1. Repoyu Klonlayın ve Bağımlılıkları Yükleyin
 
 ```bash
-git clone https://github.com/yourusername/OnlineVoting.git
+git clone https://github.com/MammadliNasimi/OnlineVoting.git
 cd OnlineVoting
 
 # Ana dizin bağımlılıkları (Backend)
