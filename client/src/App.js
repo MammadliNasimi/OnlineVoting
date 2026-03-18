@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import SimpleVoting from './SimpleVoting';
+import SimpleVoting from './components/SimpleVoting';
+import AdminDashboard from './components/AdminDashboard';
+import {
+  Box, Paper, Typography, Tabs, Tab, TextField, Button, Alert,
+  CircularProgress, Select, MenuItem, FormControlLabel, Checkbox
+} from '@mui/material';
+import HowToVoteIcon from '@mui/icons-material/HowToVote';
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import FaceIcon from '@mui/icons-material/Face';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import './App.css'; // Sadece temizlenmiş boş CSS olacak, form için değil
 
 const cameraPriority = (label = '') => {
   const text = label.toLowerCase();
@@ -113,7 +123,7 @@ function App() {
   useEffect(() => {
     const onDeviceChange = async () => {
       await refreshCameras();
-      setFaceMessage('Yeni kamera algılandı. Gerekirse listeden telefon kamerasını seçin.');
+      setFaceMessage('Yeni kamera algılandı. Gerekirse listeden telefonu seçin.');
     };
 
     if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
@@ -132,10 +142,10 @@ function App() {
       const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       tempStream.getTracks().forEach(track => track.stop());
       await refreshCameras();
-      setFaceMessage('Kamera izni verildi. Telefon kamerası bağlıysa listede görünecektir.');
+      setFaceMessage('Kamera izni verildi. Kameranız listede görünecektir.');
       return true;
     } catch (err) {
-      setFaceMessage('Kamera izni reddedildi veya cihaz bulunamadı. Tarayıcı izinlerini kontrol edin.');
+      setFaceMessage('Kamera izni reddedildi. Tarayıcı izinlerini açın.');
       return false;
     }
   };
@@ -162,11 +172,11 @@ function App() {
       await refreshCameras();
     } catch (err) {
       if (err && err.name === 'NotFoundError') {
-        setFaceMessage('Kamera bulunamadı. Telefonu webcam uygulamasıyla bağlayıp tekrar deneyin.');
+        setFaceMessage('Kamera bulunamadı.');
       } else if (err && err.name === 'NotAllowedError') {
-        setFaceMessage('Kamera izni verilmedi. Tarayıcıdan kamera iznini açın.');
+        setFaceMessage('Kamera izni verilmedi. Lütfen izin verin.');
       } else {
-        setFaceMessage('Kamera açılamadı. Telefon kamerasını webcam olarak bağlayıp tekrar deneyin.');
+        setFaceMessage('Kamera açılamadı.');
       }
     }
   };
@@ -213,7 +223,7 @@ function App() {
       if (res.data.user?.role === 'admin') {
         localStorage.setItem('adminSession', res.data.sessionId);
         localStorage.setItem('adminName', res.data.user.name);
-        window.location.href = `http://localhost:5000/admin/dashboard?session=${res.data.sessionId}&name=${encodeURIComponent(res.data.user.name)}`;
+        setCurrentPage('admin');
         return;
       }
       setCurrentPage('vote');
@@ -238,8 +248,7 @@ function App() {
       if (res.data.user?.role === 'admin') {
         localStorage.setItem('adminSession', res.data.sessionId);
         localStorage.setItem('adminName', res.data.user.name);
-        // Admin directly goes to the admin panel
-        window.location.href = `http://localhost:5000/admin/dashboard?session=${res.data.sessionId}&name=${encodeURIComponent(res.data.user.name)}`;
+        setCurrentPage('admin');
         return;
       }
       setCurrentPage('vote');
@@ -300,344 +309,15 @@ function App() {
     }
   };
 
-  const renderLogin = () => {
-    const cardStyle = {
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: "'Segoe UI', sans-serif",
-    };
-    const boxStyle = {
-      background: 'rgba(255,255,255,0.06)',
-      backdropFilter: 'blur(16px)',
-      border: '1px solid rgba(255,255,255,0.12)',
-      borderRadius: 24,
-      padding: '48px 40px',
-      width: 420,
-      boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-      color: '#fff',
-    };
-    const tabStyle = (active) => ({
-      flex: 1,
-      padding: '10px 0',
-      background: active ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'transparent',
-      border: 'none',
-      borderRadius: 10,
-      color: active ? '#fff' : 'rgba(255,255,255,0.5)',
-      fontWeight: active ? 700 : 400,
-      fontSize: 15,
-      cursor: 'pointer',
-      transition: 'all 0.2s',
-    });
-    const inputStyle = {
-      width: '100%',
-      padding: '13px 16px',
-      background: 'rgba(255,255,255,0.08)',
-      border: '1px solid rgba(255,255,255,0.15)',
-      borderRadius: 12,
-      color: '#fff',
-      fontSize: 15,
-      outline: 'none',
-      boxSizing: 'border-box',
-      marginBottom: 14,
-    };
-    const labelStyle = {
-      display: 'block',
-      fontSize: 12,
-      color: 'rgba(255,255,255,0.55)',
-      marginBottom: 5,
-      marginTop: 2,
-      letterSpacing: '0.05em',
-      textTransform: 'uppercase',
-    };
-    const btnStyle = {
-      width: '100%',
-      padding: '14px',
-      background: 'linear-gradient(135deg, #667eea, #764ba2)',
-      border: 'none',
-      borderRadius: 12,
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: 700,
-      cursor: 'pointer',
-      marginTop: 8,
-      letterSpacing: '0.03em',
-      boxShadow: '0 4px 20px rgba(102,126,234,0.4)',
-    };
-
-    return (
-      <div style={cardStyle}>
-        <div style={boxStyle}>
-          {/* Logo */}
-          <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <div style={{ fontSize: 42, marginBottom: 6 }}>🗳️</div>
-            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px' }}>SSI Blockchain Oylama</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
-              ZK-Email • EIP-712 • Anonim Kimlik
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 4, marginBottom: 28 }}>
-            <button style={tabStyle(!registerMode)} onClick={() => { setRegisterMode(false); setRegisterStep(0); setRegisterOtp(''); setRegisterFaceEnabled(false); setRegisterFaceDescriptor(null); setError(''); setInfo(''); }}>
-              Giriş Yap
-            </button>
-            <button style={tabStyle(registerMode)} onClick={() => { setRegisterMode(true); setRegisterStep(0); setRegisterOtp(''); setRegisterFaceEnabled(false); setRegisterFaceDescriptor(null); setError(''); setInfo(''); }}>
-              Kayıt Ol
-            </button>
-          </div>
-
-          {/* Fields */}
-          <div>
-            <label style={labelStyle}>Kullanıcı Adı</label>
-            <input
-              style={inputStyle}
-              type="text"
-              placeholder="kullanici_adi"
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              onKeyDown={e => e.key === 'Enter' && (registerMode ? handleRegister() : handleLogin())}
-            />
-
-            {registerMode && registerStep === 0 && (
-              <>
-                <label style={labelStyle}>Kurumsal E-posta (ZK-Email için)</label>
-                <input
-                  style={{ ...inputStyle, borderColor: form.email ? 'rgba(102,126,234,0.6)' : 'rgba(255,255,255,0.15)' }}
-                  type="email"
-                  placeholder="ad.soyad@akdeniz.edu.tr"
-                  value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && handleSendRegisterOtp()}
-                />
-              </>
-            )}
-
-            {registerMode && registerStep === 1 && (
-              <>
-                <label style={labelStyle}>E-posta: <span style={{ color: '#a5d6a7' }}>{form.email}</span></label>
-                <label style={labelStyle}>Doğrulama Kodu (OTP)</label>
-                <input
-                  style={{ ...inputStyle, letterSpacing: 6, fontSize: 22, textAlign: 'center', fontWeight: 700 }}
-                  type="text"
-                  placeholder="123456"
-                  maxLength={6}
-                  value={registerOtp}
-                  onChange={e => setRegisterOtp(e.target.value.replace(/\D/g, ''))}
-                  onKeyDown={e => e.key === 'Enter' && handleRegister()}
-                  autoFocus
-                />
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>📧 {form.email} adresine 6 haneli kod gönderildi</div>
-
-                <div style={{ marginTop: 10, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, background: 'rgba(255,255,255,0.03)' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.85)', marginBottom: registerFaceEnabled ? 10 : 0 }}>
-                    <input
-                      type="checkbox"
-                      checked={registerFaceEnabled}
-                      onChange={e => {
-                        const enabled = e.target.checked;
-                        setRegisterFaceEnabled(enabled);
-                        if (!enabled) {
-                          setRegisterFaceDescriptor(null);
-                        }
-                      }}
-                    />
-                    Kayıtta yüz profilimi de ekle (opsiyonel)
-                  </label>
-
-                  {registerFaceEnabled && (
-                    <>
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
-                        Sadece PC kamerası ile yüz doğrulama kullanılabilir.
-                      </div>
-
-                      <button
-                        style={{ ...btnStyle, marginTop: 0, marginBottom: 8, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(67,160,71,0.38)' }}
-                        onClick={requestCameraPermissionAndRefresh}
-                        disabled={faceBusy}
-                        type="button"
-                      >
-                        İzin İste ve Kameraları Yenile
-                      </button>
-
-                      <button
-                        style={{ ...btnStyle, marginTop: 0, marginBottom: 8, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(102,126,234,0.35)' }}
-                        onClick={async () => {
-                          await loadFaceModels();
-                          await refreshCameras();
-                          await startFaceCamera();
-                        }}
-                        disabled={faceLoading || faceBusy}
-                        type="button"
-                      >
-                        {faceLoading ? 'Model Yükleniyor...' : 'Kamerayı Başlat'}
-                      </button>
-
-                      {cameras.length > 0 && (
-                        <select
-                          value={selectedCameraId}
-                          onChange={e => setSelectedCameraId(e.target.value)}
-                          style={{ width: '100%', marginBottom: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff' }}
-                        >
-                          {cameras.map((cam, i) => (
-                            <option key={cam.deviceId || i} value={cam.deviceId}>
-                              {cam.label || `Kamera ${i + 1}`}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        muted
-                        playsInline
-                        style={{ width: '100%', height: 160, borderRadius: 10, background: '#000', objectFit: 'cover', marginBottom: 8 }}
-                      />
-
-                      <button
-                        style={{ ...btnStyle, marginTop: 0, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(255,193,7,0.45)' }}
-                        onClick={handleCaptureRegisterFace}
-                        disabled={faceBusy}
-                        type="button"
-                      >
-                        Yüz Verisini Yakala
-                      </button>
-
-                      {registerFaceDescriptor && (
-                        <div style={{ fontSize: 12, color: '#a5d6a7', marginTop: 8 }}>
-                          ✅ Yüz verisi hazır. Kayıtta otomatik saklanacak.
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-
-            {(!registerMode || registerStep === 0) && (
-              <>
-                <label style={labelStyle}>Şifre</label>
-                <input
-                  style={inputStyle}
-                  type="password"
-                  placeholder="••••••••"
-                  value={form.password}
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && (registerMode ? handleSendRegisterOtp() : handleLogin())}
-                />
-              </>
-            )}
-          </div>
-
-          {/* Error / Info */}
-          {error && (
-            <div style={{ background: 'rgba(244,67,54,0.15)', border: '1px solid rgba(244,67,54,0.35)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#ff8a80', marginBottom: 12 }}>
-              ⚠️ {error}
-            </div>
-          )}
-          {info && (
-            <div style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.35)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#a5d6a7', marginBottom: 12 }}>
-              ✅ {info}
-            </div>
-          )}
-
-          {/* Submit */}
-          {registerMode && registerStep === 1 && (
-            <button style={{ ...btnStyle, background: 'rgba(255,255,255,0.08)', marginBottom: 8 }}
-              onClick={() => { setRegisterStep(0); setRegisterOtp(''); setRegisterFaceEnabled(false); setRegisterFaceDescriptor(null); setError(''); setInfo(''); }}>
-              ← Geri
-            </button>
-          )}
-          <button
-            style={btnStyle}
-            onClick={registerMode ? (registerStep === 0 ? handleSendRegisterOtp : handleRegister) : handleLogin}
-          >
-            {!registerMode ? 'Giriş Yap' : registerStep === 0 ? 'Kod Gönder →' : 'Hesabı Oluştur ✓'}
-          </button>
-
-          {!registerMode && (
-            <div style={{ marginTop: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12 }}>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
-                📷 Hızlı Giriş (Face Control) — Sadece PC kamerası kullanılır
-              </div>
-
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
-                Kamera erişim izni verip listeden PC kamerasını seçin.
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <button
-                  style={{ ...btnStyle, marginTop: 0, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(67,160,71,0.38)' }}
-                  onClick={requestCameraPermissionAndRefresh}
-                  disabled={faceBusy}
-                >
-                  İzin İste ve Kameraları Yenile
-                </button>
-                <button
-                  style={{ ...btnStyle, marginTop: 0, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(102,126,234,0.35)' }}
-                  onClick={async () => {
-                    await loadFaceModels();
-                    await refreshCameras();
-                    await startFaceCamera();
-                  }}
-                  disabled={faceLoading || faceBusy}
-                >
-                  {faceLoading ? 'Model Yükleniyor...' : 'Kamerayı Başlat'}
-                </button>
-              </div>
-
-              {cameras.length > 0 && (
-                <select
-                  value={selectedCameraId}
-                  onChange={e => setSelectedCameraId(e.target.value)}
-                  style={{ width: '100%', marginBottom: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff' }}
-                >
-                  {cameras.map((cam, i) => (
-                    <option key={cam.deviceId || i} value={cam.deviceId}>
-                      {cam.label || `Kamera ${i + 1}`}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                style={{ width: '100%', height: 180, borderRadius: 10, background: '#000', objectFit: 'cover', marginBottom: 8 }}
-              />
-
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  style={{ ...btnStyle, marginTop: 0, padding: 10, fontSize: 13, boxShadow: 'none', background: 'rgba(56,142,60,0.45)' }}
-                  onClick={handleFaceLogin}
-                  disabled={!faceEnabled || faceBusy}
-                >
-                  Yüz ile Hızlı Giriş
-                </button>
-              </div>
-
-              {!!faceMessage && (
-                <div style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>
-                  {faceMessage}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ZK-Email info badge on register */}
-          {registerMode && (
-            <div style={{ marginTop: 18, padding: '12px 16px', background: 'rgba(102,126,234,0.1)', border: '1px solid rgba(102,126,234,0.25)', borderRadius: 12, fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
-              🔐 <strong style={{ color: 'rgba(255,255,255,0.8)' }}>ZK-Email oylama özelliği</strong> için kurumsal e-posta adresinizi girin. Oy kullanma ekranında OTP kodu ile kimliğinizi anonim olarak doğrulayacaksınız.
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  const handleTabChange = (e, newValue) => {
+    const isRegister = newValue === 1;
+    setRegisterMode(isRegister);
+    setRegisterStep(0);
+    setRegisterOtp('');
+    setRegisterFaceEnabled(false);
+    setRegisterFaceDescriptor(null);
+    setError('');
+    setInfo('');
   };
 
   const handleLogout = async () => {
@@ -656,18 +336,252 @@ function App() {
     setCurrentPage('login');
   };
 
-  // Main return for App
+  if (currentPage === 'vote') {
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100', py: 4 }}>
+        <SimpleVoting user={user} sessionId={sessionId} onLogout={handleLogout} />
+      </Box>
+    );
+  }
+
+  if (currentPage === 'admin') {
+    return <AdminDashboard user={user} sessionId={sessionId} onLogout={handleLogout} />;
+  }
+
   return (
-    <div style={currentPage === 'login' ? {} : { padding: 20 }}>
-      {currentPage === 'login' && renderLogin()}
-      {currentPage === 'vote' && (
-        <SimpleVoting 
-          user={user} 
-          sessionId={sessionId} 
-          onLogout={handleLogout}
-        />
-      )}
-    </div>
+    <Box sx={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
+      p: 2
+    }}>
+      <Paper elevation={24} sx={{ width: '100%', maxWidth: 460, borderRadius: 4, overflow: 'hidden' }}>
+        <Box sx={{ pt: 4, pb: 2, px: 4, textAlign: 'center', bgcolor: 'background.paper' }}>
+          <HowToVoteIcon sx={{ fontSize: 50, color: 'primary.main', mb: 1 }} />
+          <Typography variant="h5" fontWeight="900" letterSpacing={-0.5} gutterBottom>
+            SSI Blockchain Oylama
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            ZK-Email • EIP-712 • Anonim Kimlik
+          </Typography>
+        </Box>
+
+        <Tabs 
+          value={registerMode ? 1 : 0} 
+          onChange={handleTabChange} 
+          variant="fullWidth"
+          indicatorColor="primary"
+          textColor="primary"
+          sx={{ borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab label="GİRİŞ YAP" sx={{ fontWeight: 'bold' }} />
+          <Tab label="KAYIT OL" sx={{ fontWeight: 'bold' }} />
+        </Tabs>
+
+        <Box sx={{ p: 4 }}>
+          {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+          {info && <Alert severity="success" sx={{ mb: 3 }}>{info}</Alert>}
+
+          <Box component="form" noValidate autoComplete="off" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField
+              label="Kullanıcı Adı"
+              variant="outlined"
+              size="medium"
+              disabled={registerMode && registerStep === 1}
+              value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              onKeyDown={e => e.key === 'Enter' && (registerMode ? (registerStep === 0 ? handleSendRegisterOtp() : handleRegister()) : handleLogin())}
+              fullWidth
+            />
+
+            {registerMode && registerStep === 0 && (
+              <TextField
+                label="Kurumsal E-posta (ZK-Email için)"
+                type="email"
+                placeholder="ad.soyad@akdeniz.edu.tr"
+                variant="outlined"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && handleSendRegisterOtp()}
+                fullWidth
+              />
+            )}
+
+            {registerMode && registerStep === 1 && (
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="subtitle2" color="primary" gutterBottom>
+                  E-posta: {form.email}
+                </Typography>
+                <TextField
+                  label="Doğrulama Kodu (OTP)"
+                  variant="outlined"
+                  value={registerOtp}
+                  onChange={e => setRegisterOtp(e.target.value.replace(/\D/g, ''))}
+                  onKeyDown={e => e.key === 'Enter' && handleRegister()}
+                  fullWidth
+                  inputProps={{ maxLength: 6, style: { fontSize: 24, letterSpacing: 10, textAlign: 'center', fontWeight: 'bold' } }}
+                  autoFocus
+                  sx={{ mb: 1, mt: 1 }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  📧 {form.email} adresine 6 haneli kod gönderildi
+                </Typography>
+
+                <Paper variant="outlined" sx={{ p: 2, mt: 3, textAlign: 'left', bgcolor: 'grey.50', borderRadius: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox 
+                        checked={registerFaceEnabled} 
+                        onChange={e => {
+                          const enabled = e.target.checked;
+                          setRegisterFaceEnabled(enabled);
+                          if (!enabled) setRegisterFaceDescriptor(null);
+                        }} 
+                      />
+                    }
+                    label={<Typography variant="body2" fontWeight="medium">Kayıtta yüz profilimi de ekle (opsiyonel)</Typography>}
+                  />
+
+                  {registerFaceEnabled && (
+                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Sadece cihazınızın kamerası (PC/Telefon) kullanılarak doğrulama verisi oluşturulur.
+                      </Typography>
+                      
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button size="small" variant="outlined" color="success" onClick={requestCameraPermissionAndRefresh} disabled={faceBusy} fullWidth>
+                          İzin İste / Yenile
+                        </Button>
+                        <Button size="small" variant="contained" color="primary" onClick={async () => {
+                          await loadFaceModels();
+                          await refreshCameras();
+                          await startFaceCamera();
+                        }} disabled={faceLoading || faceBusy} fullWidth>
+                          {faceLoading ? <CircularProgress size={20} color="inherit" /> : 'Kamerayı Başlat'}
+                        </Button>
+                      </Box>
+                      
+                      {cameras.length > 0 && (
+                        <Select size="small" value={selectedCameraId} onChange={e => setSelectedCameraId(e.target.value)} fullWidth>
+                          {cameras.map((cam, i) => (
+                            <MenuItem key={cam.deviceId || i} value={cam.deviceId}>{cam.label || `Kamera ${i + 1}`}</MenuItem>
+                          ))}
+                        </Select>
+                      )}
+
+                      <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: 160, borderRadius: 8, background: '#000', objectFit: 'cover' }} />
+
+                      <Button variant="contained" color="warning" onClick={handleCaptureRegisterFace} disabled={faceBusy} startIcon={<CameraAltIcon />}>
+                        Yüz Verisini Yakala
+                      </Button>
+
+                      {registerFaceDescriptor && (
+                        <Typography variant="caption" color="success.main" fontWeight="bold">
+                          ✅ Yüz verisi hazır. Kayıtta otomatik saklanacak.
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </Paper>
+              </Box>
+            )}
+
+            {(!registerMode || registerStep === 0) && (
+              <TextField
+                label="Şifre"
+                type="password"
+                variant="outlined"
+                value={form.password}
+                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && (registerMode ? handleSendRegisterOtp() : handleLogin())}
+                fullWidth
+              />
+            )}
+
+            <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+              {registerMode && registerStep === 1 && (
+                <Button 
+                  variant="outlined" 
+                  size="large"
+                  onClick={() => { setRegisterStep(0); setRegisterOtp(''); setRegisterFaceEnabled(false); setRegisterFaceDescriptor(null); setError(''); setInfo(''); }}
+                  startIcon={<ArrowBackIcon />}
+                >
+                  Geri
+                </Button>
+              )}
+              <Button
+                variant="contained"
+                size="large"
+                fullWidth
+                sx={{ py: 1.5, fontWeight: 'bold' }}
+                onClick={registerMode ? (registerStep === 0 ? handleSendRegisterOtp : handleRegister) : handleLogin}
+              >
+                {!registerMode ? 'Giriş Yap' : registerStep === 0 ? 'Kod Gönder →' : 'Hesabı Oluştur ✓'}
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Quick Login - Face Recognition */}
+          {!registerMode && (
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, color: 'text.secondary', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                <FaceIcon fontSize="small" /> Hızlı Giriş (Face Control)
+              </Typography>
+              
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2, borderStyle: 'dashed' }}>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                  Kameraya izin verdikten sonra yüz verinizi doğrulayarak şifresiz giriş yapabilirsiniz. Kullanıcı adınızı formda belirtmeyi unutmayın.
+                </Typography>
+
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button size="small" variant="outlined" color="success" fullWidth onClick={requestCameraPermissionAndRefresh} disabled={faceBusy}>
+                      İzin İste
+                    </Button>
+                    <Button size="small" variant="contained" color="primary" fullWidth onClick={async () => {
+                      await loadFaceModels();
+                      await refreshCameras();
+                      await startFaceCamera();
+                    }} disabled={faceLoading || faceBusy}>
+                      {faceLoading ? <CircularProgress size={20} color="inherit" /> : 'Kamerayı Başlat'}
+                    </Button>
+                  </Box>
+
+                  {cameras.length > 0 && (
+                    <Select size="small" value={selectedCameraId} onChange={e => setSelectedCameraId(e.target.value)} fullWidth>
+                      {cameras.map((cam, i) => (
+                        <MenuItem key={cam.deviceId || i} value={cam.deviceId}>{cam.label || `Kamera ${i + 1}`}</MenuItem>
+                      ))}
+                    </Select>
+                  )}
+
+                  <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: 160, borderRadius: 8, background: '#000', objectFit: 'cover' }} />
+
+                  <Button variant="contained" color="success" onClick={handleFaceLogin} disabled={!faceEnabled || faceBusy}>
+                     Yüz ile Hızlı Giriş
+                  </Button>
+
+                  {!!faceMessage && (
+                    <Typography variant="caption" color="text.secondary" textAlign="center">
+                      {faceMessage}
+                    </Typography>
+                  )}
+                </Box>
+              </Paper>
+            </Box>
+          )}
+
+          {registerMode && (
+            <Alert severity="info" sx={{ mt: 4, borderRadius: 2 }}>
+              <strong>ZK-Email oylama özelliği</strong> için kurumsal e-posta adresinizi girin. Oy kullanma ekranında OTP kodu ile kimliğinizi <strong>anonim</strong> olarak doğrulayacaksınız.
+            </Alert>
+          )}
+
+        </Box>
+      </Paper>
+    </Box>
   );
 }
 

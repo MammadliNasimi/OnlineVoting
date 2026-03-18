@@ -1,4 +1,8 @@
 const express = require('express');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-123';
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
@@ -113,7 +117,8 @@ async function initializeServices() {
 // Call initialization
 initializeServices();
 
-app.use(cors());
+app.use(cors({ origin: ['http://localhost:3000', 'http://127.0.0.1:3000'], credentials: true }));
+app.use(cookieParser());
 app.use(express.json());
 
 // Voting period (default: always open)
@@ -131,7 +136,24 @@ function isVotingOpen() {
 
 // Session ile kullanıcıyı doğrulama helper
 async function getUserFromSession(req) {
-  const sessionId = req.headers['x-session-id'];
+    // 1. Try JWT from HttpOnly Cookie first
+    if (req.cookies && req.cookies.jwt_token) {
+        try {
+            const decoded = jwt.verify(req.cookies.jwt_token, JWT_SECRET);
+            return decoded; // { id, role, email, name, sessionId }
+        } catch(e) { }
+    }
+
+    // 2. Fallback to auth header (Bearer token)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+        try {
+            const decoded = jwt.verify(authHeader.split(" ")[1], JWT_SECRET);
+            return decoded;
+        } catch(e) { }
+    }
+
+    // 3. Fallback to Legacy x-session-id
   if (!sessionId || !useDatabase) return null;
 
   const session = await db.getSession(sessionId);
@@ -447,6 +469,28 @@ app.post('/api/login', async (req, res) => {
     }
 
     const response = await createSessionForUser(user);
+
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        id: user.id,
+        role: user.role,
+        email: user.email,
+        name: user.name,
+        sessionId: response.sessionId // Bind token to session
+      },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    // Set HttpOnly secure cookie
+    res.cookie('jwt_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 8 * 60 * 60 * 1000 // 8 hours
+    });
+
     res.json(response);
   } catch (error) {
     console.error('Login error:', error);
@@ -527,18 +571,28 @@ app.post('/api/face/login', async (req, res) => {
 // POST /api/logout - Logout ve session'ı sil
 app.post('/api/logout', async (req, res) => {
   try {
-    const sessionId = req.headers['x-session-id'];
-    if (!sessionId) {
-      return res.status(400).json({ message: 'No session found' });
-    }
+    let sessionId = req.headers['x-session-id'];
     
+    if (!sessionId && req.cookies && req.cookies.jwt_token) {
+        try {
+            const decoded = jwt.verify(req.cookies.jwt_token, JWT_SECRET);
+            sessionId = decoded.sessionId;
+        } catch(e) { }
+    }
+
+    if (!sessionId) {
+      // It is okay if they are already logged out on backend. Do nothing.
+      return res.status(200).json({ message: 'Already logged out' });
+    }
+
     if (!useDatabase) {
       return res.status(503).json({ message: 'Database not available' });
     }
-    
+
     await db.deleteSession(sessionId);
-    console.log(`🚪 Session deleted: ${sessionId}`);
-    
+
+    res.clearCookie('jwt_token');
+
     res.json({ message: 'Logged out successfully' });
   } catch (error) {
     console.error('Logout error:', error);
@@ -1109,6 +1163,12 @@ app.post('/api/voting-period', async (req, res) => {
 
 // ========== ZK-EMAIL: ADMIN DOMAIN MANAGEMENT ==========
 
+  const { authenticateJWT, requireAdmin } = require('./middlewares/auth.middleware');
+  app.use('/api/admin', authenticateJWT, requireAdmin);
+  
+  // Protect admin panel UI routes
+  app.use('/admin', authenticateJWT, requireAdmin);
+
 // GET /api/admin/email-domains  — list all whitelisted domains
 app.get('/api/admin/email-domains', async (req, res) => {
   const user = await getUserFromSession(req);
@@ -1362,159 +1422,8 @@ app.delete('/api/admin/vote-status/:id', async (req, res) => {
 
 // ========== ADMIN: ELECTION MANAGEMENT ==========
 
-// GET /api/admin/elections — list all elections with candidates and domain restrictions
-app.get('/api/admin/elections', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  res.json(db.getAllElections());
-});
-
-// POST /api/admin/elections — create a new election
-app.post('/api/admin/elections', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  const { title, description, startDate, endDate, candidates, allowedDomains } = req.body;
-  if (!title || !startDate || !endDate) return res.status(400).json({ message: 'title, startDate, endDate required' });
-  
-  try {
-    // STEP 1: Add election to blockchain first
-    if (!relayerService) {
-      return res.status(500).json({ message: 'Relayer service not available. Cannot create blockchain election.' });
-    }
-    
-    const provider = new ethers.JsonRpcProvider(process.env.RPC_URL || 'http://127.0.0.1:8545');
-    const adminWallet = new ethers.Wallet(process.env.ADMIN_PRIVATE_KEY, provider);
-    const contractAddress = process.env.VOTING_CONTRACT_ADDRESS || process.env.CONTRACT_ADDRESS;
-    
-    // Load contract ABI
-    const VotingSSI = require('./client/src/contracts/VotingAnonymous.json');
-    const contract = new ethers.Contract(contractAddress, VotingSSI.abi, adminWallet);
-    
-    // Convert dates to Unix timestamps
-    const startTime = Math.floor(new Date(startDate).getTime() / 1000);
-    const endTime = Math.floor(new Date(endDate).getTime() / 1000);
-    
-    // Prepare candidate names
-    const candidateNames = Array.isArray(candidates) ? candidates.filter(c => c && c.trim()) : [];
-    if (candidateNames.length === 0) {
-      return res.status(400).json({ message: 'At least one candidate required' });
-    }
-    
-    console.log('📝 Creating election on blockchain:', { title, startTime, endTime, candidateNames });
-    
-    // Call blockchain createElection
-    const tx = await contract.createElection(title, startTime, endTime, candidateNames);
-    await tx.wait();
-    
-    // Get the new election ID from blockchain
-    const blockchainElectionId = await contract.currentElectionId();
-    console.log('✅ Blockchain election created with ID:', blockchainElectionId.toString());
-    
-    // STEP 2: Add to database with blockchain ID
-    const election = db.createElection(title, description, startDate, endDate, Number(blockchainElectionId));
-    
-    // Add candidates to database with blockchain IDs
-    if (Array.isArray(candidates)) {
-      for (let i = 0; i < candidates.length; i++) {
-        const c = candidates[i];
-        if (c && c.trim()) {
-          db.addCandidateToElection(election.id, c.trim(), '', i);
-        }
-      }
-    }
-    
-    // Add domain restrictions
-    if (Array.isArray(allowedDomains)) {
-      for (const d of allowedDomains) {
-        if (d && d.trim()) db.addElectionDomainRestriction(election.id, d.trim());
-      }
-    }
-    
-    res.json(db.getAllElections().find(e => e.id === election.id));
-  } catch (error) {
-    console.error('❌ Error creating election:', error);
-    res.status(500).json({ message: 'Failed to create election: ' + error.message });
-  }
-});
-
-// PUT /api/admin/elections/:id — update election details
-app.put('/api/admin/elections/:id', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  const { title, description, startDate, endDate } = req.body;
-  if (!title || !startDate || !endDate) return res.status(400).json({ message: 'title, startDate, endDate required' });
-  const election = db.updateElection(parseInt(req.params.id), title, description, startDate, endDate);
-  res.json(election);
-});
-
-// DELETE /api/admin/elections/:id — delete election
-app.delete('/api/admin/elections/:id', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  db.deleteElection(parseInt(req.params.id));
-  res.json({ success: true });
-});
-
-// PUT /api/admin/elections/:id/toggle — toggle active/inactive
-app.put('/api/admin/elections/:id/toggle', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  const election = db.toggleElectionActive(parseInt(req.params.id));
-  res.json(election);
-});
-
-// POST /api/admin/elections/:id/candidates — add candidate to election
-app.post('/api/admin/elections/:id/candidates', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  const { name, description } = req.body;
-  if (!name) return res.status(400).json({ message: 'name required' });
-  const candidate = db.addCandidateToElection(parseInt(req.params.id), name, description);
-  res.json(candidate);
-});
-
-// DELETE /api/admin/elections/:id/candidates/:cid — remove candidate
-app.delete('/api/admin/elections/:id/candidates/:cid', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  db.removeCandidateFromElection(parseInt(req.params.cid));
-  res.json({ success: true });
-});
-
-// PUT /api/admin/elections/:id/candidates/:cid/update — update candidate name/description
-app.put('/api/admin/elections/:id/candidates/:cid/update', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  const { name, description } = req.body;
-  if (!name) return res.status(400).json({ message: 'name required' });
-  const candidate = db.updateCandidate(parseInt(req.params.cid), name, description);
-  res.json(candidate);
-});
-
-// GET /api/admin/elections/:id/domains — list domain restrictions
-app.get('/api/admin/elections/:id/domains', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  res.json(db.getElectionDomainRestrictions(parseInt(req.params.id)));
-});
-
-// POST /api/admin/elections/:id/domains — add domain restriction
-app.post('/api/admin/elections/:id/domains', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  const { domain } = req.body;
-  if (!domain) return res.status(400).json({ message: 'domain required' });
-  const result = db.addElectionDomainRestriction(parseInt(req.params.id), domain);
-  res.json({ success: true, domain: result });
-});
-
-// DELETE /api/admin/elections/:id/domains/:did — remove domain restriction
-app.delete('/api/admin/elections/:id/domains/:did', async (req, res) => {
-  const user = await getUserFromSession(req);
-  if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-  db.removeElectionDomainRestriction(parseInt(req.params.did));
-  res.json({ success: true });
-});
+const electionRoutes = require('./routes/election.routes');
+app.use('/api/admin/elections', electionRoutes);
 
 // ========== ADMIN PANEL ==========
 

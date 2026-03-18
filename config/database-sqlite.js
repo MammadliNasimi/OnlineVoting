@@ -347,31 +347,10 @@ class DatabaseService {
   }
 
   async recordVote(userId, electionId, blockchainCandidateId, commitment, txHash) {
-    // Convert blockchain candidate_id to database candidate id
-    const candidate = this.db.prepare(
-      `SELECT id FROM candidates WHERE election_id = ? AND blockchain_candidate_id = ?`
-    ).get(electionId, blockchainCandidateId);
-    
-    if (!candidate) {
-      throw new Error(`Candidate not found: blockchain_candidate_id=${blockchainCandidateId} for election ${electionId}`);
-    }
-    
-    const databaseCandidateId = candidate.id;
-    
-    // Mark user as voted in vote_status
+    // Sadece kullanıcının oy verdiğini "vote_status" tablosuna ekleriz.
+    // Oyların sayılması işlemini (votes tablosu) artık BlockchainIndexer devraldı.
     await this.markUserVoted(userId, electionId, txHash, commitment);
-    
-    // Record anonymous vote in votes table
-    this.db.prepare(
-      `INSERT INTO votes (election_id, candidate_id, commitment, transaction_hash)
-       VALUES (?, ?, ?, ?)`
-    ).run(electionId, databaseCandidateId, commitment, txHash);
-    
-    // Increment candidate vote count
-    this.db.prepare(
-      `UPDATE candidates SET vote_count = vote_count + 1 WHERE id = ?`
-    ).run(databaseCandidateId);
-    
+
     return { success: true };
   }
 
