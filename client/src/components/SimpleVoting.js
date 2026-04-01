@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Box, Typography, Button, Card, CardContent, CircularProgress, Alert, 
-  MenuItem, Select, FormControl, InputLabel, List, ListItem, ListItemText
+  MenuItem, Select, FormControl, InputLabel, List, ListItem, ListItemText, Snackbar
 } from '@mui/material';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import HistoryIcon from '@mui/icons-material/History';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { io } from 'socket.io-client';
+import { signVoteClientSide, getBurnerWallet } from '../LocalIdentity';
 
 const API_BASE = 'http://localhost:5000/api';
+const SOCKET_URL = 'http://localhost:5000';
 
 function SimpleVoting({ user, sessionId, onLogout }) {
   const queryClient = useQueryClient();
@@ -17,12 +20,51 @@ function SimpleVoting({ user, sessionId, onLogout }) {
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [queueMsg, setQueueMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (!user || !user.id) return;
+    
+    // Initialize or load burner wallet silently
+    try { getBurnerWallet(); } catch(e) { console.error('Ethers error: ', e) }
+
+    // Connect to WebSocket
+    const socket = io(SOCKET_URL, {
+      withCredentials: true
+    });
+
+    socket.on('connect', () => {
+      console.log('Connected to WebSocket server');
+      socket.emit('join', user.id);
+    });
+
+    socket.on('voteProcessed', (data) => {
+      if (data.success) {
+        setSuccessMsg(data.message || 'Oyunuz başarıyla blokzincire yazıldı!');
+        setQueueMsg('');
+        queryClient.invalidateQueries({ queryKey: ['votingHistory'] });
+        queryClient.invalidateQueries({ queryKey: ['elections'] });
+        setTimeout(() => setSuccessMsg(''), 5000);
+      }
+    });
+
+    socket.on('voteFailed', (data) => {
+      setErrorMsg(data.message || 'Oy işlemi başarısız oldu');
+      setQueueMsg('');
+      setTimeout(() => setErrorMsg(''), 5000);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user, queryClient]);
 
   // 1. Fetch Elections
   const { data: elections = [], isLoading: isLoadingElections, error: electionsError } = useQuery({
     queryKey: ['elections'],
     queryFn: async () => {
-      const res = await axios.get(`${API_BASE}/elections`, { headers: { 'x-session-id': sessionId } });
+      const res = await axios.get(`${API_BASE}/elections`);
       if (res.data && res.data.length > 0 && !selectedElectionId) {
         setSelectedElectionId(res.data[0].id);
       }
@@ -44,7 +86,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
   const { data: votingHistory = [], isLoading: isLoadingHistory } = useQuery({
     queryKey: ['votingHistory'],
     queryFn: async () => {
-      const res = await axios.get(`${API_BASE}/voting-history`, { headers: { 'x-session-id': sessionId } });
+      const res = await axios.get(`${API_BASE}/voting-history`);
       return res.data;
     }
   });
@@ -52,18 +94,36 @@ function SimpleVoting({ user, sessionId, onLogout }) {
   // 4. Vote Mutation
   const voteMutation = useMutation({
     mutationFn: async () => {
+      // 1. Genereate Client-Side Burner Signature locally (No MetaMask required!)
+      const voteData = await signVoteClientSide(
+        selectedCandidate.blockchain_candidate_id || selectedCandidate.id, 
+        selectedElectionId
+      );
+
+      // 2. Relay the vote wrapper to Backend Node.js
       return axios.post(
         `${API_BASE}/vote/simple`,
-        { electionId: selectedElectionId, candidateId: selectedCandidate.id },
-        { headers: { 'x-session-id': sessionId } }
+        { 
+          electionId: selectedElectionId, 
+          candidateId: selectedCandidate.id,
+          burnerAddress: voteData.burnerAddress,
+          burnerSignature: voteData.burnerSignature,
+          timestamp: voteData.timestamp
+        },
+        { headers: { 'x-session-id': sessionId }, withCredentials: true }
       );
     },
-    onSuccess: () => {
-      setSuccessMsg('Oyunuz başarıyla kaydedildi!');
+    onSuccess: (res) => {
+      if (res.data.status === 'queued') {
+        setQueueMsg(res.data.message || 'Oyunuz havuza alındı, işleniyor...');
+        setTimeout(() => setQueueMsg(''), 6000);
+      } else {
+        setSuccessMsg(res.data.message || 'Oyunuz başarıyla kaydedildi!');
+        queryClient.invalidateQueries({ queryKey: ['votingHistory'] });
+        queryClient.invalidateQueries({ queryKey: ['elections'] });
+        setTimeout(() => setSuccessMsg(''), 5000);
+      }
       setSelectedCandidate(null);
-      queryClient.invalidateQueries({ queryKey: ['votingHistory'] });
-      queryClient.invalidateQueries({ queryKey: ['elections'] });
-      setTimeout(() => setSuccessMsg(''), 3000);
     }
   });
 
@@ -101,12 +161,17 @@ function SimpleVoting({ user, sessionId, onLogout }) {
         <strong>{user.name}</strong> — {user.role === 'admin' ? 'Yönetici' : 'Vatandaş'}
       </Alert>
 
-      {(electionsError || voteMutation.isError) && (
+      {(electionsError || voteMutation.isError || errorMsg) && (
         <Alert severity="error" sx={{ mb: 3 }}>
-          {voteMutation.error?.response?.data?.message || 'Bir hata oluştu'}
+          {errorMsg || voteMutation.error?.response?.data?.message || 'Bir hata oluştu'}
         </Alert>
       )}
       {successMsg && <Alert severity="success" sx={{ mb: 3 }}>{successMsg}</Alert>}
+      {queueMsg && (
+        <Alert severity="info" icon={<CircularProgress size={20} />} sx={{ mb: 3 }}>
+          {queueMsg}
+        </Alert>
+      )}
 
       {showHistory ? (
         <Card elevation={3} sx={{ borderRadius: 3 }}>

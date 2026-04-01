@@ -23,9 +23,14 @@ contract VotingSSI {
     /// @notice EIP-712 Domain Separator
     bytes32 public DOMAIN_SEPARATOR;
     
-    /// @notice VoteProof typehash for EIP-712 (ZK-Email: emailHash replaces studentIDHash)
-    bytes32 public constant VOTEPROOF_TYPEHASH = keccak256(
-        "VoteProof(bytes32 emailHash,uint256 electionID,uint256 candidateID,uint256 timestamp)"
+    /// @notice Credential typehash for EIP-712 (Issuer signs this)
+    bytes32 public constant CREDENTIAL_TYPEHASH = keccak256(
+        "Credential(bytes32 emailHash,address burner,uint256 electionID)"
+    );
+
+    /// @notice Vote typehash for EIP-712 (Burner wallet signs this)
+    bytes32 public constant VOTE_TYPEHASH = keccak256(
+        "Vote(uint256 candidateID,uint256 electionID,uint256 timestamp)"
     );
     
     // ========== STATE VARIABLES ==========
@@ -49,16 +54,17 @@ contract VotingSSI {
         uint256 voteCount;
     }
     
-    /// @notice Vote Proof structure (matches EIP-712 signing)
-    /// @dev ZK-Email: emailHash = keccak256(email + domain + salt), never stored on-chain
+    /// @notice Vote Proof structure for Burner Wallet SSI
     struct VoteProof {
-        bytes32 emailHash;      // ZK-Email hash: keccak256(verifiedEmail + salt)
+        bytes32 emailHash;      // Unique hashed identifier
+        address burner;         // One-time random address created by student
         uint256 electionID;     // Election identifier
         uint256 candidateID;    // Chosen candidate
-        uint256 timestamp;      // Proof validity timestamp
-        bytes signature;        // Issuer's EIP-712 signature
+        uint256 timestamp;      // Vote operation timestamp
+        bytes issuerSignature;  // Admin signs: (emailHash, burner, electionID)
+        bytes burnerSignature;  // Burner signs: (candidateID, electionID, timestamp)
     }
-    
+
     /// @notice Current election ID counter
     uint256 public currentElectionId;
     
@@ -172,10 +178,10 @@ contract VotingSSI {
             "Proof expired - timestamp too old"
         );
         
-        // 5. Verify issuer's EIP-712 signature
+        // 5. Verify issuer's and burner's EIP-712 signatures
         require(
             verifyVoteProof(proof),
-            "Invalid issuer signature - unauthorized credential"
+            "Invalid signatures - unauthorized or corrupted credential"
         );
         
         // 6. Mark nullifier as used (prevents reuse)
@@ -192,37 +198,51 @@ contract VotingSSI {
     
     /**
      * @notice Verify EIP-712 signature of VoteProof
-     * @dev Reconstructs EIP-712 hash and recovers signer
+     * @dev 1) Verify Issuer gave credential to Burner. 2) Verify Burner signed the Vote
      * 
      * @param proof The VoteProof to verify
-     * @return bool True if signature is valid and from issuer
+     * @return bool True if both signatures are valid
      */
     function verifyVoteProof(VoteProof calldata proof) 
         internal 
         view 
         returns (bool) 
     {
-        // 1. Hash the struct according to EIP-712
-        bytes32 structHash = keccak256(
+        // 1. Verify Issuer Credential
+        bytes32 credHash = keccak256(
             abi.encode(
-                VOTEPROOF_TYPEHASH,
+                CREDENTIAL_TYPEHASH,
                 proof.emailHash,
-                proof.electionID,
+                proof.burner,
+                proof.electionID
+            )
+        );
+        
+        bytes32 credDigest = keccak256(
+            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, credHash)
+        );
+        
+        address credSigner = recoverSigner(credDigest, proof.issuerSignature);
+        require(credSigner == issuer, "Signer is not issuer");
+
+        // 2. Verify Burner Vote Signature
+        bytes32 voteHash = keccak256(
+            abi.encode(
+                VOTE_TYPEHASH,
                 proof.candidateID,
+                proof.electionID,
                 proof.timestamp
             )
         );
         
-        // 2. Create EIP-712 digest
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash)
+        bytes32 voteDigest = keccak256(
+            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, voteHash)
         );
         
-        // 3. Recover signer from signature
-        address signer = recoverSigner(digest, proof.signature);
-        
-        // 4. Verify signer is the issuer
-        return signer == issuer;
+        address voteSigner = recoverSigner(voteDigest, proof.burnerSignature);
+        require(voteSigner == proof.burner, "Signer is not burner");
+
+        return true;
     }
     
     /**

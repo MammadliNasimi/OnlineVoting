@@ -24,8 +24,26 @@ const API_BASE = 'http://localhost:5000/api';
 function AdminDashboard({ user, sessionId, onLogout }) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
+  const [domainModalOpen, setDomainModalOpen] = useState(false);
+  const [newDomain, setNewDomain] = useState('');
 
-  const authHeaders = { headers: { 'x-session-id': sessionId } };
+  const [electionModalOpen, setElectionModalOpen] = useState(false);
+  const [newElection, setNewElection] = useState({ title: '', description: '' });
+
+  const [candidatesModalOpen, setCandidatesModalOpen] = useState(false);
+  const [selectedElection, setSelectedElection] = useState(null);
+  const [newCandidate, setNewCandidate] = useState({ name: '', description: '' });
+
+
+  const [electionModalOpen, setElectionModalOpen] = useState(false);
+  const [newElection, setNewElection] = useState({ title: '', description: '' });
+
+  const [candidatesModalOpen, setCandidatesModalOpen] = useState(false);
+  const [selectedElection, setSelectedElection] = useState(null);
+  const [newCandidate, setNewCandidate] = useState({ name: '', description: '' });
+
+
+  const authHeaders = { headers: { 'x-session-id': sessionId }, withCredentials: true };
 
   // Queries
   const { data: dbStats } = useQuery({
@@ -40,7 +58,7 @@ function AdminDashboard({ user, sessionId, onLogout }) {
     queryKey: ['users'],
     queryFn: async () => {
       const { data } = await axios.get(`${API_BASE}/admin/users`, authHeaders);
-      return data;
+      return Array.isArray(data) ? data : [];
     },
     enabled: activeTab === 'users'
   });
@@ -49,15 +67,102 @@ function AdminDashboard({ user, sessionId, onLogout }) {
     queryKey: ['admin_elections'],
     queryFn: async () => {
       const { data } = await axios.get(`${API_BASE}/admin/elections`, authHeaders);
-      return data;
+      return Array.isArray(data) ? data : [];
     },
     enabled: activeTab === 'elections'
+  });
+
+  const { data: domains = [], isLoading: loadingDomains } = useQuery({
+    queryKey: ['admin_domains'],
+    queryFn: async () => {
+      const { data } = await axios.get(`${API_BASE}/admin/email-domains`, authHeaders);
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: activeTab === 'zkemail'
   });
 
   // User Deletion Mutation
   const deleteUserMutation = useMutation({
     mutationFn: (id) => axios.delete(`${API_BASE}/admin/users/${id}`, authHeaders),
     onSuccess: () => queryClient.invalidateQueries(['users'])
+  });
+
+  const deleteDomainMutation = useMutation({
+    mutationFn: (id) => axios.delete(`${API_BASE}/admin/email-domains/${id}`, authHeaders),
+    onSuccess: () => queryClient.invalidateQueries(['admin_domains'])
+  });
+
+  
+  const { data: candidates = [], isLoading: loadingCandidates } = useQuery({
+    queryKey: ['admin_candidates', selectedElection?.id],
+    queryFn: async () => {
+      const { data } = await axios.get(`${API_BASE}/candidates/${selectedElection.id}`, authHeaders);
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!selectedElection && candidatesModalOpen
+  });
+
+  const createElectionMutation = useMutation({
+    mutationFn: (elect) => axios.post(`${API_BASE}/admin/elections`, elect, authHeaders),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin_elections']);
+      setElectionModalOpen(false);
+      setNewElection({ title: '', description: '' });
+    }
+  });
+
+  const deleteElectionMutation = useMutation({
+    mutationFn: (id) => axios.delete(`${API_BASE}/admin/elections/${id}`, authHeaders),
+    onSuccess: () => queryClient.invalidateQueries(['admin_elections'])
+  });
+
+  const createCandidateMutation = useMutation({
+    mutationFn: (cand) => axios.post(`${API_BASE}/candidates`, cand, authHeaders),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin_candidates', selectedElection?.id]);
+      setNewCandidate({ name: '', description: '' });
+    }
+  });
+
+  
+  const { data: candidates = [], isLoading: loadingCandidates } = useQuery({
+    queryKey: ['admin_candidates', selectedElection?.id],
+    queryFn: async () => {
+      const { data } = await axios.get(`${API_BASE}/candidates/${selectedElection.id}`, authHeaders);
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!selectedElection && candidatesModalOpen
+  });
+
+  const createElectionMutation = useMutation({
+    mutationFn: (elect) => axios.post(`${API_BASE}/admin/elections`, elect, authHeaders),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin_elections']);
+      setElectionModalOpen(false);
+      setNewElection({ title: '', description: '' });
+    }
+  });
+
+  const deleteElectionMutation = useMutation({
+    mutationFn: (id) => axios.delete(`${API_BASE}/admin/elections/${id}`, authHeaders),
+    onSuccess: () => queryClient.invalidateQueries(['admin_elections'])
+  });
+
+  const createCandidateMutation = useMutation({
+    mutationFn: (cand) => axios.post(`${API_BASE}/candidates`, cand, authHeaders),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin_candidates', selectedElection?.id]);
+      setNewCandidate({ name: '', description: '' });
+    }
+  });
+
+  const addDomainMutation = useMutation({
+    mutationFn: (domain) => axios.post(`${API_BASE}/admin/email-domains`, { domain }, authHeaders),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin_domains']);
+      setDomainModalOpen(false);
+      setNewDomain('');
+    }
   });
 
   // Tab Rendering
@@ -105,7 +210,7 @@ function AdminDashboard({ user, sessionId, onLogout }) {
                 <TableBody>
                   {loadingUsers ? (
                     <TableRow><TableCell colSpan={6} align="center"><CircularProgress /></TableCell></TableRow>
-                  ) : users.map((u) => (
+                  ) : (Array.isArray(users)?users:(users?.users || [])).map((u) => (
                     <TableRow key={u.id} hover>
                       <TableCell>{u.id}</TableCell>
                       <TableCell fontWeight="medium">{u.name}</TableCell>
@@ -134,7 +239,7 @@ function AdminDashboard({ user, sessionId, onLogout }) {
           <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
               <Typography variant="h5" fontWeight="bold">Seçimler ve Adaylar</Typography>
-              <Button variant="contained" startIcon={<AddIcon />}>Yeni Seçim Ekle</Button>
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setElectionModalOpen(true)}>Yeni Seçim Ekle</Button>
             </Box>
             <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 3 }}>
               <Table>
@@ -157,8 +262,8 @@ function AdminDashboard({ user, sessionId, onLogout }) {
                       <TableCell>{e.description || '-'}</TableCell>
                       <TableCell>{new Date(e.created_at).toLocaleDateString()}</TableCell>
                       <TableCell align="right">
-                        <Button size="small" variant="outlined" sx={{ mr: 1 }}>Adaylar</Button>
-                        <IconButton color="error"><DeleteIcon /></IconButton>
+                        <Button size="small" variant="outlined" sx={{ mr: 1 }} onClick={() => { setSelectedElection(e); setCandidatesModalOpen(true); }}>Adaylar</Button>
+                        <IconButton color="error" onClick={() => deleteElectionMutation.mutate(e.id)}><DeleteIcon /></IconButton>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -178,16 +283,61 @@ function AdminDashboard({ user, sessionId, onLogout }) {
             <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
               Kurumsal anonim oylamalar için @akdeniz.edu.tr gibi kabul edilebilir alan adlarını buradan yönetebilirsiniz.
             </Alert>
-            <Button variant="contained" startIcon={<AddIcon />}>Domain Ekle</Button>
-          </Box>
-        );
+              <Box sx={{ mb: 3 }}>
+                   <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDomainModalOpen(true)}>Domain Ekle</Button>
+              </Box>
 
-      default:
-        return <Typography>Geliştirme Aşamasında</Typography>;
-    }
-  };
+              <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 3 }}>
+                <Table>
+                  <TableHead sx={{ bgcolor: 'grey.100' }}>
+                    <TableRow>
+                      <TableCell><strong>ID</strong></TableCell>
+                      <TableCell><strong>Domain</strong></TableCell>
+                      <TableCell><strong>Ekleyen</strong></TableCell>
+                      <TableCell align="right"><strong>İşlemler</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {loadingDomains ? (
+                      <TableRow><TableCell colSpan={4} align="center"><CircularProgress /></TableCell></TableRow>
+                    ) : domains.map((d) => (
+                      <TableRow key={d.id} hover>
+                        <TableCell>{d.id}</TableCell>
+                        <TableCell><strong>{d.domain}</strong></TableCell>
+                        <TableCell>{d.added_by}</TableCell>
+                        <TableCell align="right">
+                          <IconButton color="error" onClick={() => deleteDomainMutation.mutate(d.id)}><DeleteIcon /></IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {domains.length === 0 && !loadingDomains && (
+                      <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3 }}>Kayıtlı domain bulunmuyor.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
-  return (
+              <Dialog open={domainModalOpen} onClose={() => setDomainModalOpen(false)}>
+                <DialogTitle>Yeni Domain Ekle</DialogTitle>
+                <DialogContent>
+                  <TextField 
+                    autoFocus margin="dense" label="Domain (örn: akdeniz.edu.tr)" type="text"
+                    fullWidth variant="outlined" value={newDomain} onChange={e => setNewDomain(e.target.value)}
+                  />
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={() => setDomainModalOpen(false)}>İptal</Button>
+                  <Button onClick={() => addDomainMutation.mutate(newDomain)} variant="contained" disabled={!newDomain}>Ekle</Button>
+                </DialogActions>
+              </Dialog>
+            </Box>
+          );
+        default:
+          return <Typography>Geliştirme Aşamasında</Typography>;
+      }
+    };
+
+    return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f4f6f8' }}>
       <AppBar position="fixed" sx={{ width: `calc(100% - ${drawerWidth}px)`, ml: `${drawerWidth}px`, bgcolor: 'white', color: 'text.primary', boxShadow: 1 }}>
         <Toolbar>
@@ -254,6 +404,63 @@ function AdminDashboard({ user, sessionId, onLogout }) {
       <Box component="main" sx={{ flexGrow: 1, p: 4, mt: 8 }}>
         <Container maxWidth="xl">
           {renderContent()}
+
+      {/* Yeni Secim Modal */}
+      <Dialog open={electionModalOpen} onClose={() => setElectionModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Yeni Seçim Ekle</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus margin="dense" label="Seçim Başlığı" fullWidth
+            value={newElection.title} onChange={e => setNewElection(prev => ({ ...prev, title: e.target.value }))}
+          />
+          <TextField
+            margin="dense" label="Açıklama" fullWidth multiline rows={3}
+            value={newElection.description} onChange={e => setNewElection(prev => ({ ...prev, description: e.target.value }))}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setElectionModalOpen(false)}>İptal</Button>
+          <Button onClick={() => createElectionMutation.mutate(newElection)} variant="contained" disabled={!newElection.title}>Ekle</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Adaylar Modal */}
+      <Dialog open={candidatesModalOpen} onClose={() => { setCandidatesModalOpen(false); setSelectedElection(null); }} maxWidth="md" fullWidth>
+        <DialogTitle>{selectedElection?.title || ''} - Aday Yönetimi</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>Mevcut Adaylar</Typography>
+          {loadingCandidates ? <CircularProgress size={24} /> : (
+            <Table size="small">
+              <TableHead><TableRow><TableCell>İsim</TableCell><TableCell>Açıklama</TableCell></TableRow></TableHead>
+              <TableBody>
+                {candidates.map(c => (
+                  <TableRow key={c.id}><TableCell>{c.name}</TableCell><TableCell>{c.description || '-'}</TableCell></TableRow>
+                ))}
+                {candidates.length === 0 && <TableRow><TableCell colSpan={2}>Hiç aday yok.</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          )}
+
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 4, mb: 2 }}>Yeni Aday Ekle</Typography>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <TextField
+              label="Aday İsmi" size="small"
+              value={newCandidate.name} onChange={e => setNewCandidate(prev => ({ ...prev, name: e.target.value }))}
+            />
+            <TextField
+              label="Açıklama" size="small" fullWidth
+              value={newCandidate.description} onChange={e => setNewCandidate(prev => ({ ...prev, description: e.target.value }))}
+            />
+            <Button variant="contained" disabled={!newCandidate.name} onClick={() => createCandidateMutation.mutate({ ...newCandidate, electionId: selectedElection?.id })}>
+              Ekle
+            </Button>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setCandidatesModalOpen(false); setSelectedElection(null); }}>Kapat</Button>
+        </DialogActions>
+      </Dialog>
+
         </Container>
       </Box>
     </Box>

@@ -1,8 +1,3 @@
-/**
- * @file database.js - SQLite Version
- * @description SQLite database connection (no installation required!)
- */
-
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
@@ -14,18 +9,15 @@ class DatabaseService {
 
   async connect() {
     try {
-      const dbPath = path.join(__dirname, '..', 'database.db');
-      this.db = new Database(dbPath);
-      
+        const dbPath = path.join(__dirname, '..', '..', 'database.db');
+        this.db = new Database(dbPath);
       console.log('✅ SQLite connected successfully');
       console.log(`   Database: ${dbPath}`);
-      
-      // Enable foreign keys
+
       this.db.pragma('foreign_keys = ON');
-      
-      // Create tables
+
       this.createTables();
-      
+
       return true;
     } catch (error) {
       console.error('❌ Database connection failed:', error.message);
@@ -34,7 +26,7 @@ class DatabaseService {
   }
 
   createTables() {
-    // Users table
+
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,10 +38,9 @@ class DatabaseService {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    // Add email column if it doesn't exist (migration for existing DBs)
+
     try { this.db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch (_) {}
 
-    // Elections table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS elections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,7 +54,6 @@ class DatabaseService {
       )
     `);
 
-    // Candidates table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS candidates (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,7 +67,6 @@ class DatabaseService {
       )
     `);
 
-    // Vote authorizations table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS vote_authorizations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,7 +83,6 @@ class DatabaseService {
       )
     `);
 
-    // Vote status table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS vote_status (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,7 +98,6 @@ class DatabaseService {
       )
     `);
 
-    // Votes table (anonymous)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS votes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -125,7 +112,6 @@ class DatabaseService {
       )
     `);
 
-    // Sessions table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
@@ -139,11 +125,10 @@ class DatabaseService {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
-    // Add wallet funding columns if they do not exist (migration for existing DBs)
+
     try { this.db.exec('ALTER TABLE sessions ADD COLUMN wallet_funded INTEGER DEFAULT 0'); } catch (_) {}
     try { this.db.exec('ALTER TABLE sessions ADD COLUMN wallet_funding_error TEXT'); } catch (_) {}
 
-    // Face profiles table (one biometric template per user)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS user_face_profiles (
         user_id INTEGER PRIMARY KEY,
@@ -154,7 +139,6 @@ class DatabaseService {
       )
     `);
 
-    // ZK-Email: Whitelist of allowed email domains (managed by admin)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS allowed_email_domains (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,8 +148,6 @@ class DatabaseService {
       )
     `);
 
-    // Election domain restrictions (which domains can vote for which election)
-    // Empty = all whitelisted domains allowed
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS election_domain_restrictions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -177,7 +159,6 @@ class DatabaseService {
       )
     `);
 
-    // ZK-Email: OTP verification records
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS email_verifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,20 +171,18 @@ class DatabaseService {
       )
     `);
 
-    // Insert default admin if not exists
     const adminExists = this.db.prepare('SELECT id FROM users WHERE name = ?').get('admin');
     if (!adminExists) {
       const bcrypt = require('bcryptjs');
-      
+
       const hashedPassword = bcrypt.hashSync('admin123', 10);
       this.db.prepare(
         'INSERT INTO users (name, password, role, student_id) VALUES (?, ?, ?, ?)'
       ).run('admin', hashedPassword, 'admin', 'ADMIN001');
-      
+
       console.log('   ✅ Default admin user created (admin/admin123)');
     }
 
-    // Insert sample election if database is empty
     const electionCount = this.db.prepare('SELECT COUNT(*) as c FROM elections').get();
     if (electionCount.c === 0) {
       const electionInfo = this.db.prepare(
@@ -212,15 +191,14 @@ class DatabaseService {
       ).run('2026 Öğrenci Başkanı Seçimi', 'Blockchain tabanlı anonim oylama', 1);
       const sampleElectionId = electionInfo.lastInsertRowid;
 
-      // Insert candidates for the newly created election id
       this.db.prepare(
         'INSERT INTO candidates (election_id, name, description, blockchain_candidate_id) VALUES (?, ?, ?, ?)'
       ).run(sampleElectionId, 'Ali Yılmaz', 'Deneyimli lider', 0);
-      
+
       this.db.prepare(
         'INSERT INTO candidates (election_id, name, description, blockchain_candidate_id) VALUES (?, ?, ?, ?)'
       ).run(sampleElectionId, 'Ayşe Demir', 'Yenilikçi düşünür', 1);
-      
+
       this.db.prepare(
         'INSERT INTO candidates (election_id, name, description, blockchain_candidate_id) VALUES (?, ?, ?, ?)'
       ).run(sampleElectionId, 'Mehmet Kaya', 'Topluluk organizatörü', 2);
@@ -235,8 +213,6 @@ class DatabaseService {
       console.log('🔒 Database connection closed');
     }
   }
-
-  // ========== USER QUERIES ==========
 
   async findUserByName(name) {
     return this.db.prepare('SELECT * FROM users WHERE name = ?').get(name);
@@ -268,7 +244,7 @@ class DatabaseService {
   }
 
   deleteUser(id) {
-    // Also delete their sessions and vote_status
+
     this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
     this.db.prepare('DELETE FROM vote_status WHERE user_id = ?').run(id);
     this.db.prepare('DELETE FROM users WHERE id = ?').run(id);
@@ -286,11 +262,9 @@ class DatabaseService {
     this.db.prepare('DELETE FROM vote_status WHERE id = ?').run(id);
   }
 
-  // ========== ELECTION QUERIES ==========
-
   async getActiveElections() {
     return this.db.prepare(
-      `SELECT * FROM elections WHERE is_active = 1 
+      `SELECT * FROM elections WHERE is_active = 1
        AND datetime('now') >= start_date AND datetime('now') <= end_date`
     ).all();
   }
@@ -298,8 +272,6 @@ class DatabaseService {
   async getElectionById(id) {
     return this.db.prepare('SELECT * FROM elections WHERE id = ?').get(id);
   }
-
-  // ========== CANDIDATE QUERIES ==========
 
   async getCandidatesByElection(electionId) {
     return this.db.prepare('SELECT * FROM candidates WHERE election_id = ? ORDER BY id').all(electionId);
@@ -309,11 +281,9 @@ class DatabaseService {
     return this.db.prepare('SELECT * FROM candidates ORDER BY election_id, id').all();
   }
 
-  // ========== VOTE AUTHORIZATION ==========
-
   async createVoteAuthorization(userId, electionId, commitment, signature) {
     const info = this.db.prepare(
-      `INSERT INTO vote_authorizations (user_id, election_id, commitment, signature) 
+      `INSERT INTO vote_authorizations (user_id, election_id, commitment, signature)
        VALUES (?, ?, ?, ?)`
     ).run(userId, electionId, commitment, signature);
     return this.db.prepare('SELECT * FROM vote_authorizations WHERE id = ?').get(info.lastInsertRowid);
@@ -324,8 +294,6 @@ class DatabaseService {
       'SELECT * FROM vote_authorizations WHERE user_id = ? AND election_id = ?'
     ).get(userId, electionId);
   }
-
-  // ========== VOTE STATUS ==========
 
   async hasUserVoted(userId, electionId) {
     const result = this.db.prepare(
@@ -338,25 +306,43 @@ class DatabaseService {
     this.db.prepare(
       `INSERT INTO vote_status (user_id, election_id, has_voted, voted_at, transaction_hash, commitment)
        VALUES (?, ?, 1, datetime('now'), ?, ?)
-       ON CONFLICT(user_id, election_id) DO UPDATE SET 
+       ON CONFLICT(user_id, election_id) DO UPDATE SET
        has_voted = 1, voted_at = datetime('now'), transaction_hash = ?, commitment = ?`
     ).run(userId, electionId, txHash, commitment, txHash, commitment);
-    
+
     return this.db.prepare('SELECT * FROM vote_status WHERE user_id = ? AND election_id = ?')
       .get(userId, electionId);
   }
 
   async recordVote(userId, electionId, blockchainCandidateId, commitment, txHash) {
-    // Sadece kullanıcının oy verdiğini "vote_status" tablosuna ekleriz.
-    // Oyların sayılması işlemini (votes tablosu) artık BlockchainIndexer devraldı.
+
+    const candidate = this.db.prepare(
+      `SELECT id FROM candidates WHERE election_id = ? AND blockchain_candidate_id = ?`
+    ).get(electionId, blockchainCandidateId);
+
+    if (!candidate) {
+      throw new Error(`Candidate not found: blockchain_candidate_id=${blockchainCandidateId} for election ${electionId}`);
+    }
+
+    const databaseCandidateId = candidate.id;
+
     await this.markUserVoted(userId, electionId, txHash, commitment);
+
+    this.db.prepare(
+      `INSERT INTO votes (election_id, candidate_id, commitment, transaction_hash)
+       VALUES (?, ?, ?, ?)`
+    ).run(electionId, databaseCandidateId, commitment, txHash);
+
+    this.db.prepare(
+      `UPDATE candidates SET vote_count = vote_count + 1 WHERE id = ?`
+    ).run(databaseCandidateId);
 
     return { success: true };
   }
 
   async getUserVotingHistory(userId) {
     return this.db.prepare(
-      `SELECT 
+      `SELECT
         vs.voted_at,
         vs.transaction_hash,
         e.title as election_title,
@@ -388,8 +374,6 @@ class DatabaseService {
     return electionId ? stmt.all(electionId) : stmt.all();
   }
 
-  // ========== SESSIONS ==========
-
   async createSession(sessionId, userId, expiresAt, walletAddress = null, walletPrivateKeyEncrypted = null, walletFunded = false, walletFundingError = null) {
     this.db.prepare(
       `INSERT INTO sessions
@@ -409,8 +393,8 @@ class DatabaseService {
 
   async getSession(sessionId) {
     return this.db.prepare(
-      `SELECT s.*, u.id as user_id, u.name, u.role FROM sessions s 
-       JOIN users u ON s.user_id = u.id 
+      `SELECT s.*, u.id as user_id, u.name, u.role FROM sessions s
+       JOIN users u ON s.user_id = u.id
        WHERE s.id = ? AND datetime(s.expires_at) > datetime('now')`
     ).get(sessionId);
   }
@@ -439,8 +423,6 @@ class DatabaseService {
     return info?.changes || 0;
   }
 
-  // ========== FACE LOGIN ==========
-
   setUserFaceProfile(userId, descriptorArray) {
     const descriptorJson = JSON.stringify(descriptorArray);
     this.db.prepare(
@@ -467,8 +449,6 @@ class DatabaseService {
     const row = this.db.prepare('SELECT user_id FROM user_face_profiles WHERE user_id = ?').get(userId);
     return !!row;
   }
-
-  // ========== ZK-EMAIL: ALLOWED DOMAINS ==========
 
   getAllowedEmailDomains() {
     return this.db.prepare('SELECT * FROM allowed_email_domains ORDER BY created_at DESC').all();
@@ -497,7 +477,7 @@ class DatabaseService {
   isEmailDomainAllowed(email) {
     const domain = email.split('@')[1]?.toLowerCase();
     if (!domain) return false;
-    // If no domains configured, deny all
+
     const count = this.db.prepare('SELECT COUNT(*) as c FROM allowed_email_domains').get();
     if (count.c === 0) return false;
     const found = this.db.prepare(
@@ -506,10 +486,8 @@ class DatabaseService {
     return !!found;
   }
 
-  // ========== ZK-EMAIL: OTP VERIFICATION ==========
-
   createEmailVerification(email, emailHash, otpHash, expiresAt) {
-    // Invalidate previous unused verifications for this email
+
     this.db.prepare(
       "UPDATE email_verifications SET used = 1 WHERE email = ? AND used = 0"
     ).run(email.toLowerCase());
@@ -533,8 +511,6 @@ class DatabaseService {
     this.db.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').run(id);
   }
 
-  // ========== ELECTION MANAGEMENT (ADMIN) ==========
-
   getAllElections() {
     const elections = this.db.prepare('SELECT * FROM elections ORDER BY id DESC').all();
     return elections.map(e => ({
@@ -545,9 +521,9 @@ class DatabaseService {
   }
 
   createElection(title, description, startDate, endDate, blockchainElectionId = null) {
-    const blockchainId = blockchainElectionId || 
+    const blockchainId = blockchainElectionId ||
       (this.db.prepare('SELECT COALESCE(MAX(blockchain_election_id), 0) + 1 as next FROM elections').get().next);
-    
+
     const info = this.db.prepare(
       `INSERT INTO elections (title, description, start_date, end_date, is_active, blockchain_election_id)
        VALUES (?, ?, ?, ?, 1, ?)`
@@ -612,17 +588,14 @@ class DatabaseService {
     this.db.prepare('DELETE FROM election_domain_restrictions WHERE id = ?').run(id);
   }
 
-  // Check if an email's domain is allowed for a specific election.
-  // If the election has no domain restrictions → falls back to global whitelist.
-  // If it has restrictions → email domain must be in those restrictions (AND global whitelist).
   isEmailAllowedForElection(email, electionId) {
-    if (!this.isEmailDomainAllowed(email)) return false; // must always be in global whitelist
+    if (!this.isEmailDomainAllowed(email)) return false;
     const domain = email.split('@')[1]?.toLowerCase();
     if (!domain) return false;
     const count = this.db.prepare(
       'SELECT COUNT(*) as c FROM election_domain_restrictions WHERE election_id = ?'
     ).get(electionId);
-    if (count.c === 0) return true; // no restrictions = all whitelisted domains allowed
+    if (count.c === 0) return true;
     const found = this.db.prepare(
       'SELECT id FROM election_domain_restrictions WHERE election_id = ? AND domain = ?'
     ).get(electionId, domain);

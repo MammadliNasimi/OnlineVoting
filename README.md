@@ -1,76 +1,49 @@
-﻿<div align="center">
-  <h1>🗳️ SSI Voting - Blockchain Tabnlı Anonim Oylama Sistemi</h1>
-  <p><strong>TÜBİTAK 2209-A Araştırma Projesi Kapsamında Geliştirilmiş, Sıfır Bilgi İspatı (Zero-Knowledge) ve Self-Sovereign Identity (SSI) Destekli Yeni Nesil Oylama Altyapısı</strong></p>
-  
+<div align="center">
+  <h1>🗳️ SSI Voting - Blockchain Tabanlı Anonim Oylama Sistemi</h1>
+  <p><strong>TÜBİTAK 2209-A Araştırma Projesi Kapsamında Geliştirilmiş, Self-Sovereign Identity (SSI) Destekli Yeni Nesil Oylama Altyapısı</strong></p>
+
   [![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg?style=for-the-badge&logo=nodedotjs)](https://nodejs.org/)
   [![React](https://img.shields.io/badge/React-18.x-blue.svg?style=for-the-badge&logo=react)](https://reactjs.org/)
   [![Solidity](https://img.shields.io/badge/Solidity-0.8.x-black.svg?style=for-the-badge&logo=solidity)](https://soliditylang.org/)
   [![Ethers.js](https://img.shields.io/badge/Ethers.js-v6-blueviolet.svg?style=for-the-badge)](https://docs.ethers.io/)
   [![SQLite](https://img.shields.io/badge/SQLite-3-003B57.svg?style=for-the-badge&logo=sqlite)](https://sqlite.org/)
-  
+  [![Socket.io](https://img.shields.io/badge/Socket.io-4.x-black.svg?style=for-the-badge&logo=socket.io)](https://socket.io/)
+
 </div>
 
 ---
 
 ## 📖 Proje Hakkında
 
-Geleneksel elektronik oylama sistemlerinin şeffaflık ve manipülasyon sorunlarına karşın tasarlanan bu proje, **Ethereum Akıllı Sözleşmeleri**, **ZK-Email Konsepti** ve **Self-Sovereign Identity (SSI)** altyapılarını kullanarak geliştirilmiştir.
+Geleneksel ve mevcut elektronik oylama sistemlerinin şeffaflık ve manipülasyon sorunlarına karşın tasarlanan bu proje, **Ethereum Akıllı Sözleşmeleri** ve **Self-Sovereign Identity (SSI)** altyapısını kullanarak geliştirilmiştir.
 
 Sistem, seçmenlerin kimliğini tamamen gizli tutarken (anonimlik), kullanılan her oyun sadece bir kez kullanıldığı (çift oy engeli) ve değiştirilemeyeceği (değişmezlik) prensipleriyle çalışır. Harici bir **MetaMask veya Kripto Cüzdanına ihtiyaç duymadan**, Web2 rahatlığında Web3 güvenliği sağlar.
 
 ---
 
-## 🌟 Öne Çıkan Özellikler & Nasıl Çalışır? (Features Deep-Dive)
+## 🌟 Öne Çıkan Özellikler & Güncel Mimari (Features Deep-Dive)
 
-Sistemin her bir yapı taşı, güvenlik ve kullanıcı deneyimi gözetilerek özel olarak tasarlanmıştır.
+### 1. 🔑 Gerçek SSI & Burner Wallet Mimarisi (Local Identity)
+- **Nasıl Çalışır?** Kullanıcılar (seçmenler) sisteme dahil olduklarında eklenti kurmalarına gerek yoktur. Kullanıcının tarayıcısında (Local Storage) tek kullanımlık, güvenli ve kriptografik bir **Burner Wallet** (Geçici Kimlik Cüzdanı) otomatik üretilir.
+- **Faydası:** Merkezi arka plan (Backend) asla kullanıcının kimlik veya cüzdan anahtarlarına erişemez. İmza işlemleri (Oylama) %100 oranında istemci tarafında (Client-side) gerçekleşir, bu da sistemi "Trustless" (Güvene İhtiyaç Duymayan) hale getirir.
 
-### 1. 🎭 ZK-Email & Nullifier Mekanizması (Tam Anonimlik)
-- **Nasıl Çalışır?** Kullanıcı sisteme kurumsal e-posta adresiyle kayıt olur. Kullanıcı oy kullanırken e-posta bilgisi doğrudan blockchain'e gönderilmez. Bunun yerine, e-posta adresi, arka planda kriptografik olarak hashlenir ve seçim ile birleştirilerek tekil bir **Nullifier** (Gizli Kimlik Özeti) oluşturulur `keccak256(idHash + electionId)`.
-- **Faydası:** Blockchain üzerindeki işlemler incelense bile, oyun kime ait olduğu (e-posta veya isim) asla geriye dönük olarak tespit edilemez. Çift oy kullanmaya çalışan bir kişinin "Nullifier"ı zaten kayıtlı olacağından sistem oyu otomatik reddeder.
+### 2. 🔏 EIP-712 Çift İmza (Dual Signature) Standardı
+- **Nasıl Çalışır?** Blockchain üzerindeki Akıllı Sözleşme (`VotingSSI.sol`) her bir oyu işleme alırken iki farklı imza talep eder:
+  1. **Issuer Signature (Kimlik Sağlayıcı/Üniversite):** Öğrencinin (Burner cüzdan) gerçekten okula kayıtlı olduğunu ve oy kullanmaya hakkı olduğunu onaylayan yetkili imzası.
+  2. **Burner Signature (Seçmen):** Yetki verilmiş geçici cüzdanın oy tercihi doğrultusunda kendi attığı gerçek ve manipüle edilemez seçmen imzası.
+- **Faydası:** Yalnıza tek bir yöneticinin (Backend) manipülasyonla sahte oylar üretmesinin (Centralized Proxy) önüne geçilerek tam anlamıyla merkeziyetsizlik (Decentralization) başarılmıştır.
 
-### 2. ⛽ Walletless Oylama & Relayer Servisi (Gasless Oylama)
-- **Nasıl Çalışır?** Kullanıcılar (seçmenler) kripto para piyasasından veya cüzdan konfigürasyonlarından (Gas ücreti, Metamask kurulumu vb.) tamamen izoledir. Kullanıcı giriş yaptığında (Login) arka planda geçici, şifrelenmiş bir **Session Wallet** (Oturum Cüzdanı) oluşturulur.
-- **Faydası:** Kullanıcı oylama butonuna bastığında, işlem sistemin merkezi bir **Relayer** (Aktarıcı) servisi aracılığıyla kullanıcı adına ödemesi yapılarak blockchain'e yazılır. Seçmenin hiçbir kripto bilgisi olması gerekmez.
+### 3. 🎭 Gizlilik ve Nullifier Mekanizması
+- Kullanıcı oy kullandığında e-posta veya kişisel kimlik verisi blockchain'e yollanmaz. Özel olarak oluşturulan `Nullifier` (Kimlik özeti) ile çift oyun engeli sağlanırken anonimlik korunur. İşlemler `Relayer` (Aktarıcı) üzerinden ağ ücreti ödenmeden (Gasless) gerçekleştirilir.
 
-### 3. ✍️ EIP-712 Typed Data Stardardı
-- **Nasıl Çalışır?** Oylama işlemi için standart veri paketleri yerine, doğrulanabilir ve kriptografik olarak yapılandırılmış bir "Oy İmza Paketi" (Credential ve Oy Dağılımı) oluşturulur.
-- **Faydası:** Backend'in, kullanıcının niyetini (hangi adaya oy verdiğini) manipüle etmesini engeller. Akıllı Sözleşme, atılan imzanın tam ve kesin olarak o kişiye ait olduğunu EIP-712 standardında test ederek doğrular.
+### 4. ⚡ Asenkron Queue (Kuyruk) ve WebSockets
+- **Nasıl Çalışır?** Oyların blockchain'e yazılma süreci `p-queue` aracılığıyla sıraya alınır (Job Queue) ve arka planda ağ tıkanmalarını engelleyerek Node.js sunucusunu kitlemez. İşlemin her adımı (Hazırlanıyor -> Onaya Gönderiliyor -> Blockchain'e Yazıldı) kullanıcının arayüzüne **Socket.io** üzerinden gerçek zamanlı (Real-time) olarak iletilir.
 
-### 4. 🛡️ Geçici Oturum Cüzdanları (Ephemeral Wallets)
-- **Nasıl Çalışır?** Her başarılı kullanıcı girişinde bellekte rastgele bir cüzdan (Private Key) oluşturulur, AES-256 algoritmasıyla şifrelenir ve oturum süresince saklanır. Çıkış yapıldığında (Logout veya Timeout) cüzdan tamamen yok edilir.
-- **Faydası:** Cihaz çalınsa veya hacklense dahi veritabanında kullanıcının kalıcı bir cüzdanı bulunmadığı için geriye dönük oy sızıntısı riski ortadan kaldırılır.
-
----
-
-## 🛠️ Yönetim ve Admin Paneli
-
-Oylama sisteminin yönetimi, kullanımı kolay gelişmiş araçlarla desteklenmiş eşzamanlı bir kontrol paneli üzerinden yapılır:
-* **Canlı Monitör:** Sisteme atılan oylar, blockchain blok onayları ve aktif seçimler gerçek zamanlı (%100 Live) izlenir.
-* **Akıllı Seçim ve Aday Yönetimi:** Özel domain bazlı seçim kısıtları tanımlanabilir (Örn: *Sadece "@akdeniz.edu.tr" uzantılı kişiler oy kullanabilir*).
-* **Blockchain Node Takibi:** Hardhat çalışma durumu, Contract adresleri, mevcut gaz kullanım oranları tek ekrandan gözlenir.
-
----
-
-## 🏗️ Sistem Mimarisi & Oylama İş Akışı (Workflow)
-
-```mermaid
-graph TD;
-    A[Kullanıcı Login Olur] -->|1. JWT + Şifreli Ephemeral Cüzdan| B(Backend Session Başlar);
-    B --> C{Seçimleri ve Adayları Görüntüle};
-    C -->|2. Aday Seçimi| D[Oy Verme İsteği Tetiklenir];
-    D -->|3. EIP-712 İmzalama| E{Backend: Veri Doğrulama ve Hash Oluşturma};
-    E -->|4. ZK-Email & Nullifier| F[Sistem Cüzdanı / Relayer];
-    F -->|5. Gas Odenerek Tx Gonderilir| G[(Ethereum Akıllı Sözleşmesi)];
-    G -->|6. Akıllı Sözleşme Kontrolü| H{Nullifier Kayıtlı mı?};
-    H -- EVET --> I[Tx İptal Edilir REVERT];
-    H -- HAYIR --> J[Oy Sayacı Artar & Nullifier Kaydedilir];
-    J --> K[Oylama Başarılı! TxHash Dönülür];
-```
-
-1. **Autentikasyon Phase:** Kullanıcı giriş yapar, Backend kullanıcıyı yetkilendirir ve oturum oluşturur.
-2. **Retrieve Phase:** Kullanıcının görmeye yetkili olduğu (domain filtresine uygun) aktif seçimler frontend'e gönderilir.
-3. **Voting Phase:** E-posta verisi kullanarak özel bir SSI Credential'ı JSON olarak hazırlanır ve geçici cüzdan ile imzalanıp Relayer'a verilir.
-4. **On-Chain Phase:** Smart contract, imzayı denetler; kimlik ve Nullifier temiz ise `vote()` fonksiyonunu işletir.
+### 5. 🛠 Yönetim ve Admin Dashboard Paneli
+- Gelişmiş panel sayesinde veritabanı (SQLite) ile Akıllı sözleşme senkronize çalışır. Modal arayüzleri ile canlı ve anlık olarak:
+  * **Seçim Oluşturma:** Yeni seçim (Election) ekleyebilme.
+  * **Aday Yönetimi:** Seçimlere özel yeni dinamik aday (Candidate) atama imkanı.
+  * **Monitör:** Sistemdeki toplam oy ve kullanıcı verilerini canlı izleme.
 
 ---
 
@@ -78,17 +51,17 @@ graph TD;
 
 | Bileşen | Kullanılan Teknoloji | Görevi / Rolü |
 |---------|----------------------|---------------|
-| **Frontend** | React 18, Chart.js, Tailwind/CS | Etkileşimli Kullanıcı ve Aday Seçim Arayüzü |
-| **Backend** | Node.js, Express.js | API Yönetimi, Oturum işlemleri ve Relayer Servisi |
-| **Veritabanı** | SQLite (better-sqlite3) | Hızlı, gömülü ve ilişkisel data yönetimi |
-| **Blockchain** | Solidity, Hardhat, Ethers.js v6 | Oyların barındırıldığı şeffaf Akıllı Sözleşmeler |
-| **Kriptografi** | keccak256, bcrypt, AES-256-CBC | Kimlik ve ZK veri bütünlüğü güvenliği |
+| **Frontend** | React 18, Material UI, Axios | Arayüz, Burner Wallet yönetimi, EIP-712 Şifreleme |
+| **Backend** | Node.js, Express.js | API, SSI Issuer, Relayer Servisi ve JWT oturum |
+| **Veritabanı** | SQLite (better-sqlite3) | Hızlı ve güvenli ilişkisel/gerçek zamanlı veri depolama |
+| **Blockchain** | Solidity, Hardhat, Ethers.js v6 | EIP-712 destekli oyların tutulduğu akıllı sözleşme |
+| **Senkronizasyon** | Socket.io, p-queue | Arka plan kuyruk yönetimi (Background Jobs) |
 
 ---
 
 ## 🚀 Yerel Ortamda Kurulum ve Çalıştırma
 
-Projeyi bilgisayarınızda çalıştırmak oldukça basittir. Node.js (v16+) ve git yüklü olduğundan emin olun.
+Projeyi bilgisayarınızda çalıştırmak oldukça basittir. Node.js (v18+) ve `git` yüklü olduğundan emin olun.
 
 ### 1. Repoyu Klonlayın ve Bağımlılıkları Yükleyin
 
@@ -100,15 +73,19 @@ cd OnlineVoting
 npm install
 
 # İstemci (Frontend) bağımlılıkları
-cd client && npm install && cd ..
+cd client
+npm install
+cd ..
 
 # Blockchain (Smart Contract) bağımlılıkları
-cd smart-contracts && npm install && cd ..
+cd smart-contracts
+npm install
+cd ..
 ```
 
 ### 2. Ortam Değişkenleri (Environment Config)
 
-Ana dizinde `.env` isimli yeni bir dosya oluşturun ve içerisine aşağıdaki değişkenleri yapıştırın:
+Ana dizinde `.env` isimli bir dosya oluşturun veya güncelleyin:
 
 ```env
 # Admin/Deployer Private Key (Hardhat Test Account #0)
@@ -117,26 +94,27 @@ ADMIN_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2
 BLOCKCHAIN_RPC_URL=http://127.0.0.1:8545
 CHAIN_ID=31337
 PORT=5000
-SESSION_TIMEOUT=28800000
-SESSION_SECRET=local_development_secret_key_1234
-CORS_ORIGINS=http://localhost:3000,http://localhost:5000
+
+# Akıllı sözleşmeler derlenip dağıtıldıktan sonra buraya o adresi ekleyin
+VOTING_CONTRACT_ADDRESS="0x..."
 ```
 
 ### 3. Sistemi Başlatma Süreci
 
 Uygulamanın farklı katmanlarını başlatmak için 3 ayrı terminal penceresi açmalısınız:
 
-**Terminal 1 (Blockchain Test Ağı):**
+**Terminal 1 (Blockchain Node Çalıştırma):**
 ```bash
 cd smart-contracts
 npx hardhat node
 ```
 
-**Terminal 2 (Sözleşmeleri Dağıtma ve Backend'i Başlatma):**  
-*(Sadece ilk seferde contract dağıtılır)*
+**Terminal 2 (Sözleşme Dağıtma ve Backend Başlatma):**
+*(Gerekli adres Deploy script'inden alındıktan sonra mutlaka .env dosyasındaki VOTING_CONTRACT_ADDRESS güncellenmelidir).*
+
 ```bash
 cd smart-contracts
-npx hardhat run scripts/deploy.js --network localhost
+npx hardhat run scripts/deploy-ssi.js --network localhost
 cd ..
 node server.js
 ```
@@ -146,19 +124,13 @@ node server.js
 cd client
 npm start
 ```
-*Frontend adresi:* `http://localhost:3000`  
-*Admin Paneli adresi:* `http://localhost:5000/admin.html`
+*Frontend adresi:* `http://localhost:3000`
 
 ---
 
-## 📈 Proje Durumu / Sürüm Notları (Mart 2026)
-* 🚀 Karmaşık `SSIVoting` akışı sadeleştirilerek tamamen `SimpleVoting` komponentinin kararlılığı sağlandı.
-* 🧹 Kullanılmayan legacy SSI API endpointleri tamamen temizlendi, sistem `vote()` fonksiyonuna yönlendirildi.
-* 📊 `?electionId` query yapısı ile seçimlere özel anlık durum getirme mekanizması geliştirildi.
-* 🔐 Admin kullanıcı oluşumu standardize edildi.
+## 👨‍💻 Notlar ve Geliştirici Bilgileri
+Bu proje aktif bir prototiptir ve akademik araştırma bağlamında, blockchain'in seçim gizliliği sistemlerine uygulanabilirliğini doğrulamak amacıyla kodlanmıştır. `Nullifier`, `Burner Wallet` ve `EIP-712 Dual Signature` entegrasyonlarıyla ZK-SSI hedeflerine başarılı bir şekilde ulaşmıştır.
 
 ---
-
-<p align="center">
-  <i>Bu proje <b>TÜBİTAK 2209-A</b> araştırma programı tarafından desteklenmiş olup, eğitim ve akademik araştırma bağlamında, blockchain'in anonim kimliklendirme sistemleri üzerindeki kullanılabilirliğini incelemek vizyonuyla hazırlanmıştır. 🎓</i>
-</p>
+> *TÜBİTAK 2209-A projesi kapsamında üretilmiş ve açık kaynak geliştirilmiştir.*
+</div>

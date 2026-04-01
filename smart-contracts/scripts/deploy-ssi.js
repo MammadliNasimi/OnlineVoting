@@ -77,7 +77,8 @@ async function main() {
   const domainSeparator = await votingContract.DOMAIN_SEPARATOR();
   console.log("🔐 EIP-712 Configuration:");
   console.log("   Domain Separator:", domainSeparator);
-  console.log("   VoteProof TypeHash:", await votingContract.VOTEPROOF_TYPEHASH());
+  console.log("   Credential TypeHash:", await votingContract.CREDENTIAL_TYPEHASH());
+  console.log("   Vote TypeHash:", await votingContract.VOTE_TYPEHASH());
   console.log("");
 
   // Update .env file with contract address
@@ -112,13 +113,11 @@ async function main() {
   console.log("   End Time:", new Date(endTime * 1000).toLocaleString());
   console.log("");
 
-  // Test nullifier calculation
-  const testStudentIDHash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("test_student_123"));
-  const testNullifier = await votingContract.calculateNullifier(testStudentIDHash, 1);
-  console.log("🧪 Test Nullifier Calculation:");
-  console.log("   Student ID Hash:", testStudentIDHash);
-  console.log("   Nullifier:", testNullifier);
-  console.log("");
+  // Note: calculateNullifier isn't public by default anymore or works slightly differently in ZK approach
+  try {
+    const testStudentIDHash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("test_student_123"));
+    // Not critical, skipping manual calculation print
+  } catch (e) {}
 
   console.log("🎉 DEPLOYMENT COMPLETE!");
   console.log("");
