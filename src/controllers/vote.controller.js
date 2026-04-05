@@ -71,7 +71,7 @@ class VoteQueue {
            if (state.io) {
              state.io.to(`user_${jobData.user_id}`).emit('voteFailed', {
                  success: false,       
-                 message: 'Oyunuz işlenirken hata oluştu: ' + jobError.message,
+                 message: 'İşlem başarısız. Zaten oy kullanmış olabilirsiniz.',
                  electionId: jobData.election_id
              });
            }
@@ -336,7 +336,7 @@ class VoteController {
 
     const hasVoted = await db.hasUserVoted(user.id, electionId);
     if (hasVoted) {
-      return res.status(400).json({ message: 'You have already voted in this election' });
+      return res.status(400).json({ message: 'Daha önce oy kullandınız.' });
     }
 
     const sessionWallet = await db.getSessionWallet(sessionId);
@@ -438,14 +438,14 @@ class VoteController {
 
     const msg = error.reason || error.message || '';
     if (msg.includes('Nullifier already used') || msg.includes('Commitment already used')) {
-      return res.status(400).json({ message: 'You have already voted in this election.' });
+      return res.status(400).json({ message: 'Daha önce oy kullandınız.' });
     }
     if (error.code === 'CALL_EXCEPTION') {
-      return res.status(400).json({ message: 'Smart contract rejected the vote: ' + (error.reason || 'unknown reason') });
+      return res.status(400).json({ message: 'İşlem reddedildi. Zaten oy kullanmış olabilirsiniz.' });
     }
 
     res.status(500).json({
-      message: error.reason || error.message || 'Vote submission failed'
+      message: 'Oy gönderimi başarısız oldu. İşlem daha önce yapılmış olabilir.'
     });
   }
 
@@ -534,6 +534,7 @@ module.exports = {
   VoteController: new VoteController(),
   voteJobQueue
 };
+
 
 
 
