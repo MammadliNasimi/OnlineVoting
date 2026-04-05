@@ -1,6 +1,7 @@
 const { ethers } = require('ethers');
 const path = require('path');
 const fs = require('fs');
+const db = require('../config/database-sqlite');
 
 const VOTE_PROOF_TYPES = {
     VoteProof: [
@@ -39,25 +40,16 @@ class RelayerService {
     }
 
     checkRateLimit(identifier) {
-        const now = Date.now();
-        const oneHourAgo = now - (60 * 60 * 1000);
-
-        if (!this.submissionHistory.has(identifier)) {
-            this.submissionHistory.set(identifier, []);
-        }
-
-        const userSubmissions = this.submissionHistory.get(identifier);
-
-        const recentSubmissions = userSubmissions.filter(timestamp => timestamp > oneHourAgo);
-        this.submissionHistory.set(identifier, recentSubmissions);
-
-        if (recentSubmissions.length >= this.MAX_SUBMISSIONS_PER_HOUR) {
-            console.log(`⚠️  Rate limit exceeded for ${identifier}`);
-            return true;
-        }
-
-        return false;
+    const currentKey = identifier || 'anonymous';
+    const isAllowed = db.checkAndIncrementRelayerLimit(currentKey, this.MAX_SUBMISSIONS_PER_HOUR, 1);
+    
+    if (!isAllowed) {
+      throw new Error(`Rate limit aşıldı. identifier ${currentKey} için ${this.MAX_SUBMISSIONS_PER_HOUR} limitine ulaşıldı.`);
     }
+    
+    console.log(`[Relayer] Identifier limit checked/incremented for ${currentKey}`);
+    return true;
+  }
 
     recordSubmission(identifier) {
         const submissions = this.submissionHistory.get(identifier) || [];
@@ -98,9 +90,8 @@ class RelayerService {
             console.log('   Election ID:', credential.electionID);
             console.log('   Candidate ID:', credential.candidateID);
 
-            if (this.checkRateLimit(userIdentifier)) {
-                throw new Error('Rate limit exceeded - please try again later');
-            }
+              // checkRateLimit returns true if allowed, or throws an error.
+              this.checkRateLimit(userIdentifier);
 
             const isValidSignature = await this.verifyCredentialSignature(credential, issuerAddress);
             if (!isValidSignature) {
@@ -129,7 +120,7 @@ class RelayerService {
             };
 
             // Blockchain will naturally revert with exact reason via estimateGas
-            const estimatedGas = await this.contract.vote.estimateGas(voteProof);
+      console.log(voteProof); const estimatedGas = await this.contract.vote.estimateGas(voteProof);
             console.log('   Estimated Gas:', estimatedGas.toString());
 
             const balance = await this.provider.getBalance(this.relayerWallet.address);
@@ -166,13 +157,17 @@ class RelayerService {
         } catch (error) {
             console.error('❌ Relayer error:', error);
 
-            if (error.message.includes('Nullifier already used')) {
+            if (error.message.includes('Nullifier already used') || error.message.includes('DoubleVoting')) {
                 throw new Error('Double voting detected - you have already voted in this election');
-            } else if (error.message.includes('Invalid issuer signature')) {
+            } else if (error.message.includes('Invalid issuer signature') || error.message.includes('InvalidSignatures')) {
                 throw new Error('Invalid credential - signature verification failed');
-            } else if (error.message.includes('Election is not active')) {
+            } else if (error.message.includes('Election is not active') || error.message.includes('ElectionNotActive')) {
                 throw new Error('Election is not currently active');
-            } else if (error.message.includes('Proof expired')) {
+            } else if (error.message.includes('ElectionNotStarted')) {
+                throw new Error('Election has not started yet');
+            } else if (error.message.includes('ElectionEnded') || error.message.includes('ElectionAlreadyEnded')) {
+                throw new Error('Election has already ended');
+            } else if (error.message.includes('Proof expired') || error.message.includes('ProofExpired')) {
                 throw new Error('Credential expired - please request a new one');
             }
 

@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+﻿const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/database-sqlite');
@@ -6,7 +6,7 @@ const db = require('../config/database-sqlite');
 const state = require('../config/state');
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_2026';
 
-const { hashEmail, isValidFaceDescriptor, isValidStudentId, extractStudentIdFromEmail, validateUserIdentityMapping, getUserFromSession, createSessionForUser, createMailTransporter } = require('../utils/helpers');
+const { hashEmail, isValidFaceDescriptor, euclideanDistance, isValidStudentId, extractStudentIdFromEmail, validateUserIdentityMapping, getUserFromSession, createSessionForUser, createMailTransporter } = require('../utils/helpers');
 
 class AuthController {
 
@@ -82,7 +82,7 @@ class AuthController {
   async register(req, res) {
 
   try {
-    const { name, password, studentId, email, otp, faceDescriptor } = req.body;
+    const { password, studentId, email, otp, faceDescriptor, firstName, lastName } = req.body; const name = req.body.name ? req.body.name.trim() : null;
     if (!name || !password) {
       return res.status(400).json({ message: 'İsim ve şifre zorunludur' });
     }
@@ -124,7 +124,7 @@ class AuthController {
       return res.status(400).json({ message: 'Geçersiz yüz verisi' });
     }
 
-    const createdUser = await db.createUser(name, hashedPassword, 'user', mappedStudentId, email || null);
+    const createdUser = await db.createUser(name, hashedPassword, 'user', mappedStudentId, email || null, firstName || '', lastName || '');
     if (faceDescriptor && createdUser?.id) {
       db.setUserFaceProfile(createdUser.id, faceDescriptor);
     }
@@ -140,12 +140,19 @@ class AuthController {
 
   async me(req, res) {
     try {
-      const user = await getUserFromSession(req);
+      const user = req.user;
       if (!user) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
+      
+      const fullUser = await db.findUserByName(user.name);
+      
       res.json({
-        user,
+        user: {
+          ...user,
+          email: fullUser?.email,
+          student_id: fullUser?.student_id
+        },
         sessionId: user.sessionId || req.headers['x-session-id']
       });
     } catch (error) {
@@ -157,7 +164,7 @@ class AuthController {
   async login(req, res) {
 
   try {
-    const { name, password } = req.body;
+    const password = req.body.password; const name = req.body.name ? req.body.name.trim() : null;
 
     if (!state.useDatabase) {
       return res.status(503).json({ message: 'Database not available' });
@@ -213,12 +220,12 @@ class AuthController {
       return res.status(503).json({ message: 'Database not available' });
     }
 
-    const user = await getUserFromSession(req);
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const { descriptor } = req.body;
+    const descriptor = req.body.descriptor || req.body.faceDescriptor;
     if (!isValidFaceDescriptor(descriptor)) {
       return res.status(400).json({ message: 'Invalid face descriptor' });
     }
@@ -239,7 +246,9 @@ class AuthController {
       return res.status(503).json({ message: 'Database not available' });
     }
 
-    const { name, descriptor } = req.body;
+      const descriptor = req.body.descriptor;
+      const name = req.body.name ? req.body.name.trim() : null;
+
     if (!name || !isValidFaceDescriptor(descriptor)) {
       return res.status(400).json({ message: 'Name and valid face descriptor are required' });
     }
@@ -309,6 +318,89 @@ class AuthController {
     res.status(500).json({ message: 'Logout failed' });
   }
 
+  }
+
+  async forgotPassword(req, res) {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: 'E-posta adresi giriniz.' });
+
+      const dbConfig = require('../config/database-sqlite');
+      const user = dbConfig.db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+      if (!user) return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
+
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const crypto = require('crypto');
+      const otpHash = crypto.createHash('sha256').update(otp + email.toLowerCase()).digest('hex');
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+      dbConfig.db.prepare('INSERT INTO password_resets (email, otp_hash, expires_at) VALUES (?, ?, ?)').run(email, otpHash, expiresAt);
+      console.log(`PASSWORD RESET OTP FOR ${email}: ${otp}`);
+
+        const { createMailTransporter } = require('../utils/helpers');
+        const transporter = createMailTransporter();
+        if (transporter) {
+          try {
+            await transporter.sendMail({
+              from: process.env.SMTP_FROM || '"SSI Voting" <noreply@voting.local>',
+              to: email,
+              subject: 'Hesap Şifre Sıfırlama Kodu',
+              html: `
+              <div style="font-family:sans-serif;max-width:500px;margin:0 auto;background:#0d0a1f;color:#fff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.5)">
+                <div style="background:linear-gradient(135deg, #4f46e5, #7c3aed);padding:32px;text-align:center">
+                  <h1 style="margin:0;color:#fff;font-size:24px;letter-spacing:1px">🔐 SSI Blockchain Oylama</h1>
+                  <p style="margin:6px 0 0;color:rgba(255,255,255,0.7);font-size:13px">Şifre Sıfırlama Talebi</p>
+                </div>
+                <div style="padding:32px">
+                  <p style="color:#c4b5fd;font-size:15px;margin:0 0 8px">Şifre sıfırlama kodunuz:</p>
+                  <div style="background:#1e1b4b;border:2px solid #7c3aed;border-radius:12px;padding:24px;text-align:center;margin:16px 0">
+                    <span style="font-size:44px;font-weight:900;letter-spacing:12px;color:#4ade80;font-family:monospace">${otp}</span>
+                  </div>
+                  <p style="color:#8b5cf6;font-size:13px;text-align:center;margin:24px 0 0">Bu kod 10 dakika boyunca geçerlidir.<br>Eğer bu işlemi siz yapmadıysanız lütfen bu e-postayı dikkate almayın.</p>
+                </div>
+                <div style="background:#0f0c29;padding:16px;text-align:center;font-size:12px;color:#6b7280;border-top:1px solid rgba(124,58,237,0.2)">
+                  © 2026 SSI Voting System
+                </div>
+              </div>`
+            });
+          } catch (mailError) {
+            console.log('E-posta gönderme hatası (Şifre Sıfırlama):', mailError);
+          }
+        }
+
+        res.json({ message: 'Sıfırlama kodu maile gönderildi.' });
+    } catch(e) {
+      res.status(500).json({ message: e.message });
+    }
+  }
+
+  async resetPassword(req, res) {
+    try {
+      const { email, otp, newPassword } = req.body;
+      if (!email || !otp || !newPassword) return res.status(400).json({ message: 'Tüm alanlar zorunludur.' });
+
+      const dbConfig = require('../config/database-sqlite');
+      const activeReset = dbConfig.db.prepare("SELECT * FROM password_resets WHERE email = ? AND used = 0 AND expires_at > datetime('now') ORDER BY id DESC LIMIT 1").get(email);
+      if (!activeReset) return res.status(400).json({ message: 'Geçersiz veya süresi dolmuş kod.' });
+
+      const crypto = require('crypto');
+      const otpHash = crypto.createHash('sha256').update(otp + email.toLowerCase()).digest('hex');
+
+      if (activeReset.otp_hash !== otpHash) return res.status(400).json({ message: 'Yanlış kod.' });
+
+      const user = dbConfig.db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+      if (!user) return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
+
+      const bcrypt = require('bcryptjs');
+      const hashed = bcrypt.hashSync(newPassword, 10);
+
+      dbConfig.db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, user.id);
+      dbConfig.db.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').run(activeReset.id);
+
+      res.json({ message: 'Şifreniz başarıyla değiştirildi.' });
+    } catch(e) {
+      res.status(500).json({ message: e.message });
+    }
   }
 
 }

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import axios from 'axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -18,6 +19,14 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 
+import PauseCircleIcon from '@mui/icons-material/PauseCircle';
+import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import SettingsIcon from '@mui/icons-material/Settings';
+import EditIcon from '@mui/icons-material/Edit';
+
+import CandidatesModal from './admin/CandidatesModal';
+import DomainRestrictionsModal from './admin/DomainRestrictionsModal';
+
 const drawerWidth = 260;
 const API_BASE = 'http://localhost:5000/api';
 
@@ -28,20 +37,28 @@ function AdminDashboard({ user, sessionId, onLogout }) {
   const [newDomain, setNewDomain] = useState('');
 
   const [electionModalOpen, setElectionModalOpen] = useState(false);
-  const [newElection, setNewElection] = useState({ title: '', description: '' });
+    const [newElection, setNewElection] = useState({ title: '', description: '', startDate: '', endDate: '' });
 
   const [candidatesModalOpen, setCandidatesModalOpen] = useState(false);
+  const [electionDomainsModalOpen, setElectionDomainsModalOpen] = useState(false);
   const [selectedElection, setSelectedElection] = useState(null);
   const [newCandidate, setNewCandidate] = useState({ name: '', description: '' });
+  const [editingCandidate, setEditingCandidate] = useState(null);
+  const [newElectionDomain, setNewElectionDomain] = useState('');
 
+  useEffect(() => {
+    // Connect to WebSocket purely to listen to global vote results
+    const socket = io('http://localhost:5000', { withCredentials: true });
 
-  const [electionModalOpen, setElectionModalOpen] = useState(false);
-  const [newElection, setNewElection] = useState({ title: '', description: '' });
+    socket.on('voteUpdated', (data) => {
+      // Invalidate queries so admin sees results instantly as they happen in background!
+      queryClient.invalidateQueries({ queryKey: ['dbStats'] });
+      queryClient.invalidateQueries({ queryKey: ['elections'] });
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+    });
 
-  const [candidatesModalOpen, setCandidatesModalOpen] = useState(false);
-  const [selectedElection, setSelectedElection] = useState(null);
-  const [newCandidate, setNewCandidate] = useState({ name: '', description: '' });
-
+    return () => socket.disconnect();
+  }, [queryClient]);
 
   const authHeaders = { headers: { 'x-session-id': sessionId }, withCredentials: true };
 
@@ -81,6 +98,28 @@ function AdminDashboard({ user, sessionId, onLogout }) {
     enabled: activeTab === 'zkemail'
   });
 
+  const { data: queueJobs = [], isLoading: loadingQueue } = useQuery({
+    queryKey: ['admin_queue'],
+    queryFn: async () => {
+      const { data } = await axios.get(`${API_BASE}/admin/queue`, authHeaders);
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: activeTab === 'queue'
+  });
+  const { data: securityLogs = [], isLoading: loadingLogs } = useQuery({
+    queryKey: ['admin_logs'],
+    queryFn: async () => {
+      const { data } = await axios.get(`${API_BASE}/admin/logs`, authHeaders);
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: activeTab === 'security',
+    refetchInterval: 5000 // refresh every 5 seconds when tab is open
+  });
+  const retryJobMutation = useMutation({
+    mutationFn: (id) => axios.post(`${API_BASE}/admin/queue/${id}/retry`, {}, authHeaders),
+    onSuccess: () => queryClient.invalidateQueries(['admin_queue'])
+  });
+
   // User Deletion Mutation
   const deleteUserMutation = useMutation({
     mutationFn: (id) => axios.delete(`${API_BASE}/admin/users/${id}`, authHeaders),
@@ -92,7 +131,6 @@ function AdminDashboard({ user, sessionId, onLogout }) {
     onSuccess: () => queryClient.invalidateQueries(['admin_domains'])
   });
 
-  
   const { data: candidates = [], isLoading: loadingCandidates } = useQuery({
     queryKey: ['admin_candidates', selectedElection?.id],
     queryFn: async () => {
@@ -107,8 +145,34 @@ function AdminDashboard({ user, sessionId, onLogout }) {
     onSuccess: () => {
       queryClient.invalidateQueries(['admin_elections']);
       setElectionModalOpen(false);
-      setNewElection({ title: '', description: '' });
+      setNewElection({ title: '', description: '', startDate: '', endDate: '' });
     }
+  });
+
+  const createCandidateMutation = useMutation({
+    mutationFn: (cand) => axios.post(`${API_BASE}/elections/${selectedElection?.id}/candidates`, cand, authHeaders),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin_candidates', selectedElection?.id]);
+      setNewCandidate({ name: '', description: '' });
+    }
+  });
+
+  const updateCandidateMutation = useMutation({
+    mutationFn: ({ cid, data }) => axios.put(`${API_BASE}/elections/${selectedElection?.id}/candidates/${cid}/update`, data, authHeaders),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin_candidates', selectedElection?.id]);
+      setEditingCandidate(null);
+    }
+  });
+
+  const deleteCandidateMutation = useMutation({
+    mutationFn: (cid) => axios.delete(`${API_BASE}/elections/${selectedElection?.id}/candidates/${cid}`, authHeaders),
+    onSuccess: () => queryClient.invalidateQueries(['admin_candidates', selectedElection?.id])
+  });
+
+  const toggleElectionMutation = useMutation({
+    mutationFn: (id) => axios.put(`${API_BASE}/elections/${id}/toggle`, {}, authHeaders),
+    onSuccess: () => queryClient.invalidateQueries(['admin_elections'])
   });
 
   const deleteElectionMutation = useMutation({
@@ -116,44 +180,26 @@ function AdminDashboard({ user, sessionId, onLogout }) {
     onSuccess: () => queryClient.invalidateQueries(['admin_elections'])
   });
 
-  const createCandidateMutation = useMutation({
-    mutationFn: (cand) => axios.post(`${API_BASE}/candidates`, cand, authHeaders),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['admin_candidates', selectedElection?.id]);
-      setNewCandidate({ name: '', description: '' });
-    }
-  });
-
-  
-  const { data: candidates = [], isLoading: loadingCandidates } = useQuery({
-    queryKey: ['admin_candidates', selectedElection?.id],
+  const { data: electionDomains = [], isLoading: loadingElectionDomains } = useQuery({
+    queryKey: ['election_domains', selectedElection?.id],
     queryFn: async () => {
-      const { data } = await axios.get(`${API_BASE}/candidates/${selectedElection.id}`, authHeaders);
+      const { data } = await axios.get(`${API_BASE}/elections/${selectedElection.id}/domains`, authHeaders);
       return Array.isArray(data) ? data : [];
     },
-    enabled: !!selectedElection && candidatesModalOpen
+    enabled: !!selectedElection && electionDomainsModalOpen
   });
 
-  const createElectionMutation = useMutation({
-    mutationFn: (elect) => axios.post(`${API_BASE}/admin/elections`, elect, authHeaders),
+  const addElectionDomainMutation = useMutation({
+    mutationFn: (domain) => axios.post(`${API_BASE}/elections/${selectedElection?.id}/domains`, { domain }, authHeaders),
     onSuccess: () => {
-      queryClient.invalidateQueries(['admin_elections']);
-      setElectionModalOpen(false);
-      setNewElection({ title: '', description: '' });
+      queryClient.invalidateQueries(['election_domains', selectedElection?.id]);
+      setNewElectionDomain('');
     }
   });
 
-  const deleteElectionMutation = useMutation({
-    mutationFn: (id) => axios.delete(`${API_BASE}/admin/elections/${id}`, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['admin_elections'])
-  });
-
-  const createCandidateMutation = useMutation({
-    mutationFn: (cand) => axios.post(`${API_BASE}/candidates`, cand, authHeaders),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['admin_candidates', selectedElection?.id]);
-      setNewCandidate({ name: '', description: '' });
-    }
+  const removeElectionDomainMutation = useMutation({
+    mutationFn: (did) => axios.delete(`${API_BASE}/elections/${selectedElection?.id}/domains/${did}`, authHeaders),
+    onSuccess: () => queryClient.invalidateQueries(['election_domains', selectedElection?.id])
   });
 
   const addDomainMutation = useMutation({
@@ -248,27 +294,93 @@ function AdminDashboard({ user, sessionId, onLogout }) {
                     <TableCell><strong>ID</strong></TableCell>
                     <TableCell><strong>Seçim Başlığı</strong></TableCell>
                     <TableCell><strong>Açıklama</strong></TableCell>
-                    <TableCell><strong>Tarih</strong></TableCell>
+                    <TableCell><strong>Başlangıç – Bitiş Tarihi</strong></TableCell>
+                    <TableCell><strong>Durum</strong></TableCell>
                     <TableCell align="right"><strong>İşlemler</strong></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loadingElections ? (
-                    <TableRow><TableCell colSpan={5} align="center"><CircularProgress /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} align="center"><CircularProgress /></TableCell></TableRow>
                   ) : elections.map((e) => (
                     <TableRow key={e.id} hover>
                       <TableCell>{e.id}</TableCell>
                       <TableCell><strong>{e.title}</strong></TableCell>
                       <TableCell>{e.description || '-'}</TableCell>
-                      <TableCell>{new Date(e.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          <Typography variant="caption">B: {new Date(e.start_date || e.created_at).toLocaleString()}</Typography>
+                          <Typography variant="caption">B: {new Date(e.end_date || new Date().getTime() + 30*24*60*60*1000).toLocaleString()}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" label={e.is_active ? "Aktif" : "Pasif"} color={e.is_active ? "success" : "default"} />
+                      </TableCell>
                       <TableCell align="right">
+                        <IconButton size="small" color={e.is_active ? "error" : "success"} onClick={() => toggleElectionMutation.mutate(e.id)} title={e.is_active ? "Seçimi Bitir" : "Seçimi Başlat"}>
+                          {e.is_active ? <PauseCircleIcon /> : <PlayCircleIcon />}
+                        </IconButton>
+                        <Button size="small" variant="text" sx={{ mr: 1 }} onClick={() => { setSelectedElection(e); setElectionDomainsModalOpen(true); }}>Kısıtlamalar</Button>
                         <Button size="small" variant="outlined" sx={{ mr: 1 }} onClick={() => { setSelectedElection(e); setCandidatesModalOpen(true); }}>Adaylar</Button>
                         <IconButton color="error" onClick={() => deleteElectionMutation.mutate(e.id)}><DeleteIcon /></IconButton>
                       </TableCell>
                     </TableRow>
                   ))}
                   {elections.length === 0 && !loadingElections && (
-                    <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}>Kayıtlı seçim bulunmamaktadır.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}>Kayıtlı seçim bulunmamaktadır.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        );
+
+      case 'queue':
+        return (
+          <Box>
+            <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>Kuyruk Yönetimi</Typography>
+            <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+              Blokzincirine gönderilmek üzere bekleyen veya hata alan oyları buradan takip edip, başarısız olanları yeniden başlatabilirsiniz.
+            </Alert>
+            <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 3 }}>
+              <Table>
+                <TableHead sx={{ bgcolor: 'grey.100' }}>
+                  <TableRow>
+                    <TableCell><strong>İşlem ID</strong></TableCell>
+                    <TableCell><strong>Kullanıcı</strong></TableCell>
+                    <TableCell><strong>Seçim / Aday</strong></TableCell>
+                    <TableCell><strong>Durum</strong></TableCell>
+                    <TableCell align="right"><strong>İşlem</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loadingQueue ? (
+                    <TableRow><TableCell colSpan={5} align="center"><CircularProgress /></TableCell></TableRow>
+                  ) : queueJobs.map((j) => (
+                    <TableRow key={j.id} hover>
+                      <TableCell>{j.id}</TableCell>
+                      <TableCell>{j.user_name || 'Bilinmiyor'} (ID: {j.user_id})</TableCell>
+                      <TableCell>{j.election_title}<br/><small>{j.candidate_name}</small></TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={j.status} 
+                          color={j.status === 'completed' ? 'success' : j.status === 'failed' ? 'error' : j.status === 'processing' ? 'info' : 'warning'} 
+                          size="small" 
+                        />
+                        {j.error_message && <Typography color="error" variant="caption" display="block">{j.error_message}</Typography>}
+                      </TableCell>
+                      <TableCell align="right">
+                        {j.status === 'failed' && (
+                          <Button size="small" variant="contained" onClick={() => retryJobMutation.mutate(j.id)}>Tekrar Dene</Button>
+                        )}
+                        {j.status === 'completed' && j.tx_hash && (
+                           <Typography variant="caption" color="textSecondary" display="block">TX: {j.tx_hash.substring(0, 10)}...</Typography>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {queueJobs.length === 0 && !loadingQueue && (
+                    <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}>Kuyrukta bekleyen işlem yok.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -332,8 +444,52 @@ function AdminDashboard({ user, sessionId, onLogout }) {
               </Dialog>
             </Box>
           );
-        default:
-          return <Typography>Geliştirme Aşamasında</Typography>;
+
+      case 'security':
+        return (
+          <Box p={3}>
+            <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>Güvenlik Logları</Typography>
+            <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+              Sistemdeki son aktiviteler ve denetim kayıtları. Otomatik olarak güncellenir.
+            </Alert>
+            <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 3, maxHeight: '600px', overflowY: 'auto' }}>
+              <Table stickyHeader>
+                <TableHead sx={{ bgcolor: 'grey.100' }}>
+                  <TableRow>
+                    <TableCell><strong>Zaman</strong></TableCell>
+                    <TableCell><strong>Seviye</strong></TableCell>
+                    <TableCell><strong>Servis</strong></TableCell>
+                    <TableCell><strong>Mesaj</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loadingLogs ? (
+                     <TableRow><TableCell colSpan={4} align="center"><CircularProgress /></TableCell></TableRow>
+                  ) : securityLogs.map((log, i) => (
+                    <TableRow key={i} hover>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{log.timestamp || '-'}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={log.level || 'bilinmiyor'} 
+                          color={log.level === 'error' ? 'error' : log.level === 'warn' ? 'warning' : 'info'} 
+                          size="small" 
+                        />
+                      </TableCell>
+                      <TableCell>{log.service || '-'}</TableCell>
+                      <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{log.message}</TableCell>
+                    </TableRow>
+                  ))}
+                  {securityLogs.length === 0 && !loadingLogs && (
+                    <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3 }}>Kayıtlı log bulunamadı.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        );
+
+      default:
+        return <Typography sx={{ mt: 3, ml: 3 }}>Geliştirme Aşamasında</Typography>;
       }
     };
 
@@ -370,6 +526,7 @@ function AdminDashboard({ user, sessionId, onLogout }) {
             { id: 'overview', title: 'Genel Bakış', icon: <DashboardIcon /> },
             { id: 'users', title: 'Kullanıcılar', icon: <PeopleIcon /> },
             { id: 'elections', title: 'Seçim & Adaylar', icon: <HowToVoteIcon /> },
+            { id: 'queue', title: 'Kuyruk Yönetimi', icon: <Box component="span" sx={{ fontSize: '1.25rem' }}>⏳</Box> },
             { id: 'zkemail', title: 'ZK-Email Ayarları', icon: <EmailIcon /> },
             { id: 'security', title: 'Güvenlik Logları', icon: <SecurityIcon /> },
           ].map((item) => (
@@ -417,49 +574,40 @@ function AdminDashboard({ user, sessionId, onLogout }) {
             margin="dense" label="Açıklama" fullWidth multiline rows={3}
             value={newElection.description} onChange={e => setNewElection(prev => ({ ...prev, description: e.target.value }))}
           />
+          <TextField
+            margin="dense" label="Başlangıç Tarihi" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }}
+            value={newElection.startDate} onChange={e => setNewElection(prev => ({ ...prev, startDate: e.target.value }))}
+          />
+          <TextField
+            margin="dense" label="Bitiş Tarihi" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }}
+            value={newElection.endDate} onChange={e => setNewElection(prev => ({ ...prev, endDate: e.target.value }))}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setElectionModalOpen(false)}>İptal</Button>
-          <Button onClick={() => createElectionMutation.mutate(newElection)} variant="contained" disabled={!newElection.title}>Ekle</Button>
+          <Button onClick={() => createElectionMutation.mutate(newElection)} variant="contained" disabled={!newElection.title || !newElection.startDate || !newElection.endDate}>Ekle</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Adaylar Modal */}
-      <Dialog open={candidatesModalOpen} onClose={() => { setCandidatesModalOpen(false); setSelectedElection(null); }} maxWidth="md" fullWidth>
-        <DialogTitle>{selectedElection?.title || ''} - Aday Yönetimi</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>Mevcut Adaylar</Typography>
-          {loadingCandidates ? <CircularProgress size={24} /> : (
-            <Table size="small">
-              <TableHead><TableRow><TableCell>İsim</TableCell><TableCell>Açıklama</TableCell></TableRow></TableHead>
-              <TableBody>
-                {candidates.map(c => (
-                  <TableRow key={c.id}><TableCell>{c.name}</TableCell><TableCell>{c.description || '-'}</TableCell></TableRow>
-                ))}
-                {candidates.length === 0 && <TableRow><TableCell colSpan={2}>Hiç aday yok.</TableCell></TableRow>}
-              </TableBody>
-            </Table>
-          )}
+      <DomainRestrictionsModal
+        open={electionDomainsModalOpen}
+        onClose={() => { setElectionDomainsModalOpen(false); setSelectedElection(null); }}
+        selectedElection={selectedElection}
+        electionDomainsQuery={{ data: electionDomains, isLoading: loadingElectionDomains }}
+        addMutation={addElectionDomainMutation}
+        removeMutation={removeElectionDomainMutation}
+      />
 
-          <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 4, mb: 2 }}>Yeni Aday Ekle</Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="Aday İsmi" size="small"
-              value={newCandidate.name} onChange={e => setNewCandidate(prev => ({ ...prev, name: e.target.value }))}
-            />
-            <TextField
-              label="Açıklama" size="small" fullWidth
-              value={newCandidate.description} onChange={e => setNewCandidate(prev => ({ ...prev, description: e.target.value }))}
-            />
-            <Button variant="contained" disabled={!newCandidate.name} onClick={() => createCandidateMutation.mutate({ ...newCandidate, electionId: selectedElection?.id })}>
-              Ekle
-            </Button>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setCandidatesModalOpen(false); setSelectedElection(null); }}>Kapat</Button>
-        </DialogActions>
-      </Dialog>
+      <CandidatesModal
+        open={candidatesModalOpen}
+        onClose={() => { setCandidatesModalOpen(false); setSelectedElection(null); }}
+        selectedElection={selectedElection}
+        candidates={candidates}
+        loadingCandidates={loadingCandidates}
+        createMutation={createCandidateMutation}
+        updateMutation={updateCandidateMutation}
+        deleteMutation={deleteCandidateMutation}
+      />
 
         </Container>
       </Box>

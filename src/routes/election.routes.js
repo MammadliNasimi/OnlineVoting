@@ -29,3 +29,5 @@ router.post('/:id/domains', electionController.addDomain);
 router.delete('/:id/domains/:did', electionController.removeDomain);
 
 module.exports = router;
+
+module.exports = router;

@@ -8,15 +8,15 @@ class AdminController {
     async createElection(req, res) {
       try {
         if (!req.user || req.user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
-        const { title, description } = req.body;
+        const { title, description, startDate: bodyStartDate, endDate: bodyEndDate } = req.body;
         if (!title) return res.status(400).json({ message: 'Seçim başlığı gerekli' });
         
-        // Basitçe şimdiki andan 30 gün sonrasına kadar aktif bir seçim oluştur
-        const startDate = new Date().toISOString();
-        const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        // Belirtilen tarihler yoksa şimdiki andan 30 gün sonrasına kadar aktif bir seçim oluştur
+        const startDate = bodyStartDate ? new Date(bodyStartDate).toISOString() : new Date().toISOString();
+        const endDate = bodyEndDate ? new Date(bodyEndDate).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         const election = db.createElection(title, description || "", startDate, endDate);
-        res.json({ message: 'Election partially created via database', election });
+        res.json({ message: 'Election created successfully', election });
       } catch (err) {
         res.status(500).json({ error: err.message });
       }
@@ -77,6 +77,31 @@ class AdminController {
   if (!user || user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
   res.json(db.getAllowedEmailDomains());
 
+  }
+
+  async getQueueJobs(req, res) {
+    try {
+      if (!req.user || req.user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
+      const jobs = db.getAllQueueJobs();
+      res.json(jobs);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  async retryQueueJob(req, res) {
+    try {
+      if (!req.user || req.user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
+      const { id } = req.params;
+      db.retryQueueJob(id);
+      
+      const { voteJobQueue } = require('./vote.controller');
+      voteJobQueue.processNext();
+      
+      res.json({ message: 'Job rescheduled for processing.' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   }
 
   async addEmailDomain(req, res) {
@@ -162,6 +187,34 @@ class AdminController {
   db.deleteVoteStatus(parseInt(req.params.id));
   res.json({ success: true });
 
+  }
+
+  async getLogs(req, res) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const logPath = path.join(__dirname, '../../logs/combined.log');
+      if (!fs.existsSync(logPath)) {
+        return res.json([]);
+      }
+      
+      const content = fs.readFileSync(logPath, 'utf8');
+      const lines = content.split('\n').filter(l => l.trim() !== '');
+      
+      // Parse last 100 lines
+      const parsedLogs = lines.slice(-100).map(line => {
+        try {
+          return JSON.parse(line);
+        } catch(e) {
+          return { level: 'unknown', message: line, timestamp: new Date().toISOString() };
+        }
+      }).reverse();
+
+      res.json(parsedLogs);
+    } catch (error) {
+      console.error('Error reading logs:', error);
+      res.status(500).json({ error: 'Failed to read logs' });
+    }
   }
 
 }

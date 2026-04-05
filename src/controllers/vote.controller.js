@@ -7,45 +7,107 @@ const { getUserFromSession, extractStudentIdFromEmail, isValidStudentId, validat
 
 class VoteQueue {
   constructor() {
-    this.queue = [];
     this.isProcessing = false;
   }
-  
-  add(job) {
-    this.queue.push(job);
+
+  add(jobData) {
+    db.addVoteToQueue(jobData);
+    console.log('[VoteQueue] 📦 Job inserted to DB queue for user', jobData.userId);
+    
     if (!this.isProcessing) {
       this.processNext();
     }
   }
-  
+
   async processNext() {
-    if (this.queue.length === 0) {
-      this.isProcessing = false;
-      return;
-    }
+    if (this.isProcessing) return;
     this.isProcessing = true;
-    const job = this.queue.shift();
+
     try {
-      await job.task();
+      while (true) {
+        const jobData = db.getNextPendingVote();
+        if (!jobData) break;
+
+        console.log(`[VoteQueue] ⚙️ Processing Job ${jobData.id} for user ${jobData.user_id}`);
+        db.updateVoteStatus(jobData.id, 'processing');
+        
+        try {
+          const completeVoteProof = JSON.parse(jobData.signature);
+          
+          const result = await state.relayerService.submitVote(
+            completeVoteProof,
+            `user_${jobData.user_id}`,
+            state.credentialIssuer.getIssuerAddress()
+          );
+
+          await db.recordVote(
+            jobData.user_id,
+            jobData.election_id,
+            jobData.candidate_id,
+            result.txHash,
+            result.txHash
+          );
+
+          db.updateVoteStatus(jobData.id, 'completed', result.txHash);
+          console.log(`[VoteQueue] ✅ Job ${jobData.id} Completed! Tx: ${result.txHash}`);
+          
+          if (state.io) {
+            state.io.to(`user_${jobData.user_id}`).emit('voteProcessed', {
+                success: true,
+                message: 'Oyunuz başarıyla blokzincire yazıldı',
+                txHash: result.txHash,
+                electionId: jobData.election_id
+            });
+            state.io.emit('voteUpdated', { 
+                success: true, 
+                electionId: jobData.election_id 
+            });
+          }
+
+        } catch (jobError) {
+          console.error(`[VoteQueue] ❌ Job ${jobData.id} Failed:`, jobError.message);
+          db.updateVoteStatus(jobData.id, 'failed', null, jobError.message);
+          
+           if (state.io) {
+             state.io.to(`user_${jobData.user_id}`).emit('voteFailed', {
+                 success: false,       
+                 message: 'Oyunuz işlenirken hata oluştu: ' + jobError.message,
+                 electionId: jobData.election_id
+             });
+           }
+        }
+      }
     } catch (e) {
-      console.error("Job Queue Error:", e);
+      console.error("[VoteQueue] Critical Error:", e);
+    } finally {
+      this.isProcessing = false;
     }
-    this.processNext();
   }
 }
 const voteJobQueue = new VoteQueue();
 
+function isDomainAllowed(userRole, userDomain, election) {
+  if (userRole === 'admin') return true;
+  if (!election.allowedDomains || election.allowedDomains.length === 0) return true;
+  if (!userDomain) return false;
+  return election.allowedDomains.some(d => {
+    let restrictedDomain = d.domain.toLowerCase().trim();
+    if (restrictedDomain.startsWith('@')) restrictedDomain = restrictedDomain.substring(1);
+    return userDomain === restrictedDomain;
+  });
+}
+
 class VoteController {
 
   async addCandidate(req, res) {
-    const user = await getUserFromSession(req);
+    const user = req.user;
     if (!user || user.role !== 'admin') return res.status(403).json({ message: 'Only admin can add candidates' });
     
     const { name, electionId, description } = req.body;
     if (!name) return res.status(400).json({ message: 'Aday ismi gerekli' });
 
     try {
-      if (!useDatabase) {
+      if (!state.useDatabase) {
         return res.status(503).json({ message: 'Database not available' });
       }
       
@@ -62,7 +124,7 @@ class VoteController {
   async getCandidates(req, res) {
 
   try {
-    if (!useDatabase) {
+    if (!state.useDatabase) {
       return res.status(503).json({ message: 'Database not available' });
     }
     const candidates = await db.getAllCandidates();
@@ -77,11 +139,11 @@ class VoteController {
   async getElections(req, res) {
 
   try {
-    if (!useDatabase) {
+    if (!state.useDatabase) {
       return res.status(503).json({ message: 'Database not available' });
     }
 
-    const user = await getUserFromSession(req);
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
@@ -94,20 +156,8 @@ class VoteController {
 
     const activeElections = allElections.filter(e => e.is_active === 1);
 
-    const accessibleElections = activeElections.filter(election => {
-
-      if (!election.allowedDomains || election.allowedDomains.length === 0) {
-        return true;
-      }
-
-      if (!userDomain) {
-        return false;
-      }
-
-      return election.allowedDomains.some(d => d.domain.toLowerCase() === userDomain);
-    });
-
-    res.json(accessibleElections);
+    const accessibleElections = activeElections.filter(election => isDomainAllowed(user.role, userDomain, election));
+      res.json(accessibleElections);
   } catch (error) {
     console.error('Error fetching elections:', error);
     res.status(500).json({ message: 'Failed to fetch elections' });
@@ -118,7 +168,7 @@ class VoteController {
   async getElectionCandidates(req, res) {
 
   try {
-    if (!useDatabase) {
+    if (!state.useDatabase) {
       return res.status(503).json({ message: 'Database not available' });
     }
     const electionId = parseInt(req.params.electionId);
@@ -223,47 +273,11 @@ class VoteController {
 
     // ASENKRON KUYRUK YAKLAŞIMI: Oyu arka plan job kuyruğuna ekle
     voteJobQueue.add({
-      task: async () => {
-        try {
-          console.log(`\n⚙️ Background Job Processing: Relaying SSI vote for user ${user.id} to blockchain`);
-          
-          const result = await state.relayerService.submitVote(
-            completeVoteProof,
-            `user_${user.id}`,
-            state.credentialIssuer.getIssuerAddress()
-          );
-
-          await db.recordVote(
-            user.id,
-            normalizedElectionId,
-            blockchainCandidateId,
-            result.txHash,
-            result.txHash
-          );
-          
-          console.log(`✅ Background Job Completed: Vote for user ${user.id} recorded with hash: ${result.txHash}`);
-          
-          // Emit socket.io event to user room that the vote was successful
-          if (state.io) {
-            state.io.to(`user_${user.id}`).emit('voteProcessed', {
-                success: true,
-                message: 'Oyunuz başarıyla blokzincire yazıldı',
-                txHash: result.txHash,
-                electionId: normalizedElectionId
-            });
-          }
-
-        } catch (error) {
-           console.error("Job error for user", user.id, "error:", error.message);
-           if (state.io) {
-             state.io.to(`user_${user.id}`).emit('voteFailed', {
-                 success: false,
-                 message: 'Oyunuz işlenirken hata oluştu: ' + error.message,
-                 electionId: normalizedElectionId
-             });
-           }
-        }
-      }
+      userId: user.id,
+      electionID: normalizedElectionId,
+      candidateID: blockchainCandidateId,
+      burnerAddress: burnerAddress,
+      signature: JSON.stringify(completeVoteProof)
     });
 
     // Kullanıcıya hemen cevap dön ("Oyunuz havuza alındı")
@@ -286,7 +300,7 @@ class VoteController {
   async getVotes(req, res) {
 
   try {
-    if (!useDatabase) {
+    if (!state.useDatabase) {
       return res.status(503).json({ message: 'Database not available' });
     }
 
@@ -307,7 +321,7 @@ class VoteController {
   async postVote(req, res) {
 
   try {
-    const user = await getUserFromSession(req);
+    const user = req.user;
     const { candidate, electionId = 1 } = req.body;
     const sessionId = req.headers['x-session-id'];
 
@@ -316,7 +330,7 @@ class VoteController {
     if (!candidate) return res.status(400).json({ message: 'Candidate required' });
     if (!sessionId) return res.status(400).json({ message: 'No session found' });
 
-    if (!useDatabase) {
+    if (!state.useDatabase) {
       return res.status(503).json({ message: 'Database not available' });
     }
 
@@ -440,7 +454,7 @@ class VoteController {
   async getVotingHistory(req, res) {
 
   try {
-    const user = await getUserFromSession(req);
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
@@ -462,7 +476,7 @@ class VoteController {
 
   async setVotingPeriod(req, res) {
 
-  const user = await getUserFromSession(req);
+  const user = req.user;
   if (!user || user.role !== 'admin') return res.status(403).json({ message: 'Only admin can set voting period' });
   const { start, end } = req.body;
   votingPeriod.start = start ? new Date(start).toISOString() : null;
@@ -474,7 +488,7 @@ class VoteController {
   async getAdminDatabase(req, res) {
 
   try {
-    const user = await getUserFromSession(req);
+    const user = req.user;
     if (!user || user.role !== 'admin') {
       return res.status(401).json({ message: 'Admin girisi gerekli' });
     }
@@ -516,4 +530,13 @@ class VoteController {
 
 }
 
-module.exports = new VoteController();
+module.exports = {
+  VoteController: new VoteController(),
+  voteJobQueue
+};
+
+
+
+
+
+

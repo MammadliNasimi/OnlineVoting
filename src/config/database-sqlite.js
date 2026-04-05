@@ -31,14 +31,32 @@ class DatabaseService {
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT DEFAULT 'user',
-        student_id TEXT UNIQUE,
-        email TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+          first_name TEXT,
+          last_name TEXT,
+          password TEXT NOT NULL,
+          role TEXT DEFAULT 'user',
+          student_id TEXT UNIQUE,
+          email TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
+      // Modify existing schema if possible by running ALTER ADD COLUMN or quietly failing if exists
+      try {
+        this.db.exec(`ALTER TABLE users ADD COLUMN first_name TEXT;`);
+        this.db.exec(`ALTER TABLE users ADD COLUMN last_name TEXT;`);
+      } catch(e) { }
+
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS password_resets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          email TEXT NOT NULL,
+          otp_hash TEXT NOT NULL,
+          expires_at DATETIME NOT NULL,
+          used INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
     try { this.db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch (_) {}
 
     this.db.exec(`
@@ -49,10 +67,12 @@ class DatabaseService {
         start_date DATETIME NOT NULL,
         end_date DATETIME NOT NULL,
         is_active INTEGER DEFAULT 1,
+        results_emailed INTEGER DEFAULT 0,
         blockchain_election_id INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    try { this.db.exec('ALTER TABLE elections ADD COLUMN results_emailed INTEGER DEFAULT 0'); } catch (_) {}
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS candidates (
@@ -160,6 +180,29 @@ class DatabaseService {
     `);
 
     this.db.exec(`
+      CREATE TABLE IF NOT EXISTS vote_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        candidate_id INTEGER NOT NULL,
+        election_id INTEGER NOT NULL,
+        signature TEXT NOT NULL,
+        burner_address TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        tx_hash TEXT,
+        error_message TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS relayer_limits (
+        identifier TEXT PRIMARY KEY,
+        count INTEGER DEFAULT 0,
+        last_reset DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS email_verifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT NOT NULL,
@@ -218,10 +261,10 @@ class DatabaseService {
     return this.db.prepare('SELECT * FROM users WHERE name = ?').get(name);
   }
 
-  async createUser(name, hashedPassword, role = 'user', studentId = null, email = null) {
-    const info = this.db.prepare(
-      'INSERT INTO users (name, password, role, student_id, email) VALUES (?, ?, ?, ?, ?)'
-    ).run(name, hashedPassword, role, studentId, email);
+async createUser(name, hashedPassword, role = 'user', studentId = null, email = null, firstName = null, lastName = null) {
+      const info = this.db.prepare(
+        'INSERT INTO users (name, password, role, student_id, email, first_name, last_name) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(name, hashedPassword, role, studentId, email, firstName, lastName);
     return this.db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
   }
 
@@ -445,6 +488,68 @@ class DatabaseService {
     };
   }
 
+
+  // --- Relayer Limits Methods ---
+  checkAndIncrementRelayerLimit(identifier, maxLimit, resetHours) {
+    const row = this.db.prepare('SELECT count, last_reset FROM relayer_limits WHERE identifier = ?').get(identifier);
+    const now = new Date();
+    
+    if (row) {
+      const lastReset = new Date(row.last_reset);
+      const hoursSinceReset = Math.abs(now - lastReset) / 36e5;
+      
+      if (hoursSinceReset >= resetHours) {
+        this.db.prepare('UPDATE relayer_limits SET count = 1, last_reset = CURRENT_TIMESTAMP WHERE identifier = ?').run(identifier);
+        return true;
+      }
+      
+      if (row.count >= maxLimit) {
+        return false;
+      }
+      
+      this.db.prepare('UPDATE relayer_limits SET count = count + 1 WHERE identifier = ?').run(identifier);
+      return true;
+    } else {
+      this.db.prepare('INSERT INTO relayer_limits (identifier, count) VALUES (?, 1)').run(identifier);
+      return true;
+    }
+  }
+
+  // --- Vote Queue Methods ---
+  addVoteToQueue(jobData) {
+    const info = this.db.prepare(
+      'INSERT INTO vote_queue (user_id, candidate_id, election_id, signature, burner_address) VALUES (?, ?, ?, ?, ?)'
+    ).run(jobData.userId, jobData.candidateID, jobData.electionID, jobData.signature, jobData.burnerAddress);
+    return info.lastInsertRowid;
+  }
+
+  getNextPendingVote() {
+    return this.db.prepare("SELECT * FROM vote_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1").get();
+  }
+
+  getAllQueueJobs() {
+    return this.db.prepare(
+      `SELECT vq.*, u.name as user_name, e.title as election_title, c.name as candidate_name
+       FROM vote_queue vq
+       LEFT JOIN users u ON vq.user_id = u.id
+       LEFT JOIN elections e ON vq.election_id = e.id
+       LEFT JOIN candidates c ON vq.candidate_id = c.id
+       ORDER BY vq.created_at DESC`
+    ).all();
+  }
+
+  retryQueueJob(id) {
+    this.db.prepare(
+      "UPDATE vote_queue SET status = 'pending', tx_hash = NULL, error_message = NULL WHERE id = ?"
+    ).run(id);
+  }
+
+  updateVoteStatus(id, status, txHash = null, errorMsg = null) {
+    this.db.prepare(
+      'UPDATE vote_queue SET status = ?, tx_hash = COALESCE(?, tx_hash), error_message = COALESCE(?, error_message) WHERE id = ?'
+    ).run(status, txHash, errorMsg, id);
+  }
+
   hasUserFaceProfile(userId) {
     const row = this.db.prepare('SELECT user_id FROM user_face_profiles WHERE user_id = ?').get(userId);
     return !!row;
@@ -526,7 +631,7 @@ class DatabaseService {
 
     const info = this.db.prepare(
       `INSERT INTO elections (title, description, start_date, end_date, is_active, blockchain_election_id)
-       VALUES (?, ?, ?, ?, 1, ?)`
+       VALUES (?, ?, ?, ?, 0, ?)`
     ).run(title, description || '', startDate, endDate, blockchainId);
     return this.db.prepare('SELECT * FROM elections WHERE id = ?').get(info.lastInsertRowid);
   }

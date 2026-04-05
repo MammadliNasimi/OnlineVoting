@@ -16,9 +16,13 @@ const authRoutes = require('./src/routes/auth.routes');
 const voteRoutes = require('./src/routes/vote.routes');
 const adminRoutes = require('./src/routes/admin.routes');
 const ssiRoutes = require('./src/routes/ssi.routes');
+const electionRoutes = require('./src/routes/election.routes');
 
 const http = require('http');
 const { Server } = require('socket.io');
+const morgan = require('morgan');
+const logger = require('./src/utils/logger');
+const { errorHandler } = require('./src/middlewares/error.middleware');
 
 const app = express();
 const server = http.createServer(app);
@@ -45,6 +49,7 @@ io.on('connection', (socket) => {
 const port = process.env.PORT || 5000;
 
 // Global Middleware
+app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
@@ -53,7 +58,7 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'x-session-id']
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -78,6 +83,7 @@ app.use('/api', authRoutes);
 app.use('/api', voteRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ssi', ssiRoutes);
+app.use('/api/elections', electionRoutes);
 // Note: We mount auth and vote on /api because their routes explicitly have paths like /register, /login, /candidates which previously began with /api/
 
 app.get('/api/health', (req, res) => {
@@ -101,6 +107,8 @@ app.get('/api/stats', async (req, res) => {
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
 });
+
+app.use(errorHandler);
 
 // Start node server logic
 async function startServer() {
@@ -126,8 +134,13 @@ async function startServer() {
     }
 
     server.listen(port, () => {
-      console.log(`==================================================`);      
-      console.log(`SSI & ZK Tabanlı Oylama Sistemi Başlatıldı`);
+      console.log(`==================================================`);
+      // Start Cron Service for processing ended elections
+      const cronService = require('./src/services/cronService');
+      cronService.start();
+
+      const { voteJobQueue } = require('./src/controllers/vote.controller');
+      voteJobQueue.processNext();
       console.log(`SSI & ZK Based Voting System Started`);
       console.log(`Port: ${port}`);
       console.log(`Tarih: ${new Date().toLocaleString()}`);

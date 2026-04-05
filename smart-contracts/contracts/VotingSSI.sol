@@ -33,6 +33,24 @@ contract VotingSSI {
         "Vote(uint256 candidateID,uint256 electionID,uint256 timestamp)"
     );
     
+
+    // ========== CUSTOM ERRORS ==========
+    error Unauthorized();
+    error ElectionNotActive();
+    error ElectionNotStarted();
+    error ElectionEnded();
+    error InvalidIssuer();
+    error DoubleVoting();
+    error InvalidCandidate();
+    error ProofExpired();
+    error InvalidSignatures();
+    error InvalidSignatureLength();
+    error InvalidSignatureV();
+    error ECDSAFailed();
+    error InvalidTimeRange();
+    error NoCandidates();
+    error ElectionAlreadyEnded();
+
     // ========== STATE VARIABLES ==========
     
     /// @notice Credential Issuer address (University/Admin)
@@ -103,22 +121,22 @@ contract VotingSSI {
     // ========== MODIFIERS ==========
     
     modifier onlyIssuer() {
-        require(msg.sender == issuer, "Only issuer can perform this action");
+        if (msg.sender != issuer) revert Unauthorized();
         _;
     }
     
     modifier electionActive(uint256 _electionID) {
         Election memory election = elections[_electionID];
-        require(election.isActive, "Election is not active");
-        require(block.timestamp >= election.startTime, "Election has not started");
-        require(block.timestamp <= election.endTime, "Election has ended");
+        if (!election.isActive) revert ElectionNotActive();
+        if (block.timestamp < election.startTime) revert ElectionNotStarted();
+        if (block.timestamp > election.endTime) revert ElectionEnded();
         _;
     }
     
     // ========== CONSTRUCTOR ==========
     
     constructor(address _issuer, string memory _name, string memory _version) {
-        require(_issuer != address(0), "Issuer address cannot be zero");
+        if (_issuer == address(0)) revert InvalidIssuer();
         issuer = _issuer;
         
         // Initialize EIP-712 domain separator
@@ -161,34 +179,22 @@ contract VotingSSI {
         );
         
         // 2. Check nullifier hasn't been used (prevents double voting)
-        require(
-            !usedNullifiers[nullifier],
-            "Nullifier already used - double voting detected"
-        );
+        if (usedNullifiers[nullifier]) revert DoubleVoting();
         
         // 3. Verify candidate exists
-        require(
-            proof.candidateID < candidates[proof.electionID].length,
-            "Invalid candidate ID"
-        );
+        if (proof.candidateID >= candidates[proof.electionID].length) revert InvalidCandidate();
         
         // 4. Verify timestamp is recent (prevent replay attacks)
-        require(
-            block.timestamp <= proof.timestamp + 1 hours,
-            "Proof expired - timestamp too old"
-        );
+        if (block.timestamp > proof.timestamp + 1 hours) revert ProofExpired();
         
         // 5. Verify issuer's and burner's EIP-712 signatures
-        require(
-            verifyVoteProof(proof),
-            "Invalid signatures - unauthorized or corrupted credential"
-        );
+        if (!verifyVoteProof(proof)) revert InvalidSignatures();
         
         // 6. Mark nullifier as used (prevents reuse)
         usedNullifiers[nullifier] = true;
         
         // 7. Record the vote
-        candidates[proof.electionID][proof.candidateID].voteCount++;
+        unchecked { ++candidates[proof.electionID][proof.candidateID].voteCount; }
         
         // 8. Emit event (nullifier indexed for verification, preserves anonymity)
         emit VoteCast(proof.electionID, proof.candidateID, nullifier, proof.timestamp);
@@ -223,7 +229,7 @@ contract VotingSSI {
         );
         
         address credSigner = recoverSigner(credDigest, proof.issuerSignature);
-        require(credSigner == issuer, "Signer is not issuer");
+        if (credSigner != issuer) revert InvalidSignatures();
 
         // 2. Verify Burner Vote Signature
         bytes32 voteHash = keccak256(
@@ -240,7 +246,7 @@ contract VotingSSI {
         );
         
         address voteSigner = recoverSigner(voteDigest, proof.burnerSignature);
-        require(voteSigner == proof.burner, "Signer is not burner");
+        if (voteSigner != proof.burner) revert InvalidSignatures();
 
         return true;
     }
@@ -256,7 +262,7 @@ contract VotingSSI {
         pure
         returns (address)
     {
-        require(signature.length == 65, "Invalid signature length");
+        if (signature.length != 65) revert InvalidSignatureLength();
         
         bytes32 r;
         bytes32 s;
@@ -274,11 +280,11 @@ contract VotingSSI {
             v += 27;
         }
         
-        require(v == 27 || v == 28, "Invalid signature v value");
+        if (v != 27 && v != 28) revert InvalidSignatureV();
         
         // ecrecover returns zero address on error
         address signer = ecrecover(digest, v, r, s);
-        require(signer != address(0), "Invalid signature - ecrecover failed");
+        if (signer == address(0)) revert ECDSAFailed();
         
         return signer;
     }
@@ -301,8 +307,8 @@ contract VotingSSI {
         external 
         onlyIssuer 
     {
-        require(_startTime < _endTime, "Invalid time range");
-        require(_candidateNames.length > 0, "At least one candidate required");
+        if (_startTime >= _endTime) revert InvalidTimeRange();
+        if (_candidateNames.length == 0) revert NoCandidates();
         
         currentElectionId++;
         
@@ -331,7 +337,7 @@ contract VotingSSI {
      * @param _electionID Election ID to end
      */
     function endElection(uint256 _electionID) external onlyIssuer {
-        require(elections[_electionID].isActive, "Election already ended");
+        if (!elections[_electionID].isActive) revert ElectionAlreadyEnded();
         elections[_electionID].isActive = false;
     }
     
@@ -340,7 +346,7 @@ contract VotingSSI {
      * @param _newIssuer New issuer address
      */
     function updateIssuer(address _newIssuer) external onlyIssuer {
-        require(_newIssuer != address(0), "New issuer cannot be zero address");
+        if (_newIssuer == address(0)) revert InvalidIssuer();
         address oldIssuer = issuer;
         issuer = _newIssuer;
         emit IssuerUpdated(oldIssuer, _newIssuer);
