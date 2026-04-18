@@ -14,8 +14,8 @@ import PersonIcon from '@mui/icons-material/Person';
 import { io } from 'socket.io-client';
 import { signVoteClientSide, getBurnerWallet } from '../LocalIdentity';
 
-const API_BASE = 'http://localhost:5000/api';
-const SOCKET_URL = 'http://localhost:5000';
+const API_BASE = 'http://localhost:5001/api';
+const SOCKET_URL = 'http://localhost:5001';
 
 function SimpleVoting({ user, sessionId, onLogout }) {
   const queryClient = useQueryClient();

@@ -28,7 +28,7 @@ import CandidatesModal from './admin/CandidatesModal';
 import DomainRestrictionsModal from './admin/DomainRestrictionsModal';
 
 const drawerWidth = 260;
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:5001/api';
 
 function AdminDashboard({ user, sessionId, onLogout }) {
   const queryClient = useQueryClient();

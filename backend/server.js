@@ -45,7 +45,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5001;
 
 // Global Middleware
 app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
