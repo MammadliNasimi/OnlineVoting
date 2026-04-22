@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import SimpleVoting from './components/SimpleVoting';
 import AdminDashboard from './components/AdminDashboard';
@@ -67,7 +67,7 @@ function App() {
 
       <Route path="/vote" element={
         user && user.role !== 'admin' ? (
-          <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100', py: 4 }}>
+          <Box sx={{ minHeight: '100vh' }}>
             <SimpleVoting user={user} sessionId={sessionId} onLogout={handleLogout} />
           </Box>
         ) : (

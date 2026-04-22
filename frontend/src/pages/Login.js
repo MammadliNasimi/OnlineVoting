@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   Box, Paper, Typography, Tabs, Tab, TextField, Button, Alert,
   CircularProgress, Select, MenuItem, FormControlLabel, Checkbox,
-  Card, CardContent, InputAdornment
+  InputAdornment, IconButton, Tooltip, Divider
 } from '@mui/material';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
@@ -11,6 +11,17 @@ import FaceIcon from '@mui/icons-material/Face';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import EmailIcon from '@mui/icons-material/Email';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import PasswordOutlinedIcon from '@mui/icons-material/PasswordOutlined';
+import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
+import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
+import HowToRegOutlinedIcon from '@mui/icons-material/HowToRegOutlined';
+import MarkEmailReadOutlinedIcon from '@mui/icons-material/MarkEmailReadOutlined';
+import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
+import SensorsOutlinedIcon from '@mui/icons-material/SensorsOutlined';
+import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import '../App.css';
 
 const cameraPriority = (label = '') => {
@@ -29,6 +40,63 @@ const pickPreferredCameraId = (videoInputs, currentSelectedId = '') => {
   return sorted[0].deviceId;
 };
 
+const fieldSx = {
+  '& .MuiOutlinedInput-root': {
+    borderRadius: 1.5,
+    backgroundColor: '#fbfdff',
+    '& fieldset': {
+      borderColor: 'rgba(15, 23, 42, 0.14)'
+    },
+    '&:hover fieldset': {
+      borderColor: '#10b981'
+    },
+    '&.Mui-focused fieldset': {
+      borderColor: '#10b981',
+      boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.14)'
+    }
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: '#0f9f8f'
+  }
+};
+
+const primaryButtonSx = {
+  py: 1.45,
+  borderRadius: 1.5,
+  fontWeight: 800,
+  textTransform: 'none',
+  color: '#06221d',
+  boxShadow: '0 16px 34px rgba(16, 185, 129, 0.24)',
+  background: 'linear-gradient(135deg, #34d399 0%, #10b981 48%, #0f9f8f 100%)',
+  '&:hover': {
+    boxShadow: '0 18px 38px rgba(16, 185, 129, 0.30)',
+    background: 'linear-gradient(135deg, #2cc98f 0%, #0ea774 48%, #0b867a 100%)'
+  }
+};
+
+const secondaryButtonSx = {
+  borderRadius: 1.5,
+  fontWeight: 700,
+  textTransform: 'none',
+  borderColor: 'rgba(15, 23, 42, 0.18)',
+  color: '#243141',
+  '&:hover': {
+    borderColor: '#10b981',
+    backgroundColor: 'rgba(16, 185, 129, 0.07)'
+  }
+};
+
+const iconBubbleSx = {
+  width: 40,
+  height: 40,
+  borderRadius: 2,
+  display: 'grid',
+  placeItems: 'center',
+  color: '#2dd4bf',
+  backgroundColor: 'rgba(45, 212, 191, 0.12)',
+  border: '1px solid rgba(45, 212, 191, 0.22)'
+};
+
 function Login({ onLoginComplete }) {
   // Page navigation
   const [currentPage, setCurrentPage] = useState('login'); // login, register, forgotPassword, resetPassword
@@ -36,8 +104,12 @@ function Login({ onLoginComplete }) {
   // UI state
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
-  const [sessionId, setSessionId] = useState('');
-  const [user, setUser] = useState(null);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   // Registration state
   const [registerMode, setRegisterMode] = useState(false);
@@ -241,8 +313,6 @@ function Login({ onLoginComplete }) {
     try {
       const descriptor = await captureFaceDescriptor();
       const res = await axios.post('/api/face/login', { name: form.name, descriptor });
-      setSessionId(res.data.sessionId);
-      setUser(res.data.user);
       setForm(f => ({ ...f, password: '' }));
       if (res.data.walletFundingWarning) {
         setInfo(`⚠️ ${res.data.walletFundingWarning}`);
@@ -265,10 +335,14 @@ function Login({ onLoginComplete }) {
   const handleLogin = async () => {
     setError('');
     setInfo('');
+    if (!form.name || !form.password) {
+      setError('Kullanıcı adı ve şifre giriniz');
+      return;
+    }
+
+    setLoginLoading(true);
     try {
       const res = await axios.post('/api/login', { name: form.name, password: form.password });
-      setSessionId(res.data.sessionId);
-      setUser(res.data.user);
       setForm(f => ({ ...f, password: '' }));
       if (res.data.walletFundingWarning) {
         setInfo(`⚠️ ${res.data.walletFundingWarning}`);
@@ -282,16 +356,21 @@ function Login({ onLoginComplete }) {
       if (onLoginComplete) onLoginComplete(res.data.user, res.data.sessionId);
     } catch (err) {
       setError(err.response?.data?.message || 'Giriş başarısız');
+    } finally {
+      setLoginLoading(false);
     }
   };
 
   // Registration handlers
   const handleSendRegisterOtp = async () => {
     setError('');
-    if (!form.email) {
-      setError('OTP için e-posta adresi giriniz');
+    setInfo('');
+    if (!form.name || !form.firstName || !form.lastName || !form.email || !form.password) {
+      setError('Kayıt için tüm alanları doldurunuz');
       return;
     }
+
+    setOtpLoading(true);
     try {
       const res = await axios.post('/api/register/send-otp', { email: form.email });
       setRegisterStep(1);
@@ -299,11 +378,15 @@ function Login({ onLoginComplete }) {
       if (res.data.devOtp) setRegisterOtp(res.data.devOtp);
     } catch (err) {
       setError(err.response?.data?.message || 'OTP gönderilemedi');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
   const handleRegister = async () => {
     setError('');
+    setInfo('');
+    setRegisterLoading(true);
     try {
       await axios.post('/api/register', {
         name: form.name,
@@ -320,9 +403,11 @@ function Login({ onLoginComplete }) {
       setRegisterFaceEnabled(false);
       setRegisterFaceDescriptor(null);
       setForm(f => ({ ...f, name: '', password: '', email: '', firstName: '', lastName: '' }));
-      setInfo('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
+      setInfo('Kayıt başarılı. Şimdi giriş yapabilirsiniz.');
     } catch (err) {
       setError(err.response?.data?.message || 'Kayıt başarısız');
+    } finally {
+      setRegisterLoading(false);
     }
   };
 
@@ -346,33 +431,44 @@ function Login({ onLoginComplete }) {
   // Forgot Password handlers
   const handleForgotPasswordRequest = async () => {
     setError('');
+    setInfo('');
     if (!form.resetEmail) {
       setError('Hesabınızla ilişkili e-posta adresini giriniz');
       return;
     }
+
+    setForgotLoading(true);
     try {
       const res = await axios.post('/api/forgot-password', { email: form.resetEmail });
       setForgotPasswordStep(1);
       setInfo(res.data.message || `${form.resetEmail} adresine kod gönderildi`);
     } catch (err) {
       setError(err.response?.data?.message || 'E-posta gönderilemedi');
+    } finally {
+      setForgotLoading(false);
     }
   };
 
   const handleResetPasswordOtpVerify = async () => {
     setError('');
+    setInfo('');
     if (!forgotPasswordOtp) {
       setError('Doğrulama kodunu giriniz');
       return;
     }
+    if (!form.resetPassword || form.resetPassword !== form.resetPasswordConfirm) {
+      setError('Yeni şifre alanları eşleşmelidir');
+      return;
+    }
+
     try {
       setResetPasswordConfirmLoading(true);
-      const res = await axios.post('/api/reset-password', {
+      await axios.post('/api/reset-password', {
         email: form.resetEmail,
         otp: forgotPasswordOtp,
         newPassword: form.resetPassword
       });
-      setInfo('Şifre başarıyla sıfırlandı! Şimdi giriş yapabilirsiniz.');
+      setInfo('Şifre başarıyla sıfırlandı. Şimdi giriş yapabilirsiniz.');
       // Reset forgot password state
       setTimeout(() => {
         setCurrentPage('login');
@@ -380,8 +476,7 @@ function Login({ onLoginComplete }) {
         setForgotPasswordOtp('');
         setForm(f => ({ ...f, resetEmail: '', resetPassword: '', resetPasswordConfirm: '' }));
         setError('');
-        setInfo('');
-      }, 2000);
+      }, 1800);
     } catch (err) {
       setError(err.response?.data?.message || 'Şifre sıfırlama başarısız');
     } finally {
@@ -401,32 +496,124 @@ function Login({ onLoginComplete }) {
     setInfo('');
   };
 
-  // Logout handler
-  const handleLogout = async () => {
-    try {
-      await axios.post('/api/logout', {}, { headers: { 'x-session-id': sessionId } });
-    } catch (err) {
-      console.error('Logout error:', err);
-    }
-    localStorage.removeItem('adminSession');
-    localStorage.removeItem('adminName');
-    setUser(null);
-    setSessionId('');
-    setForm(f => ({ ...f, password: '', resetEmail: '', resetPassword: '', resetPasswordConfirm: '' }));
-    setError('');
-    setInfo('');
-  };
+  const passwordEndAdornment = (visible, toggle, label) => ({
+    startAdornment: (
+      <InputAdornment position="start">
+        <PasswordOutlinedIcon sx={{ color: '#64748b' }} />
+      </InputAdornment>
+    ),
+    endAdornment: (
+      <InputAdornment position="end">
+        <Tooltip title={label}>
+          <IconButton edge="end" onClick={toggle} aria-label={label}>
+            {visible ? <VisibilityOffOutlinedIcon /> : <VisibilityOutlinedIcon />}
+          </IconButton>
+        </Tooltip>
+      </InputAdornment>
+    )
+  });
+
+  const renderCameraSelect = () => cameras.length > 0 && (
+    <Select
+      size="small"
+      value={selectedCameraId}
+      onChange={e => setSelectedCameraId(e.target.value)}
+      fullWidth
+      sx={{
+        borderRadius: 1.5,
+        backgroundColor: '#ffffff'
+      }}
+    >
+      {cameras.map((cam, i) => (
+        <MenuItem key={cam.deviceId || i} value={cam.deviceId}>{cam.label || `Kamera ${i + 1}`}</MenuItem>
+      ))}
+    </Select>
+  );
+
+  const renderFaceTools = ({ compact = false } = {}) => (
+    <Box sx={{
+      display: 'grid',
+      gap: 1.5,
+      p: compact ? 2 : 2.25,
+      borderRadius: 2,
+      backgroundColor: '#f7fbfd',
+      border: '1px dashed rgba(16, 185, 129, 0.34)'
+    }}>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <Button
+          type="button"
+          size="small"
+          variant="outlined"
+          fullWidth
+          onClick={requestCameraPermissionAndRefresh}
+          disabled={faceBusy}
+          sx={secondaryButtonSx}
+        >
+          İzin
+        </Button>
+        <Button
+          type="button"
+          size="small"
+          variant="contained"
+          fullWidth
+          startIcon={faceLoading ? null : <CameraAltIcon />}
+          onClick={async () => {
+            await loadFaceModels();
+            await refreshCameras();
+            await startFaceCamera();
+          }}
+          disabled={faceLoading || faceBusy}
+          sx={{ ...primaryButtonSx, py: 0.9, boxShadow: 'none' }}
+        >
+          {faceLoading ? <CircularProgress size={20} color="inherit" /> : 'Kamera'}
+        </Button>
+      </Box>
+
+      {renderCameraSelect()}
+
+      <Box
+        component="video"
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        sx={{
+          width: '100%',
+          height: compact ? 132 : 156,
+          borderRadius: 1.5,
+          backgroundColor: '#080f14',
+          objectFit: 'cover',
+          border: '1px solid rgba(15, 23, 42, 0.12)'
+        }}
+      />
+
+      {!!faceMessage && (
+        <Typography variant="caption" sx={{ color: '#516173', textAlign: 'center' }}>
+          {faceMessage}
+        </Typography>
+      )}
+    </Box>
+  );
 
   // Render forgot password page
   const RenderForgotPasswordPage = () => (
     <Box>
-      <Typography variant="h6" gutterBottom sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-        <LockResetIcon sx={{ color: 'primary.main' }} />
-        Şifrenizi Sıfırlayın
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+        <Box sx={{ ...iconBubbleSx, color: '#0f9f8f', backgroundColor: 'rgba(16, 185, 129, 0.10)' }}>
+          <LockResetIcon />
+        </Box>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 900, color: '#111827' }}>
+            Şifre Sıfırlama
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>
+            Hesabınıza ait e-posta ile devam edin.
+          </Typography>
+        </Box>
+      </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {info && <Alert severity="success" sx={{ mb: 2 }}>{info}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 1.5 }}>{error}</Alert>}
+      {info && <Alert severity="success" sx={{ mb: 2, borderRadius: 1.5 }}>{info}</Alert>}
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {forgotPasswordStep === 0 && (
@@ -442,14 +629,15 @@ function Login({ onLoginComplete }) {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <EmailIcon sx={{ color: 'action.active', mr: 1 }} />
+                    <EmailIcon sx={{ color: '#64748b' }} />
                   </InputAdornment>
                 )
               }}
               fullWidth
+              sx={fieldSx}
             />
-            <Typography variant="body2" color="text.secondary">
-              Hesabınızla ilişkili e-posta adresini girin. Size sıfırlama kodu göndereceğiz.
+            <Typography variant="body2" sx={{ color: '#64748b' }}>
+              Sıfırlama kodu kayıtlı e-posta adresinize gönderilecek.
             </Typography>
           </>
         )}
@@ -462,42 +650,56 @@ function Login({ onLoginComplete }) {
               value={forgotPasswordOtp}
               onChange={e => setForgotPasswordOtp(e.target.value.replace(/\D/g, ''))}
               fullWidth
-              inputProps={{ maxLength: 6, style: { fontSize: 24, letterSpacing: 10, textAlign: 'center', fontWeight: 'bold' } }}
+              inputProps={{ maxLength: 6, style: { fontSize: 22, letterSpacing: 0, textAlign: 'center', fontWeight: 800 } }}
               autoFocus
-              sx={{ mb: 1 }}
+              sx={fieldSx}
             />
-            <Typography variant="caption" color="text.secondary">
-              📧 {form.resetEmail} adresine 6 haneli kod gönderildi
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              Kod {form.resetEmail} adresine gönderildi.
             </Typography>
 
             <TextField
               label="Yeni Şifre"
-              type="password"
+              type={showResetPassword ? 'text' : 'password'}
               variant="outlined"
               value={form.resetPassword}
               onChange={e => setForm(f => ({ ...f, resetPassword: e.target.value }))}
               fullWidth
-              sx={{ mt: 2 }}
+              sx={fieldSx}
+              InputProps={passwordEndAdornment(
+                showResetPassword,
+                () => setShowResetPassword(value => !value),
+                showResetPassword ? 'Şifreyi gizle' : 'Şifreyi göster'
+              )}
             />
 
             <TextField
               label="Şifre Tekrar"
-              type="password"
+              type={showResetPassword ? 'text' : 'password'}
               variant="outlined"
               value={form.resetPasswordConfirm}
               onChange={e => setForm(f => ({ ...f, resetPasswordConfirm: e.target.value }))}
-              onKeyDown={e => e.key === 'Enter' && form.resetPassword === form.resetPasswordConfirm && handleResetPasswordOtpVerify()}
+              onKeyDown={e => e.key === 'Enter' && handleResetPasswordOtpVerify()}
               fullWidth
+              sx={fieldSx}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <KeyOutlinedIcon sx={{ color: '#64748b' }} />
+                  </InputAdornment>
+                )
+              }}
             />
 
             {form.resetPassword !== form.resetPasswordConfirm && form.resetPasswordConfirm && (
-              <Alert severity="warning">Şifreler eşleşmiyor</Alert>
+              <Alert severity="warning" sx={{ borderRadius: 1.5 }}>Şifreler eşleşmiyor</Alert>
             )}
           </>
         )}
 
-        <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '0.9fr 1.1fr' }, gap: 1.5, mt: 1 }}>
           <Button
+            type="button"
             variant="outlined"
             size="large"
             startIcon={<ArrowBackIcon />}
@@ -509,19 +711,20 @@ function Login({ onLoginComplete }) {
               setError('');
               setInfo('');
             }}
-            fullWidth
+            sx={secondaryButtonSx}
           >
             Geri
           </Button>
           <Button
+            type="button"
             variant="contained"
             size="large"
+            startIcon={forgotPasswordStep === 0 ? <MarkEmailReadOutlinedIcon /> : <LockResetIcon />}
             onClick={forgotPasswordStep === 0 ? handleForgotPasswordRequest : handleResetPasswordOtpVerify}
-            disabled={forgotPasswordStep === 0 ? !form.resetEmail : (resetPasswordConfirmLoading || form.resetPassword !== form.resetPasswordConfirm || !form.resetPassword)}
-            fullWidth
-            sx={{ py: 1.5, fontWeight: 'bold' }}
+            disabled={forgotPasswordStep === 0 ? (forgotLoading || !form.resetEmail) : (resetPasswordConfirmLoading || form.resetPassword !== form.resetPasswordConfirm || !form.resetPassword)}
+            sx={primaryButtonSx}
           >
-            {resetPasswordConfirmLoading ? <CircularProgress size={24} color="inherit" /> : (forgotPasswordStep === 0 ? 'Kodu Gönder →' : 'Şifre Sıfırla ✓')}
+            {forgotLoading || resetPasswordConfirmLoading ? <CircularProgress size={24} color="inherit" /> : (forgotPasswordStep === 0 ? 'Kodu Gönder' : 'Şifreyi Yenile')}
           </Button>
         </Box>
       </Box>
@@ -535,314 +738,493 @@ function Login({ onLoginComplete }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
-      p: 2
+      backgroundColor: '#dbe6eb',
+      backgroundImage: `
+        linear-gradient(rgba(16, 24, 32, 0.075) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(16, 24, 32, 0.075) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.08))
+      `,
+      backgroundSize: '42px 42px, 42px 42px, cover',
+      p: { xs: 2, md: 4 }
     }}>
-      <Paper elevation={24} sx={{ width: '100%', maxWidth: 480, borderRadius: 4, overflow: 'hidden' }}>
-        <Box sx={{ pt: 4, pb: 2, px: 4, textAlign: 'center', bgcolor: 'background.paper' }}>
-          <HowToVoteIcon sx={{ fontSize: 50, color: 'primary.main', mb: 1 }} />
-          <Typography variant="h5" fontWeight="900" letterSpacing={-0.5} gutterBottom>
-            SSI Blockchain Oylama
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            ZK-Email • EIP-712 • Anonim Kimlik
-          </Typography>
+      <Paper
+        elevation={0}
+        sx={{
+          width: '100%',
+          maxWidth: 1120,
+          minHeight: { md: 720 },
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '0.9fr 1fr' },
+          overflow: 'hidden',
+          borderRadius: 2,
+          border: '1px solid rgba(15, 23, 42, 0.10)',
+          boxShadow: '0 28px 80px rgba(17, 24, 39, 0.18)'
+        }}
+      >
+        <Box sx={{
+          position: 'relative',
+          display: { xs: 'none', md: 'flex' },
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          p: 5,
+          color: '#f8fafc',
+          backgroundColor: '#101820',
+          backgroundImage: `
+            linear-gradient(145deg, rgba(16, 185, 129, 0.20), transparent 42%),
+            linear-gradient(315deg, rgba(45, 212, 191, 0.18), transparent 46%),
+            linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px)
+          `,
+          backgroundSize: 'cover, cover, 36px 36px, 36px 36px'
+        }}>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 7 }}>
+              <Box sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                display: 'grid',
+                placeItems: 'center',
+                color: '#071014',
+                backgroundColor: '#2dd4bf'
+              }}>
+                <HowToVoteIcon />
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 900, letterSpacing: 0 }}>
+                  SSI Voting
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'rgba(248, 250, 252, 0.68)' }}>
+                  Blockchain oylama arayüzü
+                </Typography>
+              </Box>
+            </Box>
+
+            <Typography variant="overline" sx={{ color: '#2dd4bf', fontWeight: 900, letterSpacing: 0 }}>
+              Güvenli Oturum
+            </Typography>
+            <Typography variant="h3" sx={{ mt: 1.5, maxWidth: 420, fontWeight: 900, lineHeight: 1.08, letterSpacing: 0 }}>
+              Kimlik doğrulama sade, seçim süreci şeffaf.
+            </Typography>
+            <Typography variant="body1" sx={{ mt: 2.5, maxWidth: 420, color: 'rgba(248, 250, 252, 0.72)', lineHeight: 1.75 }}>
+              Kurumsal e-posta, oturum güvenliği ve anonim oy kullanma akışı aynı panelde toplanır.
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'grid', gap: 2.5 }}>
+            {[
+              { icon: <VerifiedUserOutlinedIcon />, title: 'ZK-Email doğrulama', text: 'Domain kısıtlı kayıt akışı' },
+              { icon: <SensorsOutlinedIcon />, title: 'Yüz ile hızlı giriş', text: 'Opsiyonel biyometrik oturum' },
+              { icon: <KeyOutlinedIcon />, title: '8 saatlik güvenli oturum', text: 'HTTP-only JWT cookie desteği' }
+            ].map(item => (
+              <Box key={item.title} sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                <Box sx={iconBubbleSx}>
+                  {item.icon}
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
+                    {item.title}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(248, 250, 252, 0.62)' }}>
+                    {item.text}
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
         </Box>
 
-        {/* Only show tabs in login/register modes */}
-        {currentPage === 'login' && (
-          <Tabs
-            value={registerMode ? 1 : 0}
-            onChange={handleTabChange}
-            variant="fullWidth"
-            indicatorColor="primary"
-            textColor="primary"
-            sx={{ borderBottom: 1, borderColor: 'divider' }}
-          >
-            <Tab label="GİRİŞ YAP" sx={{ fontWeight: 'bold' }} />
-            <Tab label="KAYIT OL" sx={{ fontWeight: 'bold' }} />
-          </Tabs>
-        )}
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: { xs: 2.5, sm: 4, md: 5 },
+          backgroundColor: '#ffffff'
+        }}>
+          <Box sx={{ width: '100%', maxWidth: 500 }}>
+            <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1.5, mb: 3 }}>
+              <Box sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 2,
+                display: 'grid',
+                placeItems: 'center',
+                color: '#071014',
+                backgroundColor: '#2dd4bf'
+              }}>
+                <HowToVoteIcon />
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 900, color: '#111827' }}>
+                  SSI Voting
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748b' }}>
+                  Blockchain oylama arayüzü
+                </Typography>
+              </Box>
+            </Box>
 
-        <Box sx={{ p: 4 }}>
-          {/* Forgot Password Page */}
+            {currentPage === 'login' && (
+              <>
+                <Typography variant="h4" sx={{ fontWeight: 900, color: '#111827', letterSpacing: 0, mb: 1 }}>
+                  {registerMode ? 'Yeni Hesap' : 'Hoş Geldiniz'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
+                  {registerMode ? 'Kurumsal e-posta doğrulaması ile hesabınızı oluşturun.' : 'Kullanıcı bilgilerinizle güvenli oturuma geçin.'}
+                </Typography>
+
+                <Tabs
+                  value={registerMode ? 1 : 0}
+                  onChange={handleTabChange}
+                  variant="fullWidth"
+                  sx={{
+                    mb: 3,
+                    minHeight: 48,
+                    border: '1px solid rgba(15, 23, 42, 0.10)',
+                    borderRadius: 2,
+                    p: 0.5,
+                    '& .MuiTabs-indicator': {
+                      display: 'none'
+                    },
+                    '& .MuiTab-root': {
+                      minHeight: 40,
+                      borderRadius: 1.5,
+                      textTransform: 'none',
+                      fontWeight: 800,
+                      color: '#64748b'
+                    },
+                    '& .Mui-selected': {
+                      color: '#064e3b',
+                      backgroundColor: '#d5f8e9',
+                      boxShadow: 'inset 0 0 0 1px rgba(16, 185, 129, 0.22)'
+                    }
+                  }}
+                >
+                  <Tab icon={<LoginOutlinedIcon fontSize="small" />} iconPosition="start" label="Giriş" />
+                  <Tab icon={<HowToRegOutlinedIcon fontSize="small" />} iconPosition="start" label="Kayıt" />
+                </Tabs>
+              </>
+            )}
+
             {currentPage === 'forgotPassword' && RenderForgotPasswordPage()}
 
-          {/* Login/Register Page */}
-          {(currentPage === 'login' || currentPage === 'resetPassword') && (
-            <>
-              {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-              {info && <Alert severity="success" sx={{ mb: 3 }}>{info}</Alert>}
+            {(currentPage === 'login' || currentPage === 'resetPassword') && (
+              <>
+                {error && <Alert severity="error" sx={{ mb: 2.5, borderRadius: 1.5 }}>{error}</Alert>}
+                {info && <Alert severity="success" sx={{ mb: 2.5, borderRadius: 1.5 }}>{info}</Alert>}
 
-              <Box component="form" noValidate autoComplete="off" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {/* LOGIN TAB */}
-                {!registerMode && (
-                  <>
-                    <TextField
-                      label="Kullanıcı Adı"
-                      variant="outlined"
-                      size="medium"
-                      value={form.name}
-                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                      fullWidth
-                    />
+                <Box component="form" noValidate autoComplete="off" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {!registerMode && (
+                    <>
+                      <TextField
+                        label="Kullanıcı Adı"
+                        variant="outlined"
+                        size="medium"
+                        value={form.name}
+                        onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                        onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                        fullWidth
+                        sx={fieldSx}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <PersonOutlineIcon sx={{ color: '#64748b' }} />
+                            </InputAdornment>
+                          )
+                        }}
+                      />
 
-                    <TextField
-                      label="Şifre"
-                      type="password"
-                      variant="outlined"
-                      value={form.password}
-                      onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                      fullWidth
-                    />
+                      <TextField
+                        label="Şifre"
+                        type={showPassword ? 'text' : 'password'}
+                        variant="outlined"
+                        value={form.password}
+                        onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                        onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                        fullWidth
+                        sx={fieldSx}
+                        InputProps={passwordEndAdornment(
+                          showPassword,
+                          () => setShowPassword(value => !value),
+                          showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'
+                        )}
+                      />
 
-                    <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
                       <Button
+                        type="button"
                         variant="contained"
                         size="large"
                         fullWidth
-                        sx={{ py: 1.5, fontWeight: 'bold' }}
+                        startIcon={loginLoading ? null : <LoginOutlinedIcon />}
+                        sx={{ ...primaryButtonSx, mt: 1 }}
                         onClick={handleLogin}
+                        disabled={loginLoading}
                       >
-                        Giriş Yap
+                        {loginLoading ? <CircularProgress size={24} color="inherit" /> : 'Giriş Yap'}
                       </Button>
-                    </Box>
 
-                    {/* Forgot Password Link */}
-                    <Box sx={{ textAlign: 'center', mt: 2 }}>
-                      <Button
-                        variant="text"
-                        size="small"
-                        onClick={() => {
-                          setCurrentPage('forgotPassword');
-                          setError('');
-                          setInfo('');
-                        }}
-                      >
-                        Şifremi Unuttum
-                      </Button>
-                    </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mt: 0.5 }}>
+                        <Button
+                          type="button"
+                          variant="text"
+                          size="small"
+                          onClick={() => {
+                            setCurrentPage('forgotPassword');
+                            setError('');
+                            setInfo('');
+                          }}
+                          sx={{ color: '#0f9f8f', textTransform: 'none', fontWeight: 700 }}
+                        >
+                          Şifremi Unuttum
+                        </Button>
+                      </Box>
 
-                    {/* Quick Face Login */}
-                    <Box sx={{ mt: 4 }}>
-                      <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, color: 'text.secondary', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                        <FaceIcon fontSize="small" /> Hızlı Giriş (Face Control)
-                      </Typography>
+                      <Divider sx={{ my: 1.5, color: '#94a3b8', fontSize: 12 }}>veya</Divider>
 
-                      <Card variant="outlined" sx={{ bgcolor: 'grey.50', borderStyle: 'dashed' }}>
-                        <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2 } }}>
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            Kameraya izin verdikten sonra yüz verinizi doğrulayarak şifresiz giriş yapabilirsiniz. Kullanıcı adınızı yukarıda belirtmeyi unutmayın.
-                          </Typography>
-
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button size="small" variant="outlined" color="success" fullWidth onClick={requestCameraPermissionAndRefresh} disabled={faceBusy}>
-                              İzin İste
-                            </Button>
-                            <Button size="small" variant="contained" color="primary" fullWidth onClick={async () => {
-                              await loadFaceModels();
-                              await refreshCameras();
-                              await startFaceCamera();
-                            }} disabled={faceLoading || faceBusy}>
-                              {faceLoading ? <CircularProgress size={20} color="inherit" /> : 'Kamerayı Başlat'}
-                            </Button>
-                          </Box>
-
-                          {cameras.length > 0 && (
-                            <Select size="small" value={selectedCameraId} onChange={e => setSelectedCameraId(e.target.value)} fullWidth>
-                              {cameras.map((cam, i) => (
-                                <MenuItem key={cam.deviceId || i} value={cam.deviceId}>{cam.label || `Kamera ${i + 1}`}</MenuItem>
-                              ))}
-                            </Select>
-                          )}
-
-                          <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: 160, borderRadius: 8, background: '#000', objectFit: 'cover' }} />
-
-                          <Button variant="contained" color="success" onClick={handleFaceLogin} disabled={!faceEnabled || faceBusy}>
+                      <Box sx={{ display: 'grid', gap: 1.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <FaceIcon sx={{ color: '#0f9f8f' }} />
+                          <Typography variant="subtitle2" sx={{ color: '#111827', fontWeight: 900 }}>
                             Yüz ile Hızlı Giriş
-                          </Button>
-
-                          {!!faceMessage && (
-                            <Typography variant="caption" color="text.secondary" textAlign="center">
-                              {faceMessage}
-                            </Typography>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </Box>
-                  </>
-                )}
-
-                {/* REGISTRATION TAB */}
-                {registerMode && (
-                  <>
-                    <TextField
-                      label="Kullanıcı Adı"
-                      variant="outlined"
-                      size="medium"
-                      disabled={registerStep === 1}
-                      value={form.name}
-                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && (registerStep === 0 ? handleSendRegisterOtp() : handleRegister())}
-                      fullWidth
-                    />
-
-                    {registerStep === 0 && (
-                      <>
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                          <TextField
-                            label="Ad *"
-                            variant="outlined"
-                            value={form.firstName}
-                            onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))}
-                            fullWidth
-                          />
-                          <TextField
-                            label="Soyad *"
-                            variant="outlined"
-                            value={form.lastName}
-                            onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
-                            fullWidth
-                          />
+                          </Typography>
                         </Box>
 
-                        <TextField
-                          label="Kurumsal E-posta (ZK-Email için)"
-                          type="email"
-                          placeholder="ad.soyad@akdeniz.edu.tr"
-                          variant="outlined"
-                          value={form.email}
-                          onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                          onKeyDown={e => e.key === 'Enter' && handleSendRegisterOtp()}
-                          fullWidth
-                        />
+                        {renderFaceTools()}
 
-                        <TextField
-                          label="Şifre"
-                          type="password"
-                          variant="outlined"
-                          value={form.password}
-                          onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                          onKeyDown={e => e.key === 'Enter' && handleSendRegisterOtp()}
-                          fullWidth
-                        />
-                      </>
-                    )}
-
-                    {registerStep === 1 && (
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="subtitle2" color="primary" gutterBottom>
-                          E-posta: {form.email}
-                        </Typography>
-                        <TextField
-                          label="Doğrulama Kodu (OTP)"
-                          variant="outlined"
-                          value={registerOtp}
-                          onChange={e => setRegisterOtp(e.target.value.replace(/\D/g, ''))}
-                          onKeyDown={e => e.key === 'Enter' && handleRegister()}
-                          fullWidth
-                          inputProps={{ maxLength: 6, style: { fontSize: 24, letterSpacing: 10, textAlign: 'center', fontWeight: 'bold' } }}
-                          autoFocus
-                          sx={{ mb: 1, mt: 1 }}
-                        />
-                        <Typography variant="caption" color="text.secondary">
-                          📧 {form.email} adresine 6 haneli kod gönderildi
-                        </Typography>
-
-                        <Card variant="outlined" sx={{ p: 2, mt: 3, textAlign: 'left', bgcolor: 'grey.50' }}>
-                          <FormControlLabel
-                            control={
-                              <Checkbox
-                                checked={registerFaceEnabled}
-                                onChange={e => {
-                                  const enabled = e.target.checked;
-                                  setRegisterFaceEnabled(enabled);
-                                  if (!enabled) setRegisterFaceDescriptor(null);
-                                }}
-                              />
+                        <Button
+                          type="button"
+                          variant="contained"
+                          color="success"
+                          onClick={handleFaceLogin}
+                          disabled={!faceEnabled || faceBusy}
+                          startIcon={faceBusy ? null : <FaceIcon />}
+                          sx={{
+                            py: 1.25,
+                            borderRadius: 1.5,
+                            textTransform: 'none',
+                            fontWeight: 800,
+                            color: '#06221d',
+                            background: 'linear-gradient(135deg, #34d399 0%, #10b981 48%, #0f9f8f 100%)',
+                            boxShadow: '0 14px 30px rgba(16, 185, 129, 0.22)',
+                            '&:hover': {
+                              background: 'linear-gradient(135deg, #2cc98f 0%, #0ea774 48%, #0b867a 100%)'
                             }
-                            label={<Typography variant="body2" fontWeight="medium">Kayıtta yüz profilimi de ekle (opsiyonel)</Typography>}
+                          }}
+                        >
+                          {faceBusy ? <CircularProgress size={22} color="inherit" /> : 'Yüz ile Giriş'}
+                        </Button>
+                      </Box>
+                    </>
+                  )}
+
+                  {registerMode && (
+                    <>
+                      <TextField
+                        label="Kullanıcı Adı"
+                        variant="outlined"
+                        size="medium"
+                        disabled={registerStep === 1}
+                        value={form.name}
+                        onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                        onKeyDown={e => e.key === 'Enter' && (registerStep === 0 ? handleSendRegisterOtp() : handleRegister())}
+                        fullWidth
+                        sx={fieldSx}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <PersonOutlineIcon sx={{ color: '#64748b' }} />
+                            </InputAdornment>
+                          )
+                        }}
+                      />
+
+                      {registerStep === 0 && (
+                        <>
+                          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
+                            <TextField
+                              label="Ad"
+                              variant="outlined"
+                              value={form.firstName}
+                              onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))}
+                              fullWidth
+                              sx={fieldSx}
+                              InputProps={{
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <BadgeOutlinedIcon sx={{ color: '#64748b' }} />
+                                  </InputAdornment>
+                                )
+                              }}
+                            />
+                            <TextField
+                              label="Soyad"
+                              variant="outlined"
+                              value={form.lastName}
+                              onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
+                              fullWidth
+                              sx={fieldSx}
+                            />
+                          </Box>
+
+                          <TextField
+                            label="Kurumsal E-posta"
+                            type="email"
+                            placeholder="ad.soyad@akdeniz.edu.tr"
+                            variant="outlined"
+                            value={form.email}
+                            onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && handleSendRegisterOtp()}
+                            fullWidth
+                            sx={fieldSx}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <EmailIcon sx={{ color: '#64748b' }} />
+                                </InputAdornment>
+                              )
+                            }}
                           />
 
-                          {registerFaceEnabled && (
-                            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                              <Typography variant="caption" color="text.secondary">
-                                Sadece cihazınızın kamerası (PC/Telefon) kullanılarak doğrulama verisi oluşturulur.
-                              </Typography>
-
-                              <Box sx={{ display: 'flex', gap: 1 }}>
-                                <Button size="small" variant="outlined" color="success" onClick={requestCameraPermissionAndRefresh} disabled={faceBusy} fullWidth>
-                                  İzin İste / Yenile
-                                </Button>
-                                <Button size="small" variant="contained" color="primary" onClick={async () => {
-                                  await loadFaceModels();
-                                  await refreshCameras();
-                                  await startFaceCamera();
-                                }} disabled={faceLoading || faceBusy} fullWidth>
-                                  {faceLoading ? <CircularProgress size={20} color="inherit" /> : 'Kamerayı Başlat'}
-                                </Button>
-                              </Box>
-
-                              {cameras.length > 0 && (
-                                <Select size="small" value={selectedCameraId} onChange={e => setSelectedCameraId(e.target.value)} fullWidth>
-                                  {cameras.map((cam, i) => (
-                                    <MenuItem key={cam.deviceId || i} value={cam.deviceId}>{cam.label || `Kamera ${i + 1}`}</MenuItem>
-                                  ))}
-                                </Select>
-                              )}
-
-                              <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: 160, borderRadius: 8, background: '#000', objectFit: 'cover' }} />
-
-                              <Button variant="contained" color="warning" onClick={handleCaptureRegisterFace} disabled={faceBusy} startIcon={<CameraAltIcon />}>
-                                Yüz Verisini Yakala
-                              </Button>
-
-                              {registerFaceDescriptor && (
-                                <Typography variant="caption" color="success.main" fontWeight="bold">
-                                  ✅ Yüz verisi hazır. Kayıtta otomatik saklanacak.
-                                </Typography>
-                              )}
-                            </Box>
-                          )}
-                        </Card>
-                      </Box>
-                    )}
-
-                    <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                      {registerStep === 1 && (
-                        <Button
-                          variant="outlined"
-                          size="large"
-                          onClick={() => { setRegisterStep(0); setRegisterOtp(''); setRegisterFaceEnabled(false); setRegisterFaceDescriptor(null); setError(''); setInfo(''); }}
-                          startIcon={<ArrowBackIcon />}
-                        >
-                          Geri
-                        </Button>
+                          <TextField
+                            label="Şifre"
+                            type={showPassword ? 'text' : 'password'}
+                            variant="outlined"
+                            value={form.password}
+                            onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && handleSendRegisterOtp()}
+                            fullWidth
+                            sx={fieldSx}
+                            InputProps={passwordEndAdornment(
+                              showPassword,
+                              () => setShowPassword(value => !value),
+                              showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'
+                            )}
+                          />
+                        </>
                       )}
-                      <Button
-                        variant="contained"
-                        size="large"
-                        fullWidth
-                        sx={{ py: 1.5, fontWeight: 'bold' }}
-                        onClick={registerStep === 0 ? handleSendRegisterOtp : handleRegister}
-                        disabled={registerStep === 0 && (!form.name || !form.firstName || !form.lastName || !form.email || !form.password)}
-                      >
-                        {registerStep === 0 ? 'Kod Gönder →' : 'Hesabı Oluştur ✓'}
-                      </Button>
-                    </Box>
-                  </>
-                )}
-              </Box>
 
-              {registerMode && (
-                <Alert severity="info" sx={{ mt: 4, borderRadius: 2 }}>
-                  <strong>ZK-Email oylama özelliği</strong> için kurumsal e-posta adresinizi girin. Oy kullanma ekranında OTP kodu ile kimliğinizi <strong>anonim</strong> olarak doğrulayacaksınız.
-                </Alert>
-              )}
-            </>
-          )}
+                      {registerStep === 1 && (
+                        <Box sx={{ display: 'grid', gap: 2 }}>
+                          <Box sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            backgroundColor: '#f7fbfd',
+                            border: '1px solid rgba(15, 23, 42, 0.08)'
+                          }}>
+                            <Typography variant="caption" sx={{ color: '#64748b' }}>
+                              E-posta
+                            </Typography>
+                            <Typography variant="subtitle2" sx={{ color: '#111827', fontWeight: 900 }}>
+                              {form.email}
+                            </Typography>
+                          </Box>
+
+                          <TextField
+                            label="Doğrulama Kodu"
+                            variant="outlined"
+                            value={registerOtp}
+                            onChange={e => setRegisterOtp(e.target.value.replace(/\D/g, ''))}
+                            onKeyDown={e => e.key === 'Enter' && handleRegister()}
+                            fullWidth
+                            inputProps={{ maxLength: 6, style: { fontSize: 22, letterSpacing: 0, textAlign: 'center', fontWeight: 800 } }}
+                            autoFocus
+                            sx={fieldSx}
+                          />
+
+                          <Box sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            backgroundColor: '#fbfdff',
+                            border: '1px solid rgba(15, 23, 42, 0.08)'
+                          }}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={registerFaceEnabled}
+                                  onChange={e => {
+                                    const enabled = e.target.checked;
+                                    setRegisterFaceEnabled(enabled);
+                                    if (!enabled) setRegisterFaceDescriptor(null);
+                                  }}
+                                  sx={{
+                                    color: '#64748b',
+                                    '&.Mui-checked': { color: '#0f9f8f' }
+                                  }}
+                                />
+                              }
+                              label={<Typography variant="body2" sx={{ fontWeight: 800, color: '#111827' }}>Yüz profilimi ekle</Typography>}
+                            />
+
+                            {registerFaceEnabled && (
+                              <Box sx={{ mt: 1.5, display: 'grid', gap: 1.5 }}>
+                                {renderFaceTools({ compact: true })}
+
+                                <Button
+                                  type="button"
+                                  variant="contained"
+                                  onClick={handleCaptureRegisterFace}
+                                  disabled={faceBusy}
+                                  startIcon={faceBusy ? null : <CameraAltIcon />}
+                                  sx={{
+                                    py: 1.15,
+                                    borderRadius: 1.5,
+                                    textTransform: 'none',
+                                    fontWeight: 800,
+                                    backgroundColor: '#f59e0b',
+                                    color: '#111827',
+                                    boxShadow: 'none',
+                                    '&:hover': { backgroundColor: '#d88906' }
+                                  }}
+                                >
+                                  {faceBusy ? <CircularProgress size={22} color="inherit" /> : 'Yüz Verisini Yakala'}
+                                </Button>
+
+                                {registerFaceDescriptor && (
+                                  <Alert severity="success" sx={{ borderRadius: 1.5 }}>
+                                    Yüz verisi hazır. Kayıtta saklanacak.
+                                  </Alert>
+                                )}
+                              </Box>
+                            )}
+                          </Box>
+                        </Box>
+                      )}
+
+                      <Box sx={{ display: 'grid', gridTemplateColumns: registerStep === 1 ? { xs: '1fr', sm: '0.8fr 1.2fr' } : '1fr', gap: 1.5, mt: 1 }}>
+                        {registerStep === 1 && (
+                          <Button
+                            type="button"
+                            variant="outlined"
+                            size="large"
+                            onClick={() => { setRegisterStep(0); setRegisterOtp(''); setRegisterFaceEnabled(false); setRegisterFaceDescriptor(null); setError(''); setInfo(''); }}
+                            startIcon={<ArrowBackIcon />}
+                            sx={secondaryButtonSx}
+                          >
+                            Geri
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="contained"
+                          size="large"
+                          fullWidth
+                          startIcon={registerStep === 0 ? <MarkEmailReadOutlinedIcon /> : <HowToRegOutlinedIcon />}
+                          sx={primaryButtonSx}
+                          onClick={registerStep === 0 ? handleSendRegisterOtp : handleRegister}
+                          disabled={
+                            (registerStep === 0 && (otpLoading || !form.name || !form.firstName || !form.lastName || !form.email || !form.password))
+                            || (registerStep === 1 && (registerLoading || !registerOtp))
+                          }
+                        >
+                          {otpLoading || registerLoading ? <CircularProgress size={24} color="inherit" /> : (registerStep === 0 ? 'Kodu Gönder' : 'Hesabı Oluştur')}
+                        </Button>
+                      </Box>
+                    </>
+                  )}
+                </Box>
+              </>
+            )}
+          </Box>
         </Box>
       </Paper>
     </Box>
