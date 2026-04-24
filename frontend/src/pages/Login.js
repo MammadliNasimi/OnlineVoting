@@ -1,55 +1,41 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import {
-  Box, Paper, Typography, Tabs, Tab, TextField, Button, Alert,
-  CircularProgress, Select, MenuItem, FormControlLabel, Checkbox,
-  Card, CardContent, InputAdornment
+  Box, Paper, Typography, Tabs, Tab, Alert,
+  InputAdornment, IconButton, Tooltip
 } from '@mui/material';
-import HowToVoteIcon from '@mui/icons-material/HowToVote';
-import CameraAltIcon from '@mui/icons-material/CameraAlt';
-import FaceIcon from '@mui/icons-material/Face';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import LockResetIcon from '@mui/icons-material/LockReset';
-import EmailIcon from '@mui/icons-material/Email';
+import PasswordOutlinedIcon from '@mui/icons-material/PasswordOutlined';
+import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
+import HowToRegOutlinedIcon from '@mui/icons-material/HowToRegOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
+import AuthHeroPanel from '../components/auth/AuthHeroPanel';
+import ForgotPasswordPage from '../components/auth/ForgotPasswordPage';
+import LoginSection from '../components/auth/LoginSection';
+import RegisterSection from '../components/auth/RegisterSection';
+import useFaceAuth from '../components/auth/useFaceAuth';
 import '../App.css';
 
-const cameraPriority = (label = '') => {
-  const text = label.toLowerCase();
-  if (text.includes('droidcam') || text.includes('ivcam') || text.includes('iriun') || text.includes('epoccam')) return 100;
-  if (text.includes('android') || text.includes('iphone') || text.includes('phone') || text.includes('telefon')) return 80;
-  if (text.includes('usb') || text.includes('webcam') || text.includes('camera')) return 40;
-  return 10;
-};
-
-const pickPreferredCameraId = (videoInputs, currentSelectedId = '') => {
-  if (!videoInputs || videoInputs.length === 0) return '';
-  const exists = videoInputs.some(v => v.deviceId === currentSelectedId);
-  if (exists) return currentSelectedId;
-  const sorted = [...videoInputs].sort((a, b) => cameraPriority(b.label) - cameraPriority(a.label));
-  return sorted[0].deviceId;
-};
-
 function Login({ onLoginComplete }) {
-  // Page navigation
   const [currentPage, setCurrentPage] = useState('login'); // login, register, forgotPassword, resetPassword
 
-  // UI state
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
-  const [sessionId, setSessionId] = useState('');
-  const [user, setUser] = useState(null);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
-  // Registration state
   const [registerMode, setRegisterMode] = useState(false);
   const [registerStep, setRegisterStep] = useState(0); // 0=form, 1=OTP
   const [registerOtp, setRegisterOtp] = useState('');
 
-  // Forgot/Reset password state
   const [forgotPasswordStep, setForgotPasswordStep] = useState(0); // 0=email, 1=OTP, 2=newPassword
   const [forgotPasswordOtp, setForgotPasswordOtp] = useState('');
   const [resetPasswordConfirmLoading, setResetPasswordConfirmLoading] = useState(false);
 
-  // Form state - expanded with firstName and lastName
   const [form, setForm] = useState({
     name: '',
     password: '',
@@ -61,174 +47,28 @@ function Login({ onLoginComplete }) {
     resetPasswordConfirm: ''
   });
 
-  // Face recognition state
-  const [faceEnabled, setFaceEnabled] = useState(false);
-  const [faceLoading, setFaceLoading] = useState(false);
-  const [faceBusy, setFaceBusy] = useState(false);
-  const [faceMessage, setFaceMessage] = useState('');
-  const [registerFaceEnabled, setRegisterFaceEnabled] = useState(false);
-  const [registerFaceDescriptor, setRegisterFaceDescriptor] = useState(null);
-  const [cameras, setCameras] = useState([]);
-  const [selectedCameraId, setSelectedCameraId] = useState('');
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
+  const {
+    faceEnabled,
+    faceLoading,
+    faceBusy,
+    setFaceBusy,
+    faceMessage,
+    setFaceMessage,
+    registerFaceEnabled,
+    setRegisterFaceEnabled,
+    registerFaceDescriptor,
+    setRegisterFaceDescriptor,
+    cameras,
+    selectedCameraId,
+    setSelectedCameraId,
+    videoRef,
+    loadFaceModels,
+    refreshCameras,
+    requestCameraPermissionAndRefresh,
+    startFaceCamera,
+    captureFaceDescriptor
+  } = useFaceAuth(currentPage);
 
-  // Camera cleanup
-  const stopFaceCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => stopFaceCamera();
-  }, []);
-
-  useEffect(() => {
-    if (currentPage !== 'login') {
-      stopFaceCamera();
-    }
-  }, [currentPage]);
-
-  // Face API loading
-  const loadFaceModels = async () => {
-    if (faceEnabled) return;
-    setFaceLoading(true);
-    setFaceMessage('Yüz modelleri yükleniyor...');
-    try {
-      const ensureFaceApiLoaded = async () => {
-        if (window.faceapi) return window.faceapi;
-        await new Promise((resolve, reject) => {
-          const existing = document.querySelector('script[data-faceapi="1"]');
-          if (existing) {
-            existing.addEventListener('load', resolve, { once: true });
-            existing.addEventListener('error', reject, { once: true });
-            return;
-          }
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
-          script.async = true;
-          script.dataset.faceapi = '1';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.body.appendChild(script);
-        });
-        return window.faceapi;
-      };
-
-      const faceapi = await ensureFaceApiLoaded();
-      const modelBase = 'https://justadudewhohacks.github.io/face-api.js/models';
-      await faceapi.nets.tinyFaceDetector.loadFromUri(modelBase);
-      await faceapi.nets.faceLandmark68Net.loadFromUri(modelBase);
-      await faceapi.nets.faceRecognitionNet.loadFromUri(modelBase);
-      setFaceEnabled(true);
-      setFaceMessage('Yüz doğrulama hazır.');
-    } catch (err) {
-      setFaceMessage('Yüz modeli yüklenemedi. İnternet bağlantısını kontrol edin.');
-    } finally {
-      setFaceLoading(false);
-    }
-  };
-
-  // Camera management
-  const refreshCameras = useCallback(async () => {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoInputs = devices.filter(d => d.kind === 'videoinput');
-      setCameras(videoInputs);
-      const bestId = pickPreferredCameraId(videoInputs, selectedCameraId);
-      if (bestId) setSelectedCameraId(bestId);
-    } catch {
-      setFaceMessage('Kamera listesi alınamadı.');
-    }
-  }, [selectedCameraId]);
-
-  useEffect(() => {
-    const onDeviceChange = async () => {
-      await refreshCameras();
-      setFaceMessage('Yeni kamera algılandı. Gerekirse listeden telefonu seçin.');
-    };
-
-    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
-      navigator.mediaDevices.addEventListener('devicechange', onDeviceChange);
-    }
-
-    return () => {
-      if (navigator.mediaDevices && navigator.mediaDevices.removeEventListener) {
-        navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange);
-      }
-    };
-  }, [refreshCameras]);
-
-  const requestCameraPermissionAndRefresh = async () => {
-    try {
-      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      tempStream.getTracks().forEach(track => track.stop());
-      await refreshCameras();
-      setFaceMessage('Kamera izni verildi. Kameranız listede görünecektir.');
-      return true;
-    } catch (err) {
-      setFaceMessage('Kamera izni reddedildi. Tarayıcı izinlerini açın.');
-      return false;
-    }
-  };
-
-  const startFaceCamera = async () => {
-    setFaceMessage('');
-    try {
-      const granted = await requestCameraPermissionAndRefresh();
-      if (!granted) return;
-
-      stopFaceCamera();
-      const constraints = {
-        audio: false,
-        video: selectedCameraId
-          ? { deviceId: { exact: selectedCameraId }, width: { ideal: 640 }, height: { ideal: 480 } }
-          : { width: { ideal: 640 }, height: { ideal: 480 } }
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      await refreshCameras();
-    } catch (err) {
-      if (err && err.name === 'NotFoundError') {
-        setFaceMessage('Kamera bulunamadı.');
-      } else if (err && err.name === 'NotAllowedError') {
-        setFaceMessage('Kamera izni verilmedi. Lütfen izin verin.');
-      } else {
-        setFaceMessage('Kamera açılamadı.');
-      }
-    }
-  };
-
-  const captureFaceDescriptor = async () => {
-    if (!videoRef.current) {
-      throw new Error('Kamera hazır değil');
-    }
-    if (!window.faceapi) {
-      throw new Error('Yüz modeli hazır değil. Önce kamerayı başlatın.');
-    }
-    const faceapi = window.faceapi;
-    const detection = await faceapi
-      .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (!detection) {
-      throw new Error('Yüz algılanamadı. Kameraya daha net bakın.');
-    }
-
-    return Array.from(detection.descriptor);
-  };
-
-  // Login handlers
   const handleFaceLogin = async () => {
     setError('');
     if (!form.name) {
@@ -241,16 +81,12 @@ function Login({ onLoginComplete }) {
     try {
       const descriptor = await captureFaceDescriptor();
       const res = await axios.post('/api/face/login', { name: form.name, descriptor });
-      setSessionId(res.data.sessionId);
-      setUser(res.data.user);
       setForm(f => ({ ...f, password: '' }));
       if (res.data.walletFundingWarning) {
         setInfo(`⚠️ ${res.data.walletFundingWarning}`);
       }
       setFaceMessage(`Hızlı giriş başarılı (distance: ${res.data.faceDistance})`);
       if (res.data.user?.role === 'admin') {
-        localStorage.setItem('adminSession', res.data.sessionId);
-        localStorage.setItem('adminName', res.data.user.name);
         if (onLoginComplete) onLoginComplete(res.data.user, res.data.sessionId);
         return;
       }
@@ -265,45 +101,55 @@ function Login({ onLoginComplete }) {
   const handleLogin = async () => {
     setError('');
     setInfo('');
+    if (!form.name || !form.password) {
+      setError('Kullanıcı adı ve şifre giriniz');
+      return;
+    }
+
+    setLoginLoading(true);
     try {
       const res = await axios.post('/api/login', { name: form.name, password: form.password });
-      setSessionId(res.data.sessionId);
-      setUser(res.data.user);
       setForm(f => ({ ...f, password: '' }));
       if (res.data.walletFundingWarning) {
         setInfo(`⚠️ ${res.data.walletFundingWarning}`);
       }
       if (res.data.user?.role === 'admin') {
-        localStorage.setItem('adminSession', res.data.sessionId);
-        localStorage.setItem('adminName', res.data.user.name);
         if (onLoginComplete) onLoginComplete(res.data.user, res.data.sessionId);
         return;
       }
       if (onLoginComplete) onLoginComplete(res.data.user, res.data.sessionId);
     } catch (err) {
       setError(err.response?.data?.message || 'Giriş başarısız');
+    } finally {
+      setLoginLoading(false);
     }
   };
 
-  // Registration handlers
   const handleSendRegisterOtp = async () => {
     setError('');
-    if (!form.email) {
-      setError('OTP için e-posta adresi giriniz');
+    setInfo('');
+    if (!form.name || !form.firstName || !form.lastName || !form.email || !form.password) {
+      setError('Kayıt için tüm alanları doldurunuz');
       return;
     }
+
+    setOtpLoading(true);
     try {
       const res = await axios.post('/api/register/send-otp', { email: form.email });
       setRegisterStep(1);
       setInfo(res.data.message);
       if (res.data.devOtp) setRegisterOtp(res.data.devOtp);
     } catch (err) {
-      setError(err.response?.data?.message || 'OTP gönderilemedi');
+      setError(err.response?.data?.message || err.response?.data?.error || 'OTP gönderilemedi');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
   const handleRegister = async () => {
     setError('');
+    setInfo('');
+    setRegisterLoading(true);
     try {
       await axios.post('/api/register', {
         name: form.name,
@@ -320,9 +166,11 @@ function Login({ onLoginComplete }) {
       setRegisterFaceEnabled(false);
       setRegisterFaceDescriptor(null);
       setForm(f => ({ ...f, name: '', password: '', email: '', firstName: '', lastName: '' }));
-      setInfo('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
+      setInfo('Kayıt başarılı. Şimdi giriş yapabilirsiniz.');
     } catch (err) {
       setError(err.response?.data?.message || 'Kayıt başarısız');
+    } finally {
+      setRegisterLoading(false);
     }
   };
 
@@ -343,45 +191,53 @@ function Login({ onLoginComplete }) {
     }
   };
 
-  // Forgot Password handlers
   const handleForgotPasswordRequest = async () => {
     setError('');
+    setInfo('');
     if (!form.resetEmail) {
       setError('Hesabınızla ilişkili e-posta adresini giriniz');
       return;
     }
+
+    setForgotLoading(true);
     try {
       const res = await axios.post('/api/forgot-password', { email: form.resetEmail });
       setForgotPasswordStep(1);
       setInfo(res.data.message || `${form.resetEmail} adresine kod gönderildi`);
     } catch (err) {
       setError(err.response?.data?.message || 'E-posta gönderilemedi');
+    } finally {
+      setForgotLoading(false);
     }
   };
 
   const handleResetPasswordOtpVerify = async () => {
     setError('');
+    setInfo('');
     if (!forgotPasswordOtp) {
       setError('Doğrulama kodunu giriniz');
       return;
     }
+    if (!form.resetPassword || form.resetPassword !== form.resetPasswordConfirm) {
+      setError('Yeni şifre alanları eşleşmelidir');
+      return;
+    }
+
     try {
       setResetPasswordConfirmLoading(true);
-      const res = await axios.post('/api/reset-password', {
+      await axios.post('/api/reset-password', {
         email: form.resetEmail,
         otp: forgotPasswordOtp,
         newPassword: form.resetPassword
       });
-      setInfo('Şifre başarıyla sıfırlandı! Şimdi giriş yapabilirsiniz.');
-      // Reset forgot password state
+      setInfo('Şifre başarıyla sıfırlandı. Şimdi giriş yapabilirsiniz.');
       setTimeout(() => {
         setCurrentPage('login');
         setForgotPasswordStep(0);
         setForgotPasswordOtp('');
         setForm(f => ({ ...f, resetEmail: '', resetPassword: '', resetPasswordConfirm: '' }));
         setError('');
-        setInfo('');
-      }, 2000);
+      }, 1800);
     } catch (err) {
       setError(err.response?.data?.message || 'Şifre sıfırlama başarısız');
     } finally {
@@ -389,7 +245,6 @@ function Login({ onLoginComplete }) {
     }
   };
 
-  // Tab change handler for registration
   const handleTabChange = (e, newValue) => {
     const isRegister = newValue === 1;
     setRegisterMode(isRegister);
@@ -401,448 +256,127 @@ function Login({ onLoginComplete }) {
     setInfo('');
   };
 
-  // Logout handler
-  const handleLogout = async () => {
-    try {
-      await axios.post('/api/logout', {}, { headers: { 'x-session-id': sessionId } });
-    } catch (err) {
-      console.error('Logout error:', err);
-    }
-    localStorage.removeItem('adminSession');
-    localStorage.removeItem('adminName');
-    setUser(null);
-    setSessionId('');
-    setForm(f => ({ ...f, password: '', resetEmail: '', resetPassword: '', resetPasswordConfirm: '' }));
-    setError('');
-    setInfo('');
-  };
+  const passwordEndAdornment = (visible, toggle, label) => ({
+    startAdornment: (
+      <InputAdornment position="start">
+        <PasswordOutlinedIcon sx={{ color: '#64748b' }} />
+      </InputAdornment>
+    ),
+    endAdornment: (
+      <InputAdornment position="end">
+        <Tooltip title={label}>
+          <IconButton edge="end" onClick={toggle} aria-label={label}>
+            {visible ? <VisibilityOffOutlinedIcon /> : <VisibilityOutlinedIcon />}
+          </IconButton>
+        </Tooltip>
+      </InputAdornment>
+    )
+  });
 
-  // Render forgot password page
-  const RenderForgotPasswordPage = () => (
-    <Box>
-      <Typography variant="h6" gutterBottom sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-        <LockResetIcon sx={{ color: 'primary.main' }} />
-        Şifrenizi Sıfırlayın
-      </Typography>
-
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {info && <Alert severity="success" sx={{ mb: 2 }}>{info}</Alert>}
-
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {forgotPasswordStep === 0 && (
-          <>
-            <TextField
-              label="E-posta Adresi"
-              type="email"
-              placeholder="ad.soyad@akdeniz.edu.tr"
-              variant="outlined"
-              value={form.resetEmail}
-              onChange={e => setForm(f => ({ ...f, resetEmail: e.target.value }))}
-              onKeyDown={e => e.key === 'Enter' && handleForgotPasswordRequest()}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <EmailIcon sx={{ color: 'action.active', mr: 1 }} />
-                  </InputAdornment>
-                )
-              }}
-              fullWidth
-            />
-            <Typography variant="body2" color="text.secondary">
-              Hesabınızla ilişkili e-posta adresini girin. Size sıfırlama kodu göndereceğiz.
-            </Typography>
-          </>
-        )}
-
-        {forgotPasswordStep === 1 && (
-          <>
-            <TextField
-              label="Doğrulama Kodu"
-              variant="outlined"
-              value={forgotPasswordOtp}
-              onChange={e => setForgotPasswordOtp(e.target.value.replace(/\D/g, ''))}
-              fullWidth
-              inputProps={{ maxLength: 6, style: { fontSize: 24, letterSpacing: 10, textAlign: 'center', fontWeight: 'bold' } }}
-              autoFocus
-              sx={{ mb: 1 }}
-            />
-            <Typography variant="caption" color="text.secondary">
-              📧 {form.resetEmail} adresine 6 haneli kod gönderildi
-            </Typography>
-
-            <TextField
-              label="Yeni Şifre"
-              type="password"
-              variant="outlined"
-              value={form.resetPassword}
-              onChange={e => setForm(f => ({ ...f, resetPassword: e.target.value }))}
-              fullWidth
-              sx={{ mt: 2 }}
-            />
-
-            <TextField
-              label="Şifre Tekrar"
-              type="password"
-              variant="outlined"
-              value={form.resetPasswordConfirm}
-              onChange={e => setForm(f => ({ ...f, resetPasswordConfirm: e.target.value }))}
-              onKeyDown={e => e.key === 'Enter' && form.resetPassword === form.resetPasswordConfirm && handleResetPasswordOtpVerify()}
-              fullWidth
-            />
-
-            {form.resetPassword !== form.resetPasswordConfirm && form.resetPasswordConfirm && (
-              <Alert severity="warning">Şifreler eşleşmiyor</Alert>
-            )}
-          </>
-        )}
-
-        <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-          <Button
-            variant="outlined"
-            size="large"
-            startIcon={<ArrowBackIcon />}
-            onClick={() => {
-              setCurrentPage('login');
-              setForgotPasswordStep(0);
-              setForgotPasswordOtp('');
-              setForm(f => ({ ...f, resetEmail: '', resetPassword: '', resetPasswordConfirm: '' }));
-              setError('');
-              setInfo('');
-            }}
-            fullWidth
-          >
-            Geri
-          </Button>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={forgotPasswordStep === 0 ? handleForgotPasswordRequest : handleResetPasswordOtpVerify}
-            disabled={forgotPasswordStep === 0 ? !form.resetEmail : (resetPasswordConfirmLoading || form.resetPassword !== form.resetPasswordConfirm || !form.resetPassword)}
-            fullWidth
-            sx={{ py: 1.5, fontWeight: 'bold' }}
-          >
-            {resetPasswordConfirmLoading ? <CircularProgress size={24} color="inherit" /> : (forgotPasswordStep === 0 ? 'Kodu Gönder →' : 'Şifre Sıfırla ✓')}
-          </Button>
-        </Box>
-      </Box>
-    </Box>
-  );
-
-  // Main render
   return (
     <Box sx={{
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
-      p: 2
+      backgroundColor: '#dbe6eb',
+      backgroundImage: `
+        linear-gradient(rgba(16, 24, 32, 0.075) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(16, 24, 32, 0.075) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.08))
+      `,
+      backgroundSize: '42px 42px, 42px 42px, cover',
+      p: { xs: 2, md: 4 }
     }}>
-      <Paper elevation={24} sx={{ width: '100%', maxWidth: 480, borderRadius: 4, overflow: 'hidden' }}>
-        <Box sx={{ pt: 4, pb: 2, px: 4, textAlign: 'center', bgcolor: 'background.paper' }}>
-          <HowToVoteIcon sx={{ fontSize: 50, color: 'primary.main', mb: 1 }} />
-          <Typography variant="h5" fontWeight="900" letterSpacing={-0.5} gutterBottom>
-            SSI Blockchain Oylama
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            ZK-Email • EIP-712 • Anonim Kimlik
-          </Typography>
-        </Box>
+      <Paper
+        elevation={0}
+        sx={{
+          width: '100%',
+          maxWidth: 1120,
+          minHeight: { md: 720 },
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '0.9fr 1fr' },
+          overflow: 'hidden',
+          borderRadius: 2,
+          border: '1px solid rgba(15, 23, 42, 0.10)',
+          boxShadow: '0 28px 80px rgba(17, 24, 39, 0.18)'
+        }}
+      >
+        <AuthHeroPanel />
 
-        {/* Only show tabs in login/register modes */}
-        {currentPage === 'login' && (
-          <Tabs
-            value={registerMode ? 1 : 0}
-            onChange={handleTabChange}
-            variant="fullWidth"
-            indicatorColor="primary"
-            textColor="primary"
-            sx={{ borderBottom: 1, borderColor: 'divider' }}
-          >
-            <Tab label="GİRİŞ YAP" sx={{ fontWeight: 'bold' }} />
-            <Tab label="KAYIT OL" sx={{ fontWeight: 'bold' }} />
-          </Tabs>
-        )}
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: { xs: 2.5, sm: 4, md: 5 },
+          backgroundColor: '#ffffff'
+        }}>
+          <Box sx={{ width: '100%', maxWidth: 500 }}>
+            <AuthHeroPanel mobile />
 
-        <Box sx={{ p: 4 }}>
-          {/* Forgot Password Page */}
-            {currentPage === 'forgotPassword' && RenderForgotPasswordPage()}
+            {currentPage === 'login' && (
+              <>
+                <Typography variant="h4" sx={{ fontWeight: 900, color: '#111827', letterSpacing: 0, mb: 1 }}>
+                  {registerMode ? 'Yeni Hesap' : 'Hoş Geldiniz'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
+                  {registerMode ? 'Kurumsal e-posta doğrulaması ile hesabınızı oluşturun.' : 'Kullanıcı bilgilerinizle güvenli oturuma geçin.'}
+                </Typography>
 
-          {/* Login/Register Page */}
-          {(currentPage === 'login' || currentPage === 'resetPassword') && (
-            <>
-              {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-              {info && <Alert severity="success" sx={{ mb: 3 }}>{info}</Alert>}
+                <Tabs
+                  value={registerMode ? 1 : 0}
+                  onChange={handleTabChange}
+                  variant="fullWidth"
+                  sx={{
+                    mb: 3,
+                    minHeight: 48,
+                    border: '1px solid rgba(15, 23, 42, 0.10)',
+                    borderRadius: 2,
+                    p: 0.5,
+                    '& .MuiTabs-indicator': {
+                      display: 'none'
+                    },
+                    '& .MuiTab-root': {
+                      minHeight: 40,
+                      borderRadius: 1.5,
+                      textTransform: 'none',
+                      fontWeight: 800,
+                      color: '#64748b'
+                    },
+                    '& .Mui-selected': {
+                      color: '#064e3b',
+                      backgroundColor: '#d5f8e9',
+                      boxShadow: 'inset 0 0 0 1px rgba(16, 185, 129, 0.22)'
+                    }
+                  }}
+                >
+                  <Tab icon={<LoginOutlinedIcon fontSize="small" />} iconPosition="start" label="Giriş" />
+                  <Tab icon={<HowToRegOutlinedIcon fontSize="small" />} iconPosition="start" label="Kayıt" />
+                </Tabs>
+              </>
+            )}
 
-              <Box component="form" noValidate autoComplete="off" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {/* LOGIN TAB */}
-                {!registerMode && (
-                  <>
-                    <TextField
-                      label="Kullanıcı Adı"
-                      variant="outlined"
-                      size="medium"
-                      value={form.name}
-                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                      fullWidth
-                    />
+            {currentPage === 'forgotPassword' && (
+              <ForgotPasswordPage error={error} info={info} forgotPasswordStep={forgotPasswordStep} forgotPasswordOtp={forgotPasswordOtp} setForgotPasswordOtp={setForgotPasswordOtp} form={form} setForm={setForm} showResetPassword={showResetPassword} setShowResetPassword={setShowResetPassword} forgotLoading={forgotLoading} resetPasswordConfirmLoading={resetPasswordConfirmLoading} handleForgotPasswordRequest={handleForgotPasswordRequest} handleResetPasswordOtpVerify={handleResetPasswordOtpVerify} setCurrentPage={setCurrentPage} setForgotPasswordStep={setForgotPasswordStep} setError={setError} setInfo={setInfo} passwordEndAdornment={passwordEndAdornment} />
+            )}
 
-                    <TextField
-                      label="Şifre"
-                      type="password"
-                      variant="outlined"
-                      value={form.password}
-                      onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                      fullWidth
-                    />
+            {(currentPage === 'login' || currentPage === 'resetPassword') && (
+              <>
+                {error && <Alert severity="error" sx={{ mb: 2.5, borderRadius: 1.5 }}>{error}</Alert>}
+                {info && <Alert severity="success" sx={{ mb: 2.5, borderRadius: 1.5 }}>{info}</Alert>}
 
-                    <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                      <Button
-                        variant="contained"
-                        size="large"
-                        fullWidth
-                        sx={{ py: 1.5, fontWeight: 'bold' }}
-                        onClick={handleLogin}
-                      >
-                        Giriş Yap
-                      </Button>
-                    </Box>
+                <Box component="form" noValidate autoComplete="off" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {!registerMode && (
+                    <LoginSection form={form} setForm={setForm} showPassword={showPassword} setShowPassword={setShowPassword} passwordEndAdornment={passwordEndAdornment} handleLogin={handleLogin} loginLoading={loginLoading} setCurrentPage={setCurrentPage} setError={setError} setInfo={setInfo} faceEnabled={faceEnabled} faceBusy={faceBusy} handleFaceLogin={handleFaceLogin} faceLoading={faceLoading} faceMessage={faceMessage} cameras={cameras} selectedCameraId={selectedCameraId} setSelectedCameraId={setSelectedCameraId} requestCameraPermissionAndRefresh={requestCameraPermissionAndRefresh} loadFaceModels={loadFaceModels} refreshCameras={refreshCameras} startFaceCamera={startFaceCamera} videoRef={videoRef} />
+                  )}
 
-                    {/* Forgot Password Link */}
-                    <Box sx={{ textAlign: 'center', mt: 2 }}>
-                      <Button
-                        variant="text"
-                        size="small"
-                        onClick={() => {
-                          setCurrentPage('forgotPassword');
-                          setError('');
-                          setInfo('');
-                        }}
-                      >
-                        Şifremi Unuttum
-                      </Button>
-                    </Box>
-
-                    {/* Quick Face Login */}
-                    <Box sx={{ mt: 4 }}>
-                      <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, color: 'text.secondary', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                        <FaceIcon fontSize="small" /> Hızlı Giriş (Face Control)
-                      </Typography>
-
-                      <Card variant="outlined" sx={{ bgcolor: 'grey.50', borderStyle: 'dashed' }}>
-                        <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2 } }}>
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            Kameraya izin verdikten sonra yüz verinizi doğrulayarak şifresiz giriş yapabilirsiniz. Kullanıcı adınızı yukarıda belirtmeyi unutmayın.
-                          </Typography>
-
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button size="small" variant="outlined" color="success" fullWidth onClick={requestCameraPermissionAndRefresh} disabled={faceBusy}>
-                              İzin İste
-                            </Button>
-                            <Button size="small" variant="contained" color="primary" fullWidth onClick={async () => {
-                              await loadFaceModels();
-                              await refreshCameras();
-                              await startFaceCamera();
-                            }} disabled={faceLoading || faceBusy}>
-                              {faceLoading ? <CircularProgress size={20} color="inherit" /> : 'Kamerayı Başlat'}
-                            </Button>
-                          </Box>
-
-                          {cameras.length > 0 && (
-                            <Select size="small" value={selectedCameraId} onChange={e => setSelectedCameraId(e.target.value)} fullWidth>
-                              {cameras.map((cam, i) => (
-                                <MenuItem key={cam.deviceId || i} value={cam.deviceId}>{cam.label || `Kamera ${i + 1}`}</MenuItem>
-                              ))}
-                            </Select>
-                          )}
-
-                          <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: 160, borderRadius: 8, background: '#000', objectFit: 'cover' }} />
-
-                          <Button variant="contained" color="success" onClick={handleFaceLogin} disabled={!faceEnabled || faceBusy}>
-                            Yüz ile Hızlı Giriş
-                          </Button>
-
-                          {!!faceMessage && (
-                            <Typography variant="caption" color="text.secondary" textAlign="center">
-                              {faceMessage}
-                            </Typography>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </Box>
-                  </>
-                )}
-
-                {/* REGISTRATION TAB */}
-                {registerMode && (
-                  <>
-                    <TextField
-                      label="Kullanıcı Adı"
-                      variant="outlined"
-                      size="medium"
-                      disabled={registerStep === 1}
-                      value={form.name}
-                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && (registerStep === 0 ? handleSendRegisterOtp() : handleRegister())}
-                      fullWidth
-                    />
-
-                    {registerStep === 0 && (
-                      <>
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                          <TextField
-                            label="Ad *"
-                            variant="outlined"
-                            value={form.firstName}
-                            onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))}
-                            fullWidth
-                          />
-                          <TextField
-                            label="Soyad *"
-                            variant="outlined"
-                            value={form.lastName}
-                            onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
-                            fullWidth
-                          />
-                        </Box>
-
-                        <TextField
-                          label="Kurumsal E-posta (ZK-Email için)"
-                          type="email"
-                          placeholder="ad.soyad@akdeniz.edu.tr"
-                          variant="outlined"
-                          value={form.email}
-                          onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                          onKeyDown={e => e.key === 'Enter' && handleSendRegisterOtp()}
-                          fullWidth
-                        />
-
-                        <TextField
-                          label="Şifre"
-                          type="password"
-                          variant="outlined"
-                          value={form.password}
-                          onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                          onKeyDown={e => e.key === 'Enter' && handleSendRegisterOtp()}
-                          fullWidth
-                        />
-                      </>
-                    )}
-
-                    {registerStep === 1 && (
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="subtitle2" color="primary" gutterBottom>
-                          E-posta: {form.email}
-                        </Typography>
-                        <TextField
-                          label="Doğrulama Kodu (OTP)"
-                          variant="outlined"
-                          value={registerOtp}
-                          onChange={e => setRegisterOtp(e.target.value.replace(/\D/g, ''))}
-                          onKeyDown={e => e.key === 'Enter' && handleRegister()}
-                          fullWidth
-                          inputProps={{ maxLength: 6, style: { fontSize: 24, letterSpacing: 10, textAlign: 'center', fontWeight: 'bold' } }}
-                          autoFocus
-                          sx={{ mb: 1, mt: 1 }}
-                        />
-                        <Typography variant="caption" color="text.secondary">
-                          📧 {form.email} adresine 6 haneli kod gönderildi
-                        </Typography>
-
-                        <Card variant="outlined" sx={{ p: 2, mt: 3, textAlign: 'left', bgcolor: 'grey.50' }}>
-                          <FormControlLabel
-                            control={
-                              <Checkbox
-                                checked={registerFaceEnabled}
-                                onChange={e => {
-                                  const enabled = e.target.checked;
-                                  setRegisterFaceEnabled(enabled);
-                                  if (!enabled) setRegisterFaceDescriptor(null);
-                                }}
-                              />
-                            }
-                            label={<Typography variant="body2" fontWeight="medium">Kayıtta yüz profilimi de ekle (opsiyonel)</Typography>}
-                          />
-
-                          {registerFaceEnabled && (
-                            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                              <Typography variant="caption" color="text.secondary">
-                                Sadece cihazınızın kamerası (PC/Telefon) kullanılarak doğrulama verisi oluşturulur.
-                              </Typography>
-
-                              <Box sx={{ display: 'flex', gap: 1 }}>
-                                <Button size="small" variant="outlined" color="success" onClick={requestCameraPermissionAndRefresh} disabled={faceBusy} fullWidth>
-                                  İzin İste / Yenile
-                                </Button>
-                                <Button size="small" variant="contained" color="primary" onClick={async () => {
-                                  await loadFaceModels();
-                                  await refreshCameras();
-                                  await startFaceCamera();
-                                }} disabled={faceLoading || faceBusy} fullWidth>
-                                  {faceLoading ? <CircularProgress size={20} color="inherit" /> : 'Kamerayı Başlat'}
-                                </Button>
-                              </Box>
-
-                              {cameras.length > 0 && (
-                                <Select size="small" value={selectedCameraId} onChange={e => setSelectedCameraId(e.target.value)} fullWidth>
-                                  {cameras.map((cam, i) => (
-                                    <MenuItem key={cam.deviceId || i} value={cam.deviceId}>{cam.label || `Kamera ${i + 1}`}</MenuItem>
-                                  ))}
-                                </Select>
-                              )}
-
-                              <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: 160, borderRadius: 8, background: '#000', objectFit: 'cover' }} />
-
-                              <Button variant="contained" color="warning" onClick={handleCaptureRegisterFace} disabled={faceBusy} startIcon={<CameraAltIcon />}>
-                                Yüz Verisini Yakala
-                              </Button>
-
-                              {registerFaceDescriptor && (
-                                <Typography variant="caption" color="success.main" fontWeight="bold">
-                                  ✅ Yüz verisi hazır. Kayıtta otomatik saklanacak.
-                                </Typography>
-                              )}
-                            </Box>
-                          )}
-                        </Card>
-                      </Box>
-                    )}
-
-                    <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                      {registerStep === 1 && (
-                        <Button
-                          variant="outlined"
-                          size="large"
-                          onClick={() => { setRegisterStep(0); setRegisterOtp(''); setRegisterFaceEnabled(false); setRegisterFaceDescriptor(null); setError(''); setInfo(''); }}
-                          startIcon={<ArrowBackIcon />}
-                        >
-                          Geri
-                        </Button>
-                      )}
-                      <Button
-                        variant="contained"
-                        size="large"
-                        fullWidth
-                        sx={{ py: 1.5, fontWeight: 'bold' }}
-                        onClick={registerStep === 0 ? handleSendRegisterOtp : handleRegister}
-                        disabled={registerStep === 0 && (!form.name || !form.firstName || !form.lastName || !form.email || !form.password)}
-                      >
-                        {registerStep === 0 ? 'Kod Gönder →' : 'Hesabı Oluştur ✓'}
-                      </Button>
-                    </Box>
-                  </>
-                )}
-              </Box>
-
-              {registerMode && (
-                <Alert severity="info" sx={{ mt: 4, borderRadius: 2 }}>
-                  <strong>ZK-Email oylama özelliği</strong> için kurumsal e-posta adresinizi girin. Oy kullanma ekranında OTP kodu ile kimliğinizi <strong>anonim</strong> olarak doğrulayacaksınız.
-                </Alert>
-              )}
-            </>
-          )}
+                  {registerMode && (
+                    <RegisterSection form={form} setForm={setForm} registerStep={registerStep} registerOtp={registerOtp} setRegisterOtp={setRegisterOtp} registerFaceEnabled={registerFaceEnabled} setRegisterFaceEnabled={setRegisterFaceEnabled} registerFaceDescriptor={registerFaceDescriptor} setRegisterFaceDescriptor={setRegisterFaceDescriptor} faceBusy={faceBusy} showPassword={showPassword} setShowPassword={setShowPassword} passwordEndAdornment={passwordEndAdornment} handleSendRegisterOtp={handleSendRegisterOtp} handleRegister={handleRegister} handleCaptureRegisterFace={handleCaptureRegisterFace} otpLoading={otpLoading} registerLoading={registerLoading} setRegisterStep={setRegisterStep} setError={setError} setInfo={setInfo} faceLoading={faceLoading} faceMessage={faceMessage} cameras={cameras} selectedCameraId={selectedCameraId} setSelectedCameraId={setSelectedCameraId} requestCameraPermissionAndRefresh={requestCameraPermissionAndRefresh} loadFaceModels={loadFaceModels} refreshCameras={refreshCameras} startFaceCamera={startFaceCamera} videoRef={videoRef} />
+                  )}
+                </Box>
+              </>
+            )}
+          </Box>
         </Box>
       </Paper>
     </Box>

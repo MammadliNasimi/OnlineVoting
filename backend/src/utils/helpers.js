@@ -13,7 +13,9 @@ async function getUserFromSession(req) {
     }
     if (!token) return null;
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_jwt_key_2026');
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) return null;
+      const decoded = jwt.verify(token, jwtSecret);
       const session = await db.getSession(decoded.sessionId);
       if (!session) return null;
       return { id: session.user_id, name: session.name, role: session.role, sessionId: decoded.sessionId };
@@ -27,6 +29,17 @@ function extractStudentIdFromEmail(email) {
   return digitsOnly || null;
 }
 
+function isAkdenizStudentEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const domain = (email.split('@')[1] || '').trim().toLowerCase();
+  return domain === 'ogr.akdeniz.edu.tr';
+}
+
+function isValidAkdenizStudentIdFormat(studentId) {
+  if (!studentId || typeof studentId !== 'string') return false;
+  return /^\d{4}0808\d{3}$/.test(studentId.trim());
+}
+
 function isValidStudentId(studentId) {
   if (!studentId || typeof studentId !== 'string') return false;
   return studentId.trim().length > 0;
@@ -35,9 +48,13 @@ function isValidStudentId(studentId) {
 function validateUserIdentityMapping(userRecord) {
   if (!userRecord || userRecord.role === 'admin') return { ok: true };
   if (!userRecord.email) return { ok: false, message: 'Missing email' };
+
+  // Enforced mapping only for official student mail accounts.
+  if (!isAkdenizStudentEmail(userRecord.email)) return { ok: true };
+
   if (!userRecord.student_id) return { ok: false, message: 'Missing student ID' };
   const extractedStudentId = extractStudentIdFromEmail(userRecord.email);
-  if (!isValidStudentId(extractedStudentId)) return { ok: false, message: 'Invalid ID' };
+  if (!isValidAkdenizStudentIdFormat(extractedStudentId)) return { ok: false, message: 'Invalid ID' };
   if (userRecord.student_id !== extractedStudentId) return { ok: false, message: 'Mapping broken' };
   return { ok: true };
 }
@@ -88,4 +105,4 @@ function createMailTransporter() {
   return null;
 }
 
-module.exports = { getUserFromSession, extractStudentIdFromEmail, isValidStudentId, validateUserIdentityMapping, isValidFaceDescriptor, euclideanDistance, hashEmail, createSessionForUser, createMailTransporter };
+module.exports = { getUserFromSession, extractStudentIdFromEmail, isAkdenizStudentEmail, isValidAkdenizStudentIdFormat, isValidStudentId, validateUserIdentityMapping, isValidFaceDescriptor, euclideanDistance, hashEmail, createSessionForUser, createMailTransporter };

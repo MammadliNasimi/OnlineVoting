@@ -73,12 +73,12 @@ cd OnlineVoting
 npm install
 
 # İstemci (Frontend) bağımlılıkları
-cd client
+cd frontend
 npm install
 cd ..
 
 # Blockchain (Smart Contract) bağımlılıkları
-cd smart-contracts
+cd blockchain
 npm install
 cd ..
 ```
@@ -94,6 +94,10 @@ ADMIN_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2
 BLOCKCHAIN_RPC_URL=http://127.0.0.1:8545
 CHAIN_ID=31337
 PORT=5000
+JWT_SECRET=your_long_random_secret
+SESSION_SECRET=your_long_random_secret
+CORS_ORIGINS=http://localhost:3000,https://your-frontend-host.example
+FRONTEND_URL=https://your-frontend-host.example
 
 # Akıllı sözleşmeler derlenip dağıtıldıktan sonra buraya o adresi ekleyin
 VOTING_CONTRACT_ADDRESS="0x..."
@@ -105,7 +109,7 @@ Uygulamanın farklı katmanlarını başlatmak için 3 ayrı terminal penceresi 
 
 **Terminal 1 (Blockchain Node Çalıştırma):**
 ```bash
-cd smart-contracts
+cd blockchain
 npx hardhat node
 ```
 
@@ -113,7 +117,7 @@ npx hardhat node
 *(Gerekli adres Deploy script'inden alındıktan sonra mutlaka .env dosyasındaki VOTING_CONTRACT_ADDRESS güncellenmelidir).*
 
 ```bash
-cd smart-contracts
+cd blockchain
 npx hardhat run scripts/deploy-ssi.js --network localhost
 cd ..
 node server.js
@@ -121,10 +125,28 @@ node server.js
 
 **Terminal 3 (Frontend İstemcisi):**
 ```bash
-cd client
+cd frontend
 npm start
 ```
 *Frontend adresi:* `http://localhost:3000`
+
+## 🌍 Free-tier Production Deploy
+
+Uygulamayı ücretsiz katmanlarla yayınlamak için backend ve frontend'i ayrı hostlamak en basit yoldur.
+
+Backend için Render, Railway veya Fly.io; frontend için Vercel veya Netlify kullanabilirsiniz. Frontend build sırasında `REACT_APP_API_BASE_URL` ve gerekirse `REACT_APP_SOCKET_URL` değerlerini backend URL'inize göre ayarlayın. Backend tarafında `CORS_ORIGINS` ve `FRONTEND_URL` değerlerini frontend domain'inize göre güncelleyin.
+
+Gerekli production değişkenleri:
+
+```env
+NODE_ENV=production
+JWT_SECRET=...
+SESSION_SECRET=...
+CORS_ORIGINS=https://your-frontend-host.example
+FRONTEND_URL=https://your-frontend-host.example
+REACT_APP_API_BASE_URL=https://your-backend-host.example/api
+REACT_APP_SOCKET_URL=https://your-backend-host.example
+```
 
 ---
 

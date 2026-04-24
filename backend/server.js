@@ -25,9 +25,14 @@ const { errorHandler } = require('./src/middlewares/error.middleware');
 
 const app = express();
 const server = http.createServer(app);
+const frontendBuildPath = path.join(__dirname, '..', 'frontend', 'build');
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     credentials: true
   }
 });
@@ -54,7 +59,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'x-session-id']
@@ -64,7 +69,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Static files
-app.use(express.static(path.join(__dirname, 'client/build')));
+app.use(express.static(frontendBuildPath));
 
 // Database initialization state
 app.use((req, res, next) => {
@@ -103,7 +108,7 @@ app.get('/api/stats', async (req, res) => {
 
 // Serve frontend routing
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+  res.sendFile(path.join(frontendBuildPath, 'index.html'));
 });
 
 app.use(errorHandler);

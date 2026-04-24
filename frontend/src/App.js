@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import SimpleVoting from './components/SimpleVoting';
 import AdminDashboard from './components/AdminDashboard';
@@ -8,6 +8,7 @@ import { Box, CircularProgress } from '@mui/material';
 import './App.css';
 
 function App() {
+  const SESSION_STORAGE_KEY = 'ov_session_id';
   const [user, setUser] = useState(null);
   const [sessionId, setSessionId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -16,13 +17,21 @@ function App() {
 
   useEffect(() => {
     const checkSession = async () => {
+      const storedSessionId = sessionStorage.getItem(SESSION_STORAGE_KEY) || '';
       try {
-        const { data } = await axios.get('/api/me');
+        const requestConfig = storedSessionId
+          ? { headers: { 'x-session-id': storedSessionId }, withCredentials: true }
+          : { withCredentials: true };
+        const { data } = await axios.get('/api/me', requestConfig);
         setUser(data.user);
-        setSessionId(data.sessionId);
+        setSessionId(data.sessionId || storedSessionId);
+        if (data.sessionId || storedSessionId) {
+          sessionStorage.setItem(SESSION_STORAGE_KEY, data.sessionId || storedSessionId);
+        }
       } catch (err) {
         setUser(null);
         setSessionId('');
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
       } finally {
         setLoading(false);
       }
@@ -32,17 +41,28 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await axios.post('/api/logout');
+      const storedSessionId = sessionStorage.getItem(SESSION_STORAGE_KEY) || sessionId;
+      await axios.post(
+        '/api/logout',
+        {},
+        storedSessionId
+          ? { headers: { 'x-session-id': storedSessionId }, withCredentials: true }
+          : { withCredentials: true }
+      );
     } catch (e) {}
 
     setUser(null);
     setSessionId('');
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
     navigate('/login');
   };
 
   const handleLoginComplete = (loggedUser, loggedSessionId) => {
     setUser(loggedUser);
     setSessionId(loggedSessionId);
+    if (loggedSessionId) {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, loggedSessionId);
+    }
 
     if (loggedUser?.role === 'admin') {
       navigate('/admin');
@@ -67,7 +87,7 @@ function App() {
 
       <Route path="/vote" element={
         user && user.role !== 'admin' ? (
-          <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100', py: 4 }}>
+          <Box sx={{ minHeight: '100vh' }}>
             <SimpleVoting user={user} sessionId={sessionId} onLogout={handleLogout} />
           </Box>
         ) : (

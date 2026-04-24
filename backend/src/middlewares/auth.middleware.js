@@ -2,33 +2,46 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/database-sqlite');
 
 async function authenticateJWT(req, res, next) {
+  const plainSessionId = req.headers['x-session-id'];
+
+  // Prefer explicit session header so different tabs can keep independent sessions.
+  if (plainSessionId) {
+    try {
+      const session = await db.getSession(plainSessionId);
+      if (session) {
+        req.user = {
+          id: session.user_id,
+          name: session.name,
+          role: session.role,
+          sessionId: plainSessionId
+        };
+        return next();
+      }
+      req.user = null;
+      return next();
+    } catch (e) {
+      req.user = null;
+      return next();
+    }
+  }
+
   let token = req.cookies?.jwt_token || req.cookies?.token;
   if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
     token = req.headers.authorization.split(' ')[1];
   }
 
   if (!token) {
-    let plainSessionId = req.headers['x-session-id'];
-    if (plainSessionId) {
-        try {
-            const session = await db.getSession(plainSessionId);
-            if (session) {
-                req.user = {
-                  id: session.user_id,
-                  name: session.name,
-                  role: session.role,
-                  sessionId: plainSessionId
-                };
-                return next();
-            }
-        } catch (e) {}
-    }
     req.user = null;
     return next();
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_jwt_key_2026');
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      req.user = null;
+      return next();
+    }
+    const decoded = jwt.verify(token, jwtSecret);
     const session = await db.getSession(decoded.sessionId);
     if (!session) {
       req.user = null;

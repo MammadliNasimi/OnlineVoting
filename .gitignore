@@ -32,13 +32,17 @@ coverage/
 
 # Build outputs
 client/build/
+frontend/build/
 smart-contracts/artifacts/
 smart-contracts/cache/
 smart-contracts/typechain/
 smart-contracts/typechain-types/
+blockchain/artifacts/
+blockchain/cache/
 
 # Hardhat
 smart-contracts/cache/solidity-files-cache*.json
+blockchain/cache/solidity-files-cache*.json
 
 # OS generated files
 .DS_Store

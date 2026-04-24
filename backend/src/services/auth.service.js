@@ -2,10 +2,15 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const db = require('../config/database-sqlite');
 const state = require('../config/state');
-const { hashEmail, isValidFaceDescriptor, euclideanDistance, isValidStudentId, extractStudentIdFromEmail, validateUserIdentityMapping, createSessionForUser, createMailTransporter } = require('../utils/helpers');
+const { hashEmail, isValidFaceDescriptor, euclideanDistance, isValidStudentId, extractStudentIdFromEmail, isAkdenizStudentEmail, isValidAkdenizStudentIdFormat, validateUserIdentityMapping, createSessionForUser, createMailTransporter } = require('../utils/helpers');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET is required. Set JWT_SECRET in environment variables.');
+}
+
+const shouldLogSensitiveOtp = process.env.DEBUG_OTP === 'true' && process.env.NODE_ENV !== 'production';
 
 class AuthService {
   async sendOtp(email) {
@@ -59,7 +64,9 @@ class AuthService {
     }
 
     const devMode = !transporter || !emailSent;
-    console.log(`🔑 Register OTP for ${email}: ${otp}`);
+    if (shouldLogSensitiveOtp) {
+      console.log(`🔑 Register OTP for ${email}: ${otp}`);
+    }
 
     return {
       success: true,
@@ -77,9 +84,16 @@ class AuthService {
     const existingUser = await db.findUserByName(name);
     if (existingUser) throw new Error('Bu kullanıcı adı zaten kayıtlı');
 
-    const mappedStudentId = (studentId && String(studentId).trim()) || extractStudentIdFromEmail(email);
-    if (!isValidStudentId(mappedStudentId)) {
+    const normalizedEmail = (email || '').toString().trim().toLowerCase();
+    const requiresStudentFormat = isAkdenizStudentEmail(normalizedEmail);
+    const mappedStudentId = (studentId && String(studentId).trim()) || (requiresStudentFormat ? extractStudentIdFromEmail(normalizedEmail) : null);
+
+    if (requiresStudentFormat && !isValidAkdenizStudentIdFormat(mappedStudentId)) {
       throw new Error('Öğrenci numarası formatı geçersiz. Beklenen format: YYYY0808XXX (ör: 20190808081)');
+    }
+
+    if (!requiresStudentFormat && mappedStudentId && !isValidStudentId(mappedStudentId)) {
+      throw new Error('Öğrenci numarası geçersiz');
     }
 
     if (email) {
@@ -185,7 +199,9 @@ class AuthService {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
     db.db.prepare('INSERT INTO password_resets (email, otp_hash, expires_at) VALUES (?, ?, ?)').run(email, otpHash, expiresAt);
-    console.log(`PASSWORD RESET OTP FOR ${email}: ${otp}`);
+    if (shouldLogSensitiveOtp) {
+      console.log(`PASSWORD RESET OTP FOR ${email}: ${otp}`);
+    }
 
     const transporter = createMailTransporter();
     if (transporter) {

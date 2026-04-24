@@ -5,6 +5,14 @@ const { isDomainAllowed, parseContractError } = require('../utils/voteHelpers');
 const { ethers } = require('ethers');
 
 class VoteService {
+  isElectionWithinWindow(election) {
+    const now = Date.now();
+    const start = election?.start_date ? new Date(election.start_date).getTime() : NaN;
+    const end = election?.end_date ? new Date(election.end_date).getTime() : NaN;
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
+    return now >= start && now <= end;
+  }
+
   async addCandidate(user, name, electionId, description) {
     if (!user || user.role !== 'admin') throw new Error('Only admin can add candidates');
     if (!name) throw new Error('Aday ismi gerekli');
@@ -26,16 +34,29 @@ class VoteService {
     const userEmail = userDetails?.email;
     const userDomain = userEmail ? userEmail.split('@')[1]?.toLowerCase() : null;
     const allElections = db.getAllElections();
-    const activeElections = allElections.filter(e => e.is_active === 1);
+    const activeElections = allElections.filter(e => e.is_active === 1 && this.isElectionWithinWindow(e));
     return activeElections.filter(election => isDomainAllowed(user.role, userDomain, election));
   }
 
-  async getElectionCandidates(electionId) {
+  async getElectionCandidates(electionId, user) {
     if (!state.useDatabase) throw new Error('Database not available');
     if (isNaN(electionId)) throw new Error('Invalid election ID');
     const allElections = db.getAllElections();
     const election = allElections.find(e => e.id === electionId);
     if (!election) throw new Error('Election not found');
+
+    // Non-admin users should not see inactive / out-of-window / unauthorized elections.
+    if (!user || user.role !== 'admin') {
+      if (election.is_active !== 1 || !this.isElectionWithinWindow(election)) {
+        return [];
+      }
+      const userDetails = user ? await db.findUserByName(user.name) : null;
+      const userDomain = userDetails?.email ? userDetails.email.split('@')[1]?.toLowerCase() : null;
+      if (!isDomainAllowed(user?.role, userDomain, election)) {
+        return [];
+      }
+    }
+
     return election.candidates || [];
   }
 
@@ -57,6 +78,12 @@ class VoteService {
 
     if (!election) throw new Error('Seçim bulunamadı');
     if (!election.is_active) throw new Error('Bu seçim aktif değil');
+    if (!this.isElectionWithinWindow(election)) {
+      const now = Date.now();
+      const start = new Date(election.start_date).getTime();
+      if (Number.isFinite(start) && now < start) throw new Error('Seçim henüz başlamadı');
+      throw new Error('Bu seçim sona erdi');
+    }
 
     if (election.allowedDomains && election.allowedDomains.length > 0) {
       const userDomain = email.split('@')[1]?.toLowerCase();

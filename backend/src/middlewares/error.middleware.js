@@ -8,6 +8,7 @@ const catchAsync = (fn) => {
 };
 
 // Global Error Handler Middleware
+// eslint-disable-next-line no-unused-vars
 const errorHandler = (err, req, res, next) => {
   const statusCode = err.status || err.statusCode || 500;
   

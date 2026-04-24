@@ -1,12 +1,11 @@
-const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
+
 const db = require('../config/database-sqlite');
 const state = require('../config/state');
-const { ethers } = require('ethers');
-const { getUserFromSession, extractStudentIdFromEmail, isValidStudentId, validateUserIdentityMapping } = require('../utils/helpers');
 
-const { parseContractError, isDomainAllowed } = require('../utils/voteHelpers');
-const { voteJobQueue } = require('../services/voteQueue.service');
+
+
+
+
 const voteService = require('../services/vote.service');
 
 class VoteController {
@@ -45,7 +44,7 @@ class VoteController {
 
   async getElectionCandidates(req, res) {
     try {
-      const candidates = await voteService.getElectionCandidates(parseInt(req.params.electionId));
+      const candidates = await voteService.getElectionCandidates(parseInt(req.params.electionId), req.user);
       res.json(candidates);
     } catch (error) {
       console.error('Error fetching election candidates:', error);
@@ -134,4 +133,4 @@ class VoteController {
   }
 }
 
-module.exports = { VoteController: new VoteController(), voteJobQueue };
+module.exports = { VoteController: new VoteController() };

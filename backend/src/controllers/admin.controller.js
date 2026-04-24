@@ -1,8 +1,5 @@
-const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
 const db = require('../config/database-sqlite');
-const state = require('../config/state');
-const { isValidStudentId, extractStudentIdFromEmail } = require('../utils/helpers');
+const { voteJobQueue } = require('../services/voteQueue.service');
 
 class AdminController {
     async createElection(req, res) {
@@ -94,8 +91,7 @@ class AdminController {
       if (!req.user || req.user.role !== 'admin') return res.status(401).json({ message: 'Admin required' });
       const { id } = req.params;
       db.retryQueueJob(id);
-      
-      const { voteJobQueue } = require('./vote.controller');
+
       voteJobQueue.processNext();
       
       res.json({ message: 'Job rescheduled for processing.' });

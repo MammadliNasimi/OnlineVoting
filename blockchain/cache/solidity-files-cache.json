@@ -1,8 +1,8 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "C:\\Users\\Nasimi\\OneDrive - Akdeniz Üniversitesi\\Masaüstü\\OnlineVoting\\smart-contracts\\contracts\\VotingAnonymous.sol": {
-      "lastModificationDate": 1771502517042,
+    "C:\\Users\\Nasimi\\OneDrive - Akdeniz Üniversitesi\\Masaüstü\\OnlineVoting\\blockchain\\contracts\\VotingAnonymous.sol": {
+      "lastModificationDate": 1776864870913,
       "contentHash": "227037bf7e5038762f4a2fe0f36a6a25",
       "sourceName": "contracts/VotingAnonymous.sol",
       "solcConfig": {
@@ -37,7 +37,7 @@
         "VotingAnonymous"
       ]
     },
-    "C:\\Users\\Nasimi\\OneDrive - Akdeniz Üniversitesi\\Masaüstü\\OnlineVoting\\smart-contracts\\contracts\\VotingSSI.sol": {
+    "C:\\Users\\Nasimi\\OneDrive - Akdeniz Üniversitesi\\Masaüstü\\OnlineVoting\\blockchain\\contracts\\VotingSSI.sol": {
       "lastModificationDate": 1775152341643,
       "contentHash": "98e0fb0b008d5d5ff7d0cac5fb446b42",
       "sourceName": "contracts/VotingSSI.sol",

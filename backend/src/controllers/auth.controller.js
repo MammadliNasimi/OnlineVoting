@@ -1,7 +1,7 @@
 ﻿const jwt = require('jsonwebtoken');
 const authService = require('../services/auth.service');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 class AuthController {
   async sendOtp(req, res) {
@@ -13,7 +13,7 @@ class AuthController {
       let status = 500;
       if (error.message.includes('izin listesinde yok')) status = 403;
       if (error.message.includes('Geçerli bir e-posta')) status = 400;
-      res.status(status).json({ message: 'OTP gönderilemedi', error: error.message });
+      res.status(status).json({ message: error.message || 'OTP gönderilemedi' });
     }
   }
 

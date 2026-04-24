@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
-const fs = require('fs');
+const { initializeSchema } = require('./database-schema');
+const { attachQueueMethods } = require('./database-queue-methods');
 
 class DatabaseService {
   constructor() {
@@ -9,13 +10,12 @@ class DatabaseService {
 
   async connect() {
     try {
-        const dbPath = path.join(__dirname, '..', '..', '..', 'db', 'database.db');
-        this.db = new Database(dbPath);
+      const dbPath = path.join(__dirname, '..', '..', '..', 'db', 'database.db');
+      this.db = new Database(dbPath);
       console.log('✅ SQLite connected successfully');
       console.log(`   Database: ${dbPath}`);
 
       this.db.pragma('foreign_keys = ON');
-
       this.createTables();
 
       return true;
@@ -26,228 +26,7 @@ class DatabaseService {
   }
 
   createTables() {
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE NOT NULL,
-          first_name TEXT,
-          last_name TEXT,
-          password TEXT NOT NULL,
-          role TEXT DEFAULT 'user',
-          student_id TEXT UNIQUE,
-          email TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
-      // Modify existing schema if possible by running ALTER ADD COLUMN or quietly failing if exists
-      try {
-        this.db.exec(`ALTER TABLE users ADD COLUMN first_name TEXT;`);
-        this.db.exec(`ALTER TABLE users ADD COLUMN last_name TEXT;`);
-      } catch(e) { }
-
-      this.db.exec(`
-        CREATE TABLE IF NOT EXISTS password_resets (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          email TEXT NOT NULL,
-          otp_hash TEXT NOT NULL,
-          expires_at DATETIME NOT NULL,
-          used INTEGER DEFAULT 0,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-    try { this.db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch (_) {}
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS elections (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        description TEXT,
-        start_date DATETIME NOT NULL,
-        end_date DATETIME NOT NULL,
-        is_active INTEGER DEFAULT 1,
-        results_emailed INTEGER DEFAULT 0,
-        blockchain_election_id INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    try { this.db.exec('ALTER TABLE elections ADD COLUMN results_emailed INTEGER DEFAULT 0'); } catch (_) {}
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS candidates (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        election_id INTEGER,
-        name TEXT NOT NULL,
-        description TEXT,
-        blockchain_candidate_id INTEGER,
-        vote_count INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE
-      )
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS vote_authorizations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        election_id INTEGER,
-        commitment TEXT NOT NULL UNIQUE,
-        signature TEXT NOT NULL,
-        authorized_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        used INTEGER DEFAULT 0,
-        transaction_hash TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE,
-        UNIQUE(user_id, election_id)
-      )
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS vote_status (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        election_id INTEGER,
-        has_voted INTEGER DEFAULT 0,
-        voted_at DATETIME,
-        transaction_hash TEXT,
-        commitment TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE,
-        UNIQUE(user_id, election_id)
-      )
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS votes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        election_id INTEGER,
-        candidate_id INTEGER,
-        commitment TEXT UNIQUE NOT NULL,
-        transaction_hash TEXT NOT NULL,
-        block_number INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE,
-        FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE
-      )
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS sessions (
-        id TEXT PRIMARY KEY,
-        user_id INTEGER,
-        temp_wallet_address TEXT,
-        temp_wallet_private_key_encrypted TEXT,
-        wallet_funded INTEGER DEFAULT 0,
-        wallet_funding_error TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        expires_at DATETIME NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-
-    try { this.db.exec('ALTER TABLE sessions ADD COLUMN wallet_funded INTEGER DEFAULT 0'); } catch (_) {}
-    try { this.db.exec('ALTER TABLE sessions ADD COLUMN wallet_funding_error TEXT'); } catch (_) {}
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS user_face_profiles (
-        user_id INTEGER PRIMARY KEY,
-        descriptor_json TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS allowed_email_domains (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        domain TEXT UNIQUE NOT NULL,
-        added_by TEXT DEFAULT 'admin',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS election_domain_restrictions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        election_id INTEGER NOT NULL,
-        domain TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(election_id, domain),
-        FOREIGN KEY (election_id) REFERENCES elections(id) ON DELETE CASCADE
-      )
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS vote_queue (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        candidate_id INTEGER NOT NULL,
-        election_id INTEGER NOT NULL,
-        signature TEXT NOT NULL,
-        burner_address TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
-        tx_hash TEXT,
-        error_message TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS relayer_limits (
-        identifier TEXT PRIMARY KEY,
-        count INTEGER DEFAULT 0,
-        last_reset DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS email_verifications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT NOT NULL,
-        email_hash TEXT NOT NULL,
-        otp_hash TEXT NOT NULL,
-        expires_at DATETIME NOT NULL,
-        used INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    const adminExists = this.db.prepare('SELECT id FROM users WHERE name = ?').get('admin');
-    if (!adminExists) {
-      const bcrypt = require('bcryptjs');
-
-      const hashedPassword = bcrypt.hashSync('admin123', 10);
-      this.db.prepare(
-        'INSERT INTO users (name, password, role, student_id) VALUES (?, ?, ?, ?)'
-      ).run('admin', hashedPassword, 'admin', 'ADMIN001');
-
-      console.log('   ✅ Default admin user created (admin/admin123)');
-    }
-
-    const electionCount = this.db.prepare('SELECT COUNT(*) as c FROM elections').get();
-    if (electionCount.c === 0) {
-      const electionInfo = this.db.prepare(
-        `INSERT INTO elections (title, description, start_date, end_date, blockchain_election_id)
-         VALUES (?, ?, datetime('now'), datetime('now', '+30 days'), ?)`
-      ).run('2026 Öğrenci Başkanı Seçimi', 'Blockchain tabanlı anonim oylama', 1);
-      const sampleElectionId = electionInfo.lastInsertRowid;
-
-      this.db.prepare(
-        'INSERT INTO candidates (election_id, name, description, blockchain_candidate_id) VALUES (?, ?, ?, ?)'
-      ).run(sampleElectionId, 'Ali Yılmaz', 'Deneyimli lider', 0);
-
-      this.db.prepare(
-        'INSERT INTO candidates (election_id, name, description, blockchain_candidate_id) VALUES (?, ?, ?, ?)'
-      ).run(sampleElectionId, 'Ayşe Demir', 'Yenilikçi düşünür', 1);
-
-      this.db.prepare(
-        'INSERT INTO candidates (election_id, name, description, blockchain_candidate_id) VALUES (?, ?, ?, ?)'
-      ).run(sampleElectionId, 'Mehmet Kaya', 'Topluluk organizatörü', 2);
-
-      console.log('   ✅ Sample election and candidates created');
-    }
+    initializeSchema(this.db);
   }
 
   async close() {
@@ -487,69 +266,6 @@ async createUser(name, hashedPassword, role = 'user', studentId = null, email = 
       descriptor: JSON.parse(row.descriptor_json)
     };
   }
-
-
-  // --- Relayer Limits Methods ---
-  checkAndIncrementRelayerLimit(identifier, maxLimit, resetHours) {
-    const row = this.db.prepare('SELECT count, last_reset FROM relayer_limits WHERE identifier = ?').get(identifier);
-    const now = new Date();
-    
-    if (row) {
-      const lastReset = new Date(row.last_reset);
-      const hoursSinceReset = Math.abs(now - lastReset) / 36e5;
-      
-      if (hoursSinceReset >= resetHours) {
-        this.db.prepare('UPDATE relayer_limits SET count = 1, last_reset = CURRENT_TIMESTAMP WHERE identifier = ?').run(identifier);
-        return true;
-      }
-      
-      if (row.count >= maxLimit) {
-        return false;
-      }
-      
-      this.db.prepare('UPDATE relayer_limits SET count = count + 1 WHERE identifier = ?').run(identifier);
-      return true;
-    } else {
-      this.db.prepare('INSERT INTO relayer_limits (identifier, count) VALUES (?, 1)').run(identifier);
-      return true;
-    }
-  }
-
-  // --- Vote Queue Methods ---
-  addVoteToQueue(jobData) {
-    const info = this.db.prepare(
-      'INSERT INTO vote_queue (user_id, candidate_id, election_id, signature, burner_address) VALUES (?, ?, ?, ?, ?)'
-    ).run(jobData.userId, jobData.candidateID, jobData.electionID, jobData.signature, jobData.burnerAddress);
-    return info.lastInsertRowid;
-  }
-
-  getNextPendingVote() {
-    return this.db.prepare("SELECT * FROM vote_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1").get();
-  }
-
-  getAllQueueJobs() {
-    return this.db.prepare(
-      `SELECT vq.*, u.name as user_name, e.title as election_title, c.name as candidate_name
-       FROM vote_queue vq
-       LEFT JOIN users u ON vq.user_id = u.id
-       LEFT JOIN elections e ON vq.election_id = e.id
-       LEFT JOIN candidates c ON vq.candidate_id = c.id
-       ORDER BY vq.created_at DESC`
-    ).all();
-  }
-
-  retryQueueJob(id) {
-    this.db.prepare(
-      "UPDATE vote_queue SET status = 'pending', tx_hash = NULL, error_message = NULL WHERE id = ?"
-    ).run(id);
-  }
-
-  updateVoteStatus(id, status, txHash = null, errorMsg = null) {
-    this.db.prepare(
-      'UPDATE vote_queue SET status = ?, tx_hash = COALESCE(?, tx_hash), error_message = COALESCE(?, error_message) WHERE id = ?'
-    ).run(status, txHash, errorMsg, id);
-  }
-
   hasUserFaceProfile(userId) {
     const row = this.db.prepare('SELECT user_id FROM user_face_profiles WHERE user_id = ?').get(userId);
     return !!row;
@@ -707,6 +423,8 @@ async createUser(name, hashedPassword, role = 'user', studentId = null, email = 
     return !!found;
   }
 }
+
+attachQueueMethods(DatabaseService);
 
 const db = new DatabaseService();
 module.exports = db;
