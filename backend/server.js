@@ -1,7 +1,8 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 
@@ -23,9 +24,11 @@ const morgan = require('morgan');
 const logger = require('./src/utils/logger');
 const { errorHandler } = require('./src/middlewares/error.middleware');
 
+const fs = require('fs');
 const app = express();
 const server = http.createServer(app);
 const frontendBuildPath = path.join(__dirname, '..', 'frontend', 'build');
+const frontendBuildExists = fs.existsSync(path.join(frontendBuildPath, 'index.html'));
 const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000')
   .split(',')
   .map(origin => origin.trim())
@@ -68,10 +71,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Static files
-app.use(express.static(frontendBuildPath));
+if (frontendBuildExists) {
+  app.use(express.static(frontendBuildPath));
+}
 
-// Database initialization state
 app.use((req, res, next) => {
   if (!state.useDatabase) {
     if (req.method === 'GET' && !req.path.startsWith('/api/')) {
@@ -106,9 +109,15 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
-// Serve frontend routing
-app.get('*', (req, res) => {
-  res.sendFile(path.join(frontendBuildPath, 'index.html'));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  if (frontendBuildExists) {
+    return res.sendFile(path.join(frontendBuildPath, 'index.html'));
+  }
+  return res.status(404).json({
+    success: false,
+    message: 'API only deployment. Frontend ayri host ediliyor / Frontend is hosted separately.'
+  });
 });
 
 app.use(errorHandler);

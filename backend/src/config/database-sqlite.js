@@ -1,7 +1,19 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 const { initializeSchema } = require('./database-schema');
 const { attachQueueMethods } = require('./database-queue-methods');
+
+function resolveDbPath() {
+  if (process.env.DB_PATH) {
+    return path.isAbsolute(process.env.DB_PATH)
+      ? process.env.DB_PATH
+      : path.resolve(process.cwd(), process.env.DB_PATH);
+  }
+  const projectRootDb = path.join(__dirname, '..', '..', '..', 'db', 'database.db');
+  if (fs.existsSync(projectRootDb)) return projectRootDb;
+  return path.join(__dirname, '..', '..', 'db', 'database.db');
+}
 
 class DatabaseService {
   constructor() {
@@ -10,7 +22,9 @@ class DatabaseService {
 
   async connect() {
     try {
-      const dbPath = path.join(__dirname, '..', '..', '..', 'db', 'database.db');
+      const dbPath = resolveDbPath();
+      const dbDir = path.dirname(dbPath);
+      if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
       this.db = new Database(dbPath);
       console.log('✅ SQLite connected successfully');
       console.log(`   Database: ${dbPath}`);
