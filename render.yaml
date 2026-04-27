@@ -1,31 +1,32 @@
 # Render Blueprint - https://render.com/docs/blueprint-spec
-# Bu dosya repo'ya commit'lenir ve Render üzerinde "Apply Blueprint" ile otomatik
-# servis oluşturur. Manuel kurulum tercih edersen README'deki adımları izle.
+# Free plan kullanılıyor:
+#  - Persistent disk YOK (SQLite restart'ta sıfırlanır - admin yeniden oluşturulur)
+#  - 15 dk inaktivite sonra uyur (ilk istekte ~30sn cold start)
+#  - 750 saat/ay free instance
+#  - Kart bilgisi sorulmaz
 
 services:
   - type: web
     name: ssi-voting-backend
     runtime: node
-    region: frankfurt   # Türkiye için en düşük gecikme
-    plan: starter        # free yerine starter — persistent disk free'de yok ($7/ay)
+    region: frankfurt
+    plan: free
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true
-    disk:
-      name: ssi-voting-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: HOST
         value: 0.0.0.0
+      # Render free: PORT'u kendisi atar, ama default 10000
       - key: PORT
-        value: 10000      # Render varsayılan port
+        value: 10000
+      # SQLite ephemeral - container içi (restart'ta sıfırlanır, free plan'da disk yok)
       - key: DB_PATH
-        value: /var/data/database.db
+        value: /opt/render/project/src/db/database.db
       - key: BLOCKCHAIN_RPC_URL
         value: https://ethereum-sepolia-rpc.publicnode.com
       - key: RPC_URL
