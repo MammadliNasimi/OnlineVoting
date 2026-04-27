@@ -55,11 +55,14 @@ class AuthController {
     try {
       const name = req.body.name ? req.body.name.trim() : null;
       const { response, token } = await authService.login(name, req.body.password);
-      
+
+      // Cross-origin (Vercel <-> Render) icin sameSite=none + secure=true zorunlu.
+      // Lokalde (HTTP) sameSite=lax + secure=false ile cookie set edilir.
+      const isProd = process.env.NODE_ENV === 'production';
       res.cookie('jwt_token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isProd,
+        sameSite: isProd ? 'none' : 'lax',
         maxAge: 8 * 60 * 60 * 1000
       });
       res.json(response);
@@ -105,10 +108,11 @@ class AuthController {
         { expiresIn: '8h' }
       );
 
+      const isProdFace = process.env.NODE_ENV === 'production';
       res.cookie('jwt_token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isProdFace,
+        sameSite: isProdFace ? 'none' : 'lax',
         maxAge: 8 * 60 * 60 * 1000
       });
       

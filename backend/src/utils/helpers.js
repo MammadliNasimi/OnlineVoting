@@ -77,20 +77,32 @@ function hashEmail(email) {
 async function createSessionForUser(user) {
   const tempWallet = createWallet();
   const createSessionId = () => (typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'));
-  const fundTemporaryWallet = async () => {
-    try {
-      const rpcUrl = (process.env.RPC_URL || 'http://127.0.0.1:8545').trim();
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const funderPrivateKey = (process.env.ADMIN_PRIVATE_KEY || '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80').trim();
-      const funderWallet = new ethers.Wallet(funderPrivateKey, provider);
-      const tx = await funderWallet.sendTransaction({ to: tempWallet.address, value: ethers.parseEther('1.0') });
-      await tx.wait();
-      return { success: true, txHash: tx.hash };
-    } catch (e) { return { success: false, error: e.message }; }
+
+  // Production'da relayer gas'i odedigi icin burner cuzdana fund gerekmez.
+  // Local Hardhat'ta yine de fund'liyoruz ki eski testler calissin.
+  // Sepolia/production'da fund'i arka plana al, login response'unu bekletme.
+  const fundTemporaryWalletAsync = () => {
+    const rpcUrl = (process.env.RPC_URL || process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545').trim();
+    const isLocal = rpcUrl.includes('127.0.0.1') || rpcUrl.includes('localhost');
+    if (!isLocal) {
+      // Production: skip funding (relayer gasless mimarisi var)
+      return Promise.resolve({ success: true, skipped: true });
+    }
+    return (async () => {
+      try {
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const funderPrivateKey = (process.env.ADMIN_PRIVATE_KEY || '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80').trim();
+        const funderWallet = new ethers.Wallet(funderPrivateKey, provider);
+        const tx = await funderWallet.sendTransaction({ to: tempWallet.address, value: ethers.parseEther('1.0') });
+        await tx.wait();
+        return { success: true, txHash: tx.hash };
+      } catch (e) { return { success: false, error: e.message }; }
+    })();
   };
+
   const expiresAt = new Date(Date.now() + parseInt(process.env.SESSION_TIMEOUT || 28800000));
   const encryptedPrivateKey = encryptPrivateKey(tempWallet.privateKey);
-  const fundingResult = await fundTemporaryWallet();
+  const fundingResult = await fundTemporaryWalletAsync();
   let sessionId = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const candidateSessionId = createSessionId();
