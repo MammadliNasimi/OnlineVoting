@@ -30,6 +30,7 @@ class AuthService {
     db.createEmailVerification(email, emailHash, otpHash, expiresAt);
 
     let emailSent = false;
+    let lastEmailError = null;
     const transporter = createMailTransporter();
     if (transporter) {
       try {
@@ -59,13 +60,23 @@ class AuthService {
         emailSent = true;
         console.log(`📧 Register OTP sent to: ${email}`);
       } catch (e) {
+        lastEmailError = e.message;
         console.error('Register OTP email error:', e.message);
       }
     }
 
-    const devMode = !transporter || !emailSent;
-    if (shouldLogSensitiveOtp) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const devMode = !emailSent && !isProduction;
+
+    if (shouldLogSensitiveOtp || (devMode && !shouldLogSensitiveOtp)) {
       console.log(`🔑 Register OTP for ${email}: ${otp}`);
+    }
+
+    // Production'da SMTP basarisizsa OTP'yi response'a DUSURME (guvenlik).
+    // Bunun yerine kullaniciya net hata don, admin SMTP ayarini duzeltsin.
+    if (isProduction && !emailSent) {
+      console.error(`❌ SMTP failure in production: ${lastEmailError}`);
+      throw new Error('Şu anda doğrulama e-postası gönderilemiyor. Lütfen daha sonra tekrar deneyin veya yöneticiye başvurun.');
     }
 
     return {
