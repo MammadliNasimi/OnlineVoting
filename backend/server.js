@@ -35,9 +35,23 @@ const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
+
+// Vercel her deploy icin unique URL uretir (preview deploy'lar):
+// https://<proje>-<hash>-<team>.vercel.app  veya  https://<proje>-git-<branch>-<team>.vercel.app
+// Bu pattern'lere de izin ver - aksi halde her redeploy CORS hatasi verir.
+const VERCEL_PREVIEW_REGEX = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i;
+
+const corsOriginValidator = (origin, callback) => {
+  // Same-origin requests (server-side, curl, mobile apps) origin gondermez
+  if (!origin) return callback(null, true);
+  if (allowedOrigins.includes(origin)) return callback(null, true);
+  if (VERCEL_PREVIEW_REGEX.test(origin)) return callback(null, true);
+  return callback(new Error(`CORS: origin '${origin}' not allowed`));
+};
+
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: corsOriginValidator,
     credentials: true
   }
 });
@@ -68,7 +82,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 app.use(cors({
-  origin: allowedOrigins,
+  origin: corsOriginValidator,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'x-session-id']
