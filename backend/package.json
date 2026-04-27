@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "description": "Online Voting System",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "postinstall": "echo \"Backend dependencies installed.\""
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

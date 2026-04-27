@@ -33,10 +33,9 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import CandidatesModal from './admin/CandidatesModal';
 import DomainRestrictionsModal from './admin/DomainRestrictionsModal';
 import AdminTabsContent from './admin/AdminTabsContent';
+import { API_BASE, SOCKET_URL } from '../config';
 
 const drawerWidth = 260;
-const API_BASE = (process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
 
 function AdminDashboard({ user, sessionId, onLogout }) {
   const queryClient = useQueryClient();

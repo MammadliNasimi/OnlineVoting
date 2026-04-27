@@ -130,23 +130,15 @@ npm start
 ```
 *Frontend adresi:* `http://localhost:3000`
 
-## 🌍 Free-tier Production Deploy
+## 🌍 Production Deploy (Render + Vercel)
 
-Uygulamayı ücretsiz katmanlarla yayınlamak için backend ve frontend'i ayrı hostlamak en basit yoldur.
+Public deploy için adım adım rehber: **[DEPLOYMENT.md](./DEPLOYMENT.md)**
 
-Backend için Render, Railway veya Fly.io; frontend için Vercel veya Netlify kullanabilirsiniz. Frontend build sırasında `REACT_APP_API_BASE_URL` ve gerekirse `REACT_APP_SOCKET_URL` değerlerini backend URL'inize göre ayarlayın. Backend tarafında `CORS_ORIGINS` ve `FRONTEND_URL` değerlerini frontend domain'inize göre güncelleyin.
-
-Gerekli production değişkenleri:
-
-```env
-NODE_ENV=production
-JWT_SECRET=...
-SESSION_SECRET=...
-CORS_ORIGINS=https://your-frontend-host.example
-FRONTEND_URL=https://your-frontend-host.example
-REACT_APP_API_BASE_URL=https://your-backend-host.example/api
-REACT_APP_SOCKET_URL=https://your-backend-host.example
-```
+Hızlı özet:
+- **Backend**: Render (`render.yaml` blueprint hazır, persistent disk dahil)
+- **Frontend**: Vercel (`frontend/vercel.json` hazır, sadece `REACT_APP_API_URL` set edilir)
+- **Blockchain**: Sepolia testnet (zaten deploy edilmiş)
+- **Maliyet**: $7/ay (Render Starter) veya tamamen ücretsiz (free plan + SQLite kayıp riski)
 
 ---
 

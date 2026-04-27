@@ -11,8 +11,7 @@ import { FaceDialog, HistoryDialog, ProfileDialog } from './voting/VotingDialogs
 import { getPublicEmailType } from './voting/utils';
 import useFaceRegistration from './voting/useFaceRegistration';
 
-const API_BASE = (process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
+import { API_BASE, SOCKET_URL } from '../config';
 
 function SimpleVoting({ user, sessionId, onLogout }) {
   const queryClient = useQueryClient();

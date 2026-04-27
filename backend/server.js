@@ -1,5 +1,7 @@
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
+// Load env files: prefer process env (host platform like Render), fall back to project root .env, then backend-local .env
+const rootEnvPath = path.resolve(__dirname, '..', '.env');
+require('dotenv').config({ path: rootEnvPath });
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -54,6 +56,10 @@ io.on('connection', (socket) => {
 });
 
 const port = process.env.PORT || 5000;
+const host = process.env.HOST || '0.0.0.0';
+
+// Render/Railway/Vercel proxy uyumu (X-Forwarded-* headers)
+app.set('trust proxy', 1);
 
 // Global Middleware
 app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
@@ -145,7 +151,7 @@ async function startServer() {
       state.relayerService = new RelayerService(relayerPrivateKey, contractAddress, rpcUrl);
     }
 
-    server.listen(port, () => {
+    server.listen(port, host, () => {
       console.log(`==================================================`);
       // Start Cron Service for processing ended elections
       const cronService = require('./src/services/cronService');
@@ -154,9 +160,11 @@ async function startServer() {
       const { voteJobQueue } = require('./src/services/voteQueue.service');
       voteJobQueue.processNext();
       console.log(`SSI & ZK Based Voting System Started`);
-      console.log(`Port: ${port}`);
+      console.log(`Listening on: ${host}:${port}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
       console.log(`Tarih: ${new Date().toLocaleString()}`);
-      console.log(`==================================================`);      
+      console.log(`==================================================`);
     });
   } catch (error) {
     console.error('Sunucu başlatılırken kritik hata / Critical error starting server:', error);

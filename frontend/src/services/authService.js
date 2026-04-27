@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { API_BASE as API_ROOT } from '../config';
 
-const API_BASE = (process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '') + '/auth';
+const API_BASE = `${API_ROOT}/auth`;
 
 const login = async (credentials) => {
     const response = await axios.post(`${API_BASE}/login`, credentials);
