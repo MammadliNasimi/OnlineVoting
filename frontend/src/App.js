@@ -5,7 +5,6 @@ import SimpleVoting from './components/SimpleVoting';
 import AdminDashboard from './components/AdminDashboard';
 import Login from './pages/Login';
 import { Box, CircularProgress } from '@mui/material';
-import './App.css';
 
 function App() {
   const SESSION_STORAGE_KEY = 'ov_session_id';

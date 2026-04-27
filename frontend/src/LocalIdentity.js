@@ -8,9 +8,6 @@ export const getBurnerWallet = () => {
     const wallet = ethers.Wallet.createRandom();
     privateKey = wallet.privateKey;
     localStorage.setItem(STORAGE_KEY, privateKey);
-    console.log("🆕 New Burner Wallet Created:", wallet.address);
-  } else {
-    console.log("🔐 Loaded existing Burner Wallet");
   }
   return new ethers.Wallet(privateKey);
 };

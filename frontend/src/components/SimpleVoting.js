@@ -40,8 +40,8 @@ function SimpleVoting({ user, sessionId, onLogout }) {
 
     try {
       getBurnerWallet();
-    } catch (e) {
-      console.error('Ethers error:', e);
+    } catch {
+      // Burner wallet üretimi başarısız olursa sessizce devam et; oy verirken yeniden denenir.
     }
 
     const socket = io(SOCKET_URL, { withCredentials: true });

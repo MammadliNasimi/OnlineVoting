@@ -14,10 +14,9 @@ import ForgotPasswordPage from '../components/auth/ForgotPasswordPage';
 import LoginSection from '../components/auth/LoginSection';
 import RegisterSection from '../components/auth/RegisterSection';
 import useFaceAuth from '../components/auth/useFaceAuth';
-import '../App.css';
 
 function Login({ onLoginComplete }) {
-  const [currentPage, setCurrentPage] = useState('login'); // login, register, forgotPassword, resetPassword
+  const [currentPage, setCurrentPage] = useState('login');
 
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -29,10 +28,10 @@ function Login({ onLoginComplete }) {
   const [showResetPassword, setShowResetPassword] = useState(false);
 
   const [registerMode, setRegisterMode] = useState(false);
-  const [registerStep, setRegisterStep] = useState(0); // 0=form, 1=OTP
+  const [registerStep, setRegisterStep] = useState(0);
   const [registerOtp, setRegisterOtp] = useState('');
 
-  const [forgotPasswordStep, setForgotPasswordStep] = useState(0); // 0=email, 1=OTP, 2=newPassword
+  const [forgotPasswordStep, setForgotPasswordStep] = useState(0);
   const [forgotPasswordOtp, setForgotPasswordOtp] = useState('');
   const [resetPasswordConfirmLoading, setResetPasswordConfirmLoading] = useState(false);
 
@@ -360,7 +359,7 @@ function Login({ onLoginComplete }) {
               <ForgotPasswordPage error={error} info={info} forgotPasswordStep={forgotPasswordStep} forgotPasswordOtp={forgotPasswordOtp} setForgotPasswordOtp={setForgotPasswordOtp} form={form} setForm={setForm} showResetPassword={showResetPassword} setShowResetPassword={setShowResetPassword} forgotLoading={forgotLoading} resetPasswordConfirmLoading={resetPasswordConfirmLoading} handleForgotPasswordRequest={handleForgotPasswordRequest} handleResetPasswordOtpVerify={handleResetPasswordOtpVerify} setCurrentPage={setCurrentPage} setForgotPasswordStep={setForgotPasswordStep} setError={setError} setInfo={setInfo} passwordEndAdornment={passwordEndAdornment} />
             )}
 
-            {(currentPage === 'login' || currentPage === 'resetPassword') && (
+            {currentPage === 'login' && (
               <>
                 {error && <Alert severity="error" sx={{ mb: 2.5, borderRadius: 1.5 }}>{error}</Alert>}
                 {info && <Alert severity="success" sx={{ mb: 2.5, borderRadius: 1.5 }}>{info}</Alert>}

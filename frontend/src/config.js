@@ -1,6 +1,6 @@
 // Centralized API + Socket configuration.
-// Bir tek REACT_APP_API_URL set etmek yeterli; diğerleri otomatik türetilir.
-// İstersen REACT_APP_API_BASE_URL ve REACT_APP_SOCKET_URL ile override edebilirsin.
+// Tek REACT_APP_API_URL set etmek yeterli; diğerleri otomatik türetilir.
+// Override istersen REACT_APP_API_BASE_URL ve REACT_APP_SOCKET_URL kullanılabilir.
 
 const stripTrailingSlash = (value) => (value || '').replace(/\/$/, '');
 
@@ -13,6 +13,3 @@ export const API_BASE = stripTrailingSlash(
 );
 
 export const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || RAW_API_URL;
-
-const config = { API_URL, API_BASE, SOCKET_URL };
-export default config;

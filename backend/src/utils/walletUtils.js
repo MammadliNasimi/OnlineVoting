@@ -6,10 +6,7 @@ const ENCRYPTION_ALGORITHM = 'aes-256-cbc';
 
 function createWallet() {
   const wallet = ethers.Wallet.createRandom();
-  return {
-    address: wallet.address,
-    privateKey: wallet.privateKey
-  };
+  return { address: wallet.address, privateKey: wallet.privateKey };
 }
 
 function encryptPrivateKey(privateKey) {
@@ -35,8 +32,4 @@ function decryptPrivateKey(encryptedData) {
   return decrypted;
 }
 
-module.exports = {
-  createWallet,
-  encryptPrivateKey,
-  decryptPrivateKey
-};
+module.exports = { createWallet, encryptPrivateKey, decryptPrivateKey };

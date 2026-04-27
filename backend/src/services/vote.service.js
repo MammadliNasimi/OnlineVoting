@@ -1,8 +1,7 @@
 const db = require('../config/database-sqlite');
 const state = require('../config/state');
 const { voteJobQueue } = require('./voteQueue.service');
-const { isDomainAllowed, parseContractError } = require('../utils/voteHelpers');
-const { ethers } = require('ethers');
+const { isDomainAllowed } = require('../utils/voteHelpers');
 
 class VoteService {
   isElectionWithinWindow(election) {
@@ -11,20 +10,6 @@ class VoteService {
     const end = election?.end_date ? new Date(election.end_date).getTime() : NaN;
     if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
     return now >= start && now <= end;
-  }
-
-  async addCandidate(user, name, electionId, description) {
-    if (!user || user.role !== 'admin') throw new Error('Only admin can add candidates');
-    if (!name) throw new Error('Aday ismi gerekli');
-    if (!state.useDatabase) throw new Error('Database not available');
-    const eid = electionId || 1;
-    return db.addCandidateToElection(eid, name, description || "");
-  }
-
-  async getCandidates() {
-    if (!state.useDatabase) throw new Error('Database not available');
-    const candidates = await db.getAllCandidates();
-    return candidates.map(c => c.name);
   }
 
   async getElections(user) {

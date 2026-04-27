@@ -1,13 +1,12 @@
 # Dependencies
 node_modules/
-client/node_modules/
-smart-contracts/node_modules/
 
-# Environment variables (sensitive!)
+# Environment variables
 .env
+.env.local
+.env.*.local
 
-# Database
-database.db
+# SQLite databases (production data, must NOT be committed)
 *.db
 *.db-journal
 *.db-shm
@@ -17,49 +16,21 @@ database.db
 logs/
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# Runtime data
+# Runtime
 pids/
 *.pid
-*.seed
-*.pid.lock
-
-# Coverage
-coverage/
-.nyc_output/
 
 # Build outputs
-client/build/
 frontend/build/
-smart-contracts/artifacts/
-smart-contracts/cache/
-smart-contracts/typechain/
-smart-contracts/typechain-types/
 blockchain/artifacts/
 blockchain/cache/
 
-# Hardhat
-smart-contracts/cache/solidity-files-cache*.json
-blockchain/cache/solidity-files-cache*.json
-
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # IDE
 .vscode/
 .idea/
 *.swp
-*.swo
-*~
-
-# Temp
-tmp/
-temp/
