@@ -112,10 +112,26 @@ async function createSessionForUser(user) {
 }
 
 function createMailTransporter() {
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    return nodemailer.createTransport({ host: process.env.SMTP_HOST, port: parseInt(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true', auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }, tls: { ciphers: 'SSLv3', rejectUnauthorized: false } });
-  }
-  return null;
+  // Trim her degeri - panel paste'lerinden arkaya kacan \n / bosluk DNS resolve'i bozar (ENOTFOUND).
+  const host = (process.env.SMTP_HOST || '').trim();
+  const user = (process.env.SMTP_USER || '').trim();
+  const pass = (process.env.SMTP_PASS || '').trim();
+  const port = parseInt((process.env.SMTP_PORT || '587').trim(), 10);
+  const secure = (process.env.SMTP_SECURE || '').trim() === 'true';
+
+  if (!host || !user || !pass) return null;
+
+  // SSLv3 cipher hack'i sadece eski Office365 icin gerekliydi - Gmail vb. modern sunucular reddeder.
+  // Sadece Office365 host'unda eski cipher'i zorla, diger tum saglayicilarda nodemailer default'unu kullan.
+  const isOffice365 = /office365|outlook/.test(host);
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+    ...(isOffice365 ? { tls: { ciphers: 'SSLv3', rejectUnauthorized: false } } : {})
+  });
 }
 
 module.exports = { getUserFromSession, extractStudentIdFromEmail, isAkdenizStudentEmail, isValidAkdenizStudentIdFormat, isValidStudentId, validateUserIdentityMapping, isValidFaceDescriptor, euclideanDistance, hashEmail, createSessionForUser, createMailTransporter };
