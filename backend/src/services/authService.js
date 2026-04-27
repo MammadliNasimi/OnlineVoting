@@ -4,7 +4,8 @@ require('dotenv').config();
 class VoteAuthService {
   constructor() {
 
-    this.adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
+    // Trim: panellerden yapıştırırken arkaya kaçan \n / boşluklar ethers v6'da hata yaratır.
+    this.adminPrivateKey = (process.env.ADMIN_PRIVATE_KEY || '').trim();
 
     if (!this.adminPrivateKey) {
       throw new Error('❌ ADMIN_PRIVATE_KEY not found in .env file');

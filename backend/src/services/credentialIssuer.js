@@ -12,8 +12,10 @@ const VOTE_PROOF_TYPES = {
 class CredentialIssuer {
     constructor(issuerPrivateKey, contractAddress, chainId = 31337) {
 
-        this.issuerWallet = new ethers.Wallet(issuerPrivateKey);
-        this.contractAddress = contractAddress;
+        const cleanKey = typeof issuerPrivateKey === 'string' ? issuerPrivateKey.trim() : issuerPrivateKey;
+        const cleanAddress = typeof contractAddress === 'string' ? contractAddress.trim() : contractAddress;
+        this.issuerWallet = new ethers.Wallet(cleanKey);
+        this.contractAddress = cleanAddress;
         this.chainId = chainId;
 
         this.domain = {

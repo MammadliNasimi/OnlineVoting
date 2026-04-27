@@ -136,17 +136,21 @@ async function startServer() {
     state.useDatabase = true;
     console.log('Veritabanı başarıyla başlatıldı. / Database initialized successfully.');
 
+    // Env değerlerini trim et — Render/Railway/Fly gibi panellerden yapıştırırken
+    // arkaya kaçan \n veya boşluklar ethers v6'da "invalid BytesLike" hatasına yol açar.
+    const cleanEnv = (v) => (typeof v === 'string' ? v.trim() : v);
+
     console.log('Kurum Servisi (Credential Issuer) başlatılıyor... / Initializing Credential Issuer...');
-    const issuerPrivateKey = process.env.ADMIN_PRIVATE_KEY;
-    const contractAddress = process.env.VOTING_CONTRACT_ADDRESS;
-    const chainId = process.env.CHAIN_ID || '31337';
+    const issuerPrivateKey = cleanEnv(process.env.ADMIN_PRIVATE_KEY);
+    const contractAddress = cleanEnv(process.env.VOTING_CONTRACT_ADDRESS);
+    const chainId = cleanEnv(process.env.CHAIN_ID) || '31337';
     if (issuerPrivateKey) {
       state.credentialIssuer = new CredentialIssuer(issuerPrivateKey, contractAddress, parseInt(chainId));
     }
 
     console.log('Relayer Servisi başlatılıyor... / Initializing Relayer Service...');
-    const relayerPrivateKey = process.env.RELAYER_PRIVATE_KEY || process.env.ADMIN_PRIVATE_KEY;
-    const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545';
+    const relayerPrivateKey = cleanEnv(process.env.RELAYER_PRIVATE_KEY) || cleanEnv(process.env.ADMIN_PRIVATE_KEY);
+    const rpcUrl = cleanEnv(process.env.BLOCKCHAIN_RPC_URL) || 'http://127.0.0.1:8545';
     if (relayerPrivateKey && contractAddress) {
       state.relayerService = new RelayerService(relayerPrivateKey, contractAddress, rpcUrl);
     }

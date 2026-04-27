@@ -79,8 +79,9 @@ async function createSessionForUser(user) {
   const createSessionId = () => (typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'));
   const fundTemporaryWallet = async () => {
     try {
-      const provider = new ethers.JsonRpcProvider(process.env.RPC_URL || 'http://127.0.0.1:8545');
-      const funderPrivateKey = process.env.ADMIN_PRIVATE_KEY || '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+      const rpcUrl = (process.env.RPC_URL || 'http://127.0.0.1:8545').trim();
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const funderPrivateKey = (process.env.ADMIN_PRIVATE_KEY || '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80').trim();
       const funderWallet = new ethers.Wallet(funderPrivateKey, provider);
       const tx = await funderWallet.sendTransaction({ to: tempWallet.address, value: ethers.parseEther('1.0') });
       await tx.wait();
