@@ -5,13 +5,9 @@ import HistoryIcon from '@mui/icons-material/History';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
-import LightModeIcon from '@mui/icons-material/LightMode';
 import { headerButtonSx, headerPrimaryButtonSx, panelSx } from './styles';
-import { useThemeMode } from '../../ThemeContext';
 
 function VotingHeader({ user, onLogout, onShowProfile, onShowFace, onShowHistory }) {
-  const { mode, toggleMode } = useThemeMode();
   return (
     <Paper
       elevation={0}
@@ -63,20 +59,6 @@ function VotingHeader({ user, onLogout, onShowProfile, onShowFace, onShowHistory
             <Button variant="outlined" startIcon={<HistoryIcon />} onClick={onShowHistory} sx={headerButtonSx}>
               Gecmis
             </Button>
-          </Tooltip>
-          <Tooltip title={mode === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}>
-            <IconButton
-              onClick={toggleMode}
-              sx={{
-                width: 42, height: 42, borderRadius: 1.5,
-                color: mode === 'dark' ? '#fbbf24' : '#e2e8f0',
-                border: '1px solid rgba(255,255,255,0.14)',
-                backgroundColor: 'rgba(255,255,255,0.06)',
-                '&:hover': { backgroundColor: 'rgba(255,255,255,0.12)' }
-              }}
-            >
-              {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-            </IconButton>
           </Tooltip>
           <Tooltip title="Cikis yap">
             <IconButton

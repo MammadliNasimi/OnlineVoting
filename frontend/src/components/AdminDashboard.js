@@ -34,9 +34,6 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import InsightsIcon from '@mui/icons-material/Insights';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import HistoryIcon from '@mui/icons-material/History';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import { useThemeMode } from '../ThemeContext';
 
 import CandidatesModal from './admin/CandidatesModal';
 import DomainRestrictionsModal from './admin/DomainRestrictionsModal';
@@ -47,7 +44,6 @@ const drawerWidth = 260;
 
 function AdminDashboard({ user, sessionId, onLogout }) {
   const queryClient = useQueryClient();
-  const { mode, toggleMode } = useThemeMode();
   const [activeTab, setActiveTab] = useState('overview');
 
   const [domainModalOpen, setDomainModalOpen] = useState(false);
@@ -211,11 +207,6 @@ function AdminDashboard({ user, sessionId, onLogout }) {
         <Toolbar>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>Yonetim Paneli</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Tooltip title={mode === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}>
-              <IconButton size="small" onClick={toggleMode}>
-                {mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-              </IconButton>
-            </Tooltip>
             <Typography variant="body2" fontWeight="medium">{user?.name} (Admin)</Typography>
             <Avatar sx={{ bgcolor: 'secondary.main', width: 32, height: 32 }}>{user?.name?.charAt(0).toUpperCase()}</Avatar>
           </Box>
