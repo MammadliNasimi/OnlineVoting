@@ -278,11 +278,11 @@ function Login({ onLoginComplete }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#dbe6eb',
+      backgroundColor: '#e6eef2',
       backgroundImage: `
-        linear-gradient(rgba(16, 24, 32, 0.075) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(16, 24, 32, 0.075) 1px, transparent 1px),
-        linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.08))
+        linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(20, 184, 166, 0.08), rgba(15, 23, 42, 0.05))
       `,
       backgroundSize: '42px 42px, 42px 42px, cover',
       p: { xs: 2, md: 4 }
@@ -297,8 +297,8 @@ function Login({ onLoginComplete }) {
           gridTemplateColumns: { xs: '1fr', md: '0.9fr 1fr' },
           overflow: 'hidden',
           borderRadius: 2,
-          border: '1px solid rgba(15, 23, 42, 0.10)',
-          boxShadow: '0 28px 80px rgba(17, 24, 39, 0.18)'
+          border: '1px solid rgba(15, 23, 42, 0.14)',
+          boxShadow: '0 24px 64px rgba(15, 23, 42, 0.16)'
         }}
       >
         <AuthHeroPanel />
@@ -329,9 +329,10 @@ function Login({ onLoginComplete }) {
                   sx={{
                     mb: 3,
                     minHeight: 48,
-                    border: '1px solid rgba(15, 23, 42, 0.10)',
+                    border: '1px solid rgba(15, 23, 42, 0.14)',
                     borderRadius: 2,
                     p: 0.5,
+                    backgroundColor: '#f8fafc',
                     '& .MuiTabs-indicator': {
                       display: 'none'
                     },
@@ -340,12 +341,12 @@ function Login({ onLoginComplete }) {
                       borderRadius: 1.5,
                       textTransform: 'none',
                       fontWeight: 800,
-                      color: '#64748b'
+                      color: '#334155'
                     },
                     '& .Mui-selected': {
-                      color: '#064e3b',
-                      backgroundColor: '#d5f8e9',
-                      boxShadow: 'inset 0 0 0 1px rgba(16, 185, 129, 0.22)'
+                      color: '#0f172a',
+                      backgroundColor: '#ccfbf1',
+                      boxShadow: 'inset 0 0 0 1px rgba(20, 184, 166, 0.35)'
                     }
                   }}
                 >

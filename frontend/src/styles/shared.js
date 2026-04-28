@@ -7,17 +7,19 @@
  */
 
 export const fieldSx = {
+  '& .MuiInputLabel-root': { color: '#334155' },
   '& .MuiOutlinedInput-root': {
     borderRadius: 1.5,
-    backgroundColor: '#fbfdff',
-    '& fieldset': { borderColor: 'rgba(15, 23, 42, 0.14)' },
-    '&:hover fieldset': { borderColor: '#10b981' },
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
+    '& fieldset': { borderColor: 'rgba(15, 23, 42, 0.22)' },
+    '&:hover fieldset': { borderColor: '#14b8a6' },
     '&.Mui-focused fieldset': {
-      borderColor: '#10b981',
-      boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.14)'
+      borderColor: '#14b8a6',
+      boxShadow: '0 0 0 3px rgba(20, 184, 166, 0.16)'
     }
   },
-  '& .MuiInputLabel-root.Mui-focused': { color: '#0f9f8f' }
+  '& .MuiInputLabel-root.Mui-focused': { color: '#0f766e' }
 };
 
 // Votingde `fontWeight: 900` + `&.Mui-disabled` kullanılıyor;
