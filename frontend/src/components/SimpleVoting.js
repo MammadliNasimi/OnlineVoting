@@ -5,7 +5,6 @@ import { Alert, Box, CircularProgress } from '@mui/material';
 import { io } from 'socket.io-client';
 import Confetti from 'react-confetti';
 import {
-  changeBurnerPin,
   getBurnerAddress,
   resetBurnerWallet,
   signVoteClientSide
@@ -230,35 +229,6 @@ function SimpleVoting({ user, sessionId, onLogout }) {
     setTimeout(() => setWalletCopied(false), 1800);
   };
 
-  const handleChangePin = async () => {
-    const oldPin = window.prompt('Mevcut PIN girin');
-    if (oldPin === null) return;
-    const newPin = window.prompt('Yeni PIN girin (en az 4 karakter)');
-    if (newPin === null) return;
-    const confirmPin = window.prompt('Yeni PIN tekrar girin');
-    if (confirmPin === null) return;
-
-    if (!newPin || newPin.length < 4) {
-      setErrorMsg('Yeni PIN en az 4 karakter olmalı.');
-      setTimeout(() => setErrorMsg(''), 5000);
-      return;
-    }
-    if (newPin !== confirmPin) {
-      setErrorMsg('Yeni PIN alanları eşleşmiyor.');
-      setTimeout(() => setErrorMsg(''), 5000);
-      return;
-    }
-
-    try {
-      await changeBurnerPin(oldPin, newPin);
-      setSuccessMsg('PIN başarıyla değiştirildi.');
-      setTimeout(() => setSuccessMsg(''), 5000);
-    } catch (err) {
-      setErrorMsg(err?.message || 'PIN değiştirilemedi.');
-      setTimeout(() => setErrorMsg(''), 5000);
-    }
-  };
-
   const handleResetWallet = () => {
     const ok = window.confirm(
       'Cüzdan sıfırlanırsa mevcut burner cüzdan erişimi kaybolur. Devam etmek istiyor musunuz?'
@@ -381,7 +351,6 @@ function SimpleVoting({ user, sessionId, onLogout }) {
           setShowFaceModal(true);
           startFaceCamera();
         }}
-        onChangePin={handleChangePin}
         onResetWallet={handleResetWallet}
         user={user}
         userInitial={userInitial}

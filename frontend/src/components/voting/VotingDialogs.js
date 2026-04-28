@@ -276,7 +276,6 @@ export function ProfileDialog({
   open,
   onClose,
   onOpenFace,
-  onChangePin,
   onResetWallet,
   user,
   userInitial,
@@ -364,20 +363,6 @@ export function ProfileDialog({
         </Box>
       </DialogContent>
       <DialogActions sx={{ p: 2, backgroundColor: '#ffffff' }}>
-        <Button
-          onClick={onChangePin}
-          sx={{
-            borderRadius: 1.5,
-            fontWeight: 800,
-            textTransform: 'none',
-            color: '#0f172a',
-            border: '1px solid rgba(15, 23, 42, 0.18)',
-            backgroundColor: '#f8fafc',
-            '&:hover': { borderColor: '#0f9f8f', backgroundColor: '#eefcf8' }
-          }}
-        >
-          PIN Degistir
-        </Button>
         <Button
           onClick={onResetWallet}
           sx={{

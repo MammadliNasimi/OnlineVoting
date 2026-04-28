@@ -4,7 +4,6 @@ import axios from 'axios';
 import SimpleVoting from './components/SimpleVoting';
 import AdminDashboard from './components/AdminDashboard';
 import Login from './pages/Login';
-import PinPromptDialog from './components/PinPromptDialog';
 import { lockBurnerWallet } from './LocalIdentity';
 import { Box, CircularProgress } from '@mui/material';
 
@@ -83,7 +82,6 @@ function App() {
 
   return (
     <>
-      <PinPromptDialog />
       <Routes>
         <Route path="/" element={<Navigate to={user?.role === 'admin' ? '/admin' : user ? '/vote' : '/login'} replace />} />
 
