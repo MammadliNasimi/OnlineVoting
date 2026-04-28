@@ -6,8 +6,6 @@ import {
   AppBar,
   Avatar,
   Box,
-  IconButton,
-  Tooltip,
   Button,
   Container,
   Dialog,
