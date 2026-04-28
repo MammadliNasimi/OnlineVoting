@@ -6,6 +6,9 @@ function parseContractError(err) {
   if (msg.includes('0xe55099ca') || msg.includes('ElectionNotStarted') || msg.includes('not started')) return 'Seçim henüz başlamadı.';
   if (msg.includes('0x66ec7230') || msg.includes('ElectionEnded') || msg.includes('has ended')) return 'Bu seçim sona erdi.';
   if (msg.includes('0xe66ea08f') || msg.includes('InvalidCandidate')) return 'Geçersiz aday seçimi.';
+  if (msg.includes('0x274cf401') || msg.includes('InvalidSignatures')) {
+    return 'İmza doğrulaması başarısız. Sunucu/kontrat adresi veya chain ayarları uyuşmuyor olabilir.';
+  }
   if (msg.includes('Rate limit') || msg.includes('Rate limit aşıldı') || msg.includes('limitine ulaşıldı')) {
     return 'Çok sık oy gönderme denemesi yapıldı. Lütfen bir süre bekleyip tekrar deneyin.';
   }

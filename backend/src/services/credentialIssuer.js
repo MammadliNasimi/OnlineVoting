@@ -14,15 +14,16 @@ class CredentialIssuer {
 
         const cleanKey = typeof issuerPrivateKey === 'string' ? issuerPrivateKey.trim() : issuerPrivateKey;
         const cleanAddress = typeof contractAddress === 'string' ? contractAddress.trim() : contractAddress;
+        const numericChainId = Number(chainId);
         this.issuerWallet = new ethers.Wallet(cleanKey);
         this.contractAddress = cleanAddress;
-        this.chainId = chainId;
+        this.chainId = Number.isFinite(numericChainId) ? numericChainId : 31337;
 
         this.domain = {
             name: 'VotingSSI',
             version: '1.0',
-            chainId: chainId,
-            verifyingContract: contractAddress
+            chainId: this.chainId,
+            verifyingContract: cleanAddress
         };
 
         this.types = VOTE_PROOF_TYPES;
