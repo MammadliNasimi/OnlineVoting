@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pickPreferredCameraId } from './cameraUtils';
+import { waitForBlink } from './livenessCheck';
+import { loadFaceModels as loadModels, stopFaceStream } from './faceApiLoader';
 
 function useFaceAuth(currentPage) {
   const [faceEnabled, setFaceEnabled] = useState(false);
@@ -15,13 +17,7 @@ function useFaceAuth(currentPage) {
   const streamRef = useRef(null);
 
   const stopFaceCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    stopFaceStream(videoRef, streamRef);
   }, []);
 
   useEffect(() => {
@@ -36,39 +32,14 @@ function useFaceAuth(currentPage) {
 
   const loadFaceModels = async () => {
     if (faceEnabled) return;
-
     setFaceLoading(true);
-    setFaceMessage('Yuz modelleri yukleniyor...');
+    setFaceMessage('Yüz modelleri yükleniyor...');
     try {
-      const ensureFaceApiLoaded = async () => {
-        if (window.faceapi) return window.faceapi;
-        await new Promise((resolve, reject) => {
-          const existing = document.querySelector('script[data-faceapi="1"]');
-          if (existing) {
-            existing.addEventListener('load', resolve, { once: true });
-            existing.addEventListener('error', reject, { once: true });
-            return;
-          }
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
-          script.async = true;
-          script.dataset.faceapi = '1';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.body.appendChild(script);
-        });
-        return window.faceapi;
-      };
-
-      const faceapi = await ensureFaceApiLoaded();
-      const modelBase = 'https://justadudewhohacks.github.io/face-api.js/models';
-      await faceapi.nets.tinyFaceDetector.loadFromUri(modelBase);
-      await faceapi.nets.faceLandmark68Net.loadFromUri(modelBase);
-      await faceapi.nets.faceRecognitionNet.loadFromUri(modelBase);
+      await loadModels();
       setFaceEnabled(true);
-      setFaceMessage('Yuz dogrulama hazir.');
+      setFaceMessage('Yüz doğrulama hazır.');
     } catch {
-      setFaceMessage('Yuz modeli yuklenemedi. Internet baglantisini kontrol edin.');
+      setFaceMessage('Yüz modeli yüklenemedi. İnternet bağlantısını kontrol edin.');
     } finally {
       setFaceLoading(false);
     }
@@ -155,15 +126,25 @@ function useFaceAuth(currentPage) {
       throw new Error('Yuz modeli hazir degil. Once kamerayi baslatin.');
     }
     const faceapi = window.faceapi;
-    const detection = await faceapi
-      .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor();
 
-    if (!detection) {
+    // Liveness: kullaniciya goz kirpma istiyoruz; bu sayede telefonda gosterilen
+    // sabit bir fotoğraf reddedilir.
+    setFaceMessage('Lutfen kameraya bakin ve bir kez goz kirpin...');
+    const { detection } = await waitForBlink({
+      video: videoRef.current,
+      faceapi,
+      onState: (s) => {
+        if (s === 'searching') setFaceMessage('Yuzunuz aranıyor...');
+        if (s === 'open') setFaceMessage('Goz acildi — simdi kapatip acin...');
+        if (s === 'closed') setFaceMessage('Goz kapali algilandi — gozunuzu acin...');
+      }
+    });
+
+    if (!detection || !detection.descriptor) {
       throw new Error('Yuz algilanamadi. Kameraya daha net bakin.');
     }
 
+    setFaceMessage('Canlilik dogrulandi.');
     return Array.from(detection.descriptor);
   };
 

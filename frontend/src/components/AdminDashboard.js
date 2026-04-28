@@ -6,6 +6,8 @@ import {
   AppBar,
   Avatar,
   Box,
+  IconButton,
+  Tooltip,
   Button,
   Container,
   Dialog,
@@ -29,6 +31,12 @@ import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import SecurityIcon from '@mui/icons-material/Security';
 import EmailIcon from '@mui/icons-material/Email';
 import LogoutIcon from '@mui/icons-material/Logout';
+import InsightsIcon from '@mui/icons-material/Insights';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import HistoryIcon from '@mui/icons-material/History';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import { useThemeMode } from '../ThemeContext';
 
 import CandidatesModal from './admin/CandidatesModal';
 import DomainRestrictionsModal from './admin/DomainRestrictionsModal';
@@ -39,6 +47,7 @@ const drawerWidth = 260;
 
 function AdminDashboard({ user, sessionId, onLogout }) {
   const queryClient = useQueryClient();
+  const { mode, toggleMode } = useThemeMode();
   const [activeTab, setActiveTab] = useState('overview');
 
   const [domainModalOpen, setDomainModalOpen] = useState(false);
@@ -59,6 +68,13 @@ function AdminDashboard({ user, sessionId, onLogout }) {
       queryClient.invalidateQueries({ queryKey: ['dbStats'] });
       queryClient.invalidateQueries({ queryKey: ['elections'] });
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['admin_elections'] });
+      queryClient.invalidateQueries({ queryKey: ['admin_queue'] });
+      // Analytics + Sonuclar arşivi: tüm scope'lar icin yenile.
+      queryClient.invalidateQueries({ queryKey: ['analytics_overview'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics_elections'] });
+      queryClient.invalidateQueries({ queryKey: ['archive_elections'] });
+      queryClient.invalidateQueries({ queryKey: ['election_analytics'] });
     });
     return () => socket.disconnect();
   }, [queryClient]);
@@ -194,7 +210,12 @@ function AdminDashboard({ user, sessionId, onLogout }) {
       <AppBar position="fixed" sx={{ width: `calc(100% - ${drawerWidth}px)`, ml: `${drawerWidth}px`, bgcolor: 'white', color: 'text.primary', boxShadow: 1 }}>
         <Toolbar>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>Yonetim Paneli</Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Tooltip title={mode === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}>
+              <IconButton size="small" onClick={toggleMode}>
+                {mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
             <Typography variant="body2" fontWeight="medium">{user?.name} (Admin)</Typography>
             <Avatar sx={{ bgcolor: 'secondary.main', width: 32, height: 32 }}>{user?.name?.charAt(0).toUpperCase()}</Avatar>
           </Box>
@@ -211,6 +232,9 @@ function AdminDashboard({ user, sessionId, onLogout }) {
         <List sx={{ mt: 2, px: 2 }}>
           {[
             { id: 'overview', title: 'Genel Bakis', icon: <DashboardIcon /> },
+            { id: 'analytics', title: 'Live Analytics', icon: <InsightsIcon /> },
+            { id: 'results', title: 'Sonuclar & Arsiv', icon: <EmojiEventsIcon /> },
+            { id: 'votes', title: 'Gecmis Oylar', icon: <HistoryIcon /> },
             { id: 'users', title: 'Kullanicilar', icon: <PeopleIcon /> },
             { id: 'elections', title: 'Secim & Adaylar', icon: <HowToVoteIcon /> },
             { id: 'queue', title: 'Kuyruk Yonetimi', icon: <Box component="span" sx={{ fontSize: '1.25rem' }}>?</Box> },
@@ -237,6 +261,7 @@ function AdminDashboard({ user, sessionId, onLogout }) {
         <Container maxWidth="xl">
           <AdminTabsContent
             activeTab={activeTab}
+            sessionId={sessionId}
             dbStats={dbStats}
             users={users}
             loadingUsers={loadingUsers}

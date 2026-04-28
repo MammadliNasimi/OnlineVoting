@@ -79,6 +79,27 @@ class VoteService {
     const candidate = election.candidates.find(c => c.id === Number(candidateId));
     if (!candidate) throw new Error('Aday bulunamadı');
 
+    if (candidate.blockchain_candidate_id === null || candidate.blockchain_candidate_id === undefined) {
+      // On-chain'de bulunmayan adaya oy atılamaz (DB-only kayıt edilmiş, seçim aktive
+      // edilmeden eklenmiş ama senkronizasyon kopuk vs.).
+      throw new Error('Bu aday on-chain seçim listesinde bulunmadığı için oy verilemiyor. Yöneticiyle iletişime geçin.');
+    }
+
+    // Zaten basariyla oy atilmis mi? (DB tarafi, asil engel on-chain nullifier).
+    if (db.hasUserVoted && (await db.hasUserVoted(user.id, normalizedElectionId))) {
+      const err = new Error('Bu seçim için zaten oy kullandınız.');
+      err.code = 'ALREADY_VOTED';
+      throw err;
+    }
+    if (db.hasCompletedVote && db.hasCompletedVote(user.id, normalizedElectionId)) {
+      const err = new Error('Bu seçim için zaten oy kullandınız.');
+      err.code = 'ALREADY_VOTED';
+      throw err;
+    }
+
+    // Eski / kalmis bir 'failed' job varsa onu sil ki yeni dene­me partial-unique
+    // index ile catismasin (sadece pending/processing'i tutuyoruz zaten).
+
     const credentialData = await state.credentialIssuer.issueVoteCredential(email, election.blockchain_election_id, burnerAddress);
 
     const completeVoteProof = {
@@ -91,13 +112,23 @@ class VoteService {
       burnerSignature: burnerSignature
     };
 
-    voteJobQueue.add({
-      userId: user.id,
-      electionID: normalizedElectionId,
-      candidateID: candidate.blockchain_candidate_id,
-      burnerAddress: burnerAddress,
-      signature: JSON.stringify(completeVoteProof)
-    });
+    try {
+      voteJobQueue.add({
+        userId: user.id,
+        electionID: normalizedElectionId,
+        candidateID: candidate.blockchain_candidate_id,
+        burnerAddress: burnerAddress,
+        signature: JSON.stringify(completeVoteProof)
+      });
+    } catch (queueErr) {
+      // Race kontrolu: ayni anda 2 istek geldi, partial-unique index ikinciyi reddetti.
+      if (queueErr.code === 'DUPLICATE_PENDING_VOTE' || (queueErr.message && queueErr.message.includes('UNIQUE'))) {
+        const err = new Error('Bu seçim için zaten bekleyen bir oyunuz var. Lütfen sonucu bekleyin.');
+        err.code = 'DUPLICATE_PENDING_VOTE';
+        throw err;
+      }
+      throw queueErr;
+    }
   }
 
   async getVotingHistory(user) {

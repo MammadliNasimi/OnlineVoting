@@ -4,6 +4,8 @@ import axios from 'axios';
 import SimpleVoting from './components/SimpleVoting';
 import AdminDashboard from './components/AdminDashboard';
 import Login from './pages/Login';
+import PinPromptDialog from './components/PinPromptDialog';
+import { lockBurnerWallet } from './LocalIdentity';
 import { Box, CircularProgress } from '@mui/material';
 
 function App() {
@@ -53,6 +55,7 @@ function App() {
     setUser(null);
     setSessionId('');
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    lockBurnerWallet();
     navigate('/login');
   };
 
@@ -79,29 +82,32 @@ function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to={user?.role === 'admin' ? '/admin' : user ? '/vote' : '/login'} replace />} />
+    <>
+      <PinPromptDialog />
+      <Routes>
+        <Route path="/" element={<Navigate to={user?.role === 'admin' ? '/admin' : user ? '/vote' : '/login'} replace />} />
 
-      <Route path="/login" element={<Login onLoginComplete={handleLoginComplete} />} />
+        <Route path="/login" element={<Login onLoginComplete={handleLoginComplete} />} />
 
-      <Route path="/vote" element={
-        user && user.role !== 'admin' ? (
-          <Box sx={{ minHeight: '100vh' }}>
-            <SimpleVoting user={user} sessionId={sessionId} onLogout={handleLogout} />
-          </Box>
-        ) : (
-          <Navigate to="/login" replace />
-        )
-      } />
+        <Route path="/vote" element={
+          user && user.role !== 'admin' ? (
+            <Box sx={{ minHeight: '100vh' }}>
+              <SimpleVoting user={user} sessionId={sessionId} onLogout={handleLogout} />
+            </Box>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
 
-      <Route path="/admin/*" element={
-        user?.role === 'admin' ? (
-          <AdminDashboard user={user} sessionId={sessionId} onLogout={handleLogout} />
-        ) : (
-          <Navigate to="/login" replace />
-        )
-      } />
-    </Routes>
+        <Route path="/admin/*" element={
+          user?.role === 'admin' ? (
+            <AdminDashboard user={user} sessionId={sessionId} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+      </Routes>
+    </>
   );
 }
 

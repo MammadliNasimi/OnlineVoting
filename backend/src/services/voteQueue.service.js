@@ -2,6 +2,8 @@ const db = require('../config/database-sqlite');
 const state = require('../config/state');
 const { parseContractError } = require('../utils/voteHelpers');
 
+const PROOF_TTL_SECONDS = 60 * 60; // Smart contract da 1 saatlik geçerlilik bekliyor.
+
 class VoteQueue {
   constructor() {
     this.isProcessing = false;
@@ -26,6 +28,25 @@ class VoteQueue {
         db.updateVoteStatus(jobData.id, 'processing');
         try {
           const completeVoteProof = JSON.parse(jobData.signature);
+
+          // Imza freshness kontrolu: queue gecikmesi nedeniyle on-chain ProofExpired
+          // donmeden once kalici 'failed' isaretle ki sonsuz retry olmasin.
+          const nowSec = Math.floor(Date.now() / 1000);
+          const proofTs = Number(completeVoteProof.timestamp);
+          if (!Number.isFinite(proofTs) || nowSec - proofTs > PROOF_TTL_SECONDS) {
+            const expiredMsg = 'EXPIRED_PROOF: imza süresi dolmuş, lütfen yeniden oy verin';
+            console.warn(`[VoteQueue] ⏰ Job ${jobData.id} expired (age: ${nowSec - proofTs}s)`);
+            db.updateVoteStatus(jobData.id, 'failed', null, expiredMsg);
+            if (state.io) {
+              state.io.to(`user_${jobData.user_id}`).emit('voteFailed', {
+                success: false,
+                message: 'Oy imzanızın süresi doldu. Lütfen tekrar oy verin.',
+                electionId: jobData.election_id
+              });
+            }
+            continue;
+          }
+
           const result = await state.relayerService.submitVote(
             completeVoteProof,
             `user_${jobData.user_id}`,
@@ -51,10 +72,12 @@ class VoteQueue {
           }
         } catch(jobError) {
           console.error(`[VoteQueue] ❌ Job ${jobData.id} Failed:`, jobError.message);
-          db.updateVoteStatus(jobData.id, 'failed', null, jobError.message);
+          // Belirli kalıcı hatalarda direkt 'failed' (tekrar denemenin anlamı yok).
+          const permanent = /ProofExpired|DoubleVoting|InvalidSignatures|ElectionNotActive|ElectionEnded|InvalidCandidate/i.test(jobError.message || '');
+          db.updateVoteStatus(jobData.id, permanent ? 'failed' : 'failed', null, jobError.message);
            if (state.io) {
              state.io.to(`user_${jobData.user_id}`).emit('voteFailed', {
-                 success: false,       
+                 success: false,
                  message: parseContractError(jobError),
                  electionId: jobData.election_id
              });

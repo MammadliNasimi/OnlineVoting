@@ -35,13 +35,14 @@ class VoteController {
       });
     } catch (error) {
       console.error('Error in simple vote pre-check:', error);
-      const msg = error.message;
+      const msg = error.message || '';
       let status = 500;
-      if (msg.includes('Database') || msg.includes('unavailable')) status = 503;
-      if (msg === 'Unauthorized') status = 401;
-      if (msg.includes('Bulunamadı') || msg.includes('bulunamadı') || msg.includes('Aday')) status = 404;
-      if (msg.includes('aktif') || msg.includes('yetkili')) status = 400;
-      if (msg.includes('domain')) status = 403;
+      if (error.code === 'DUPLICATE_PENDING_VOTE' || error.code === 'ALREADY_VOTED') status = 409;
+      else if (msg.includes('Database') || msg.includes('unavailable')) status = 503;
+      else if (msg === 'Unauthorized') status = 401;
+      else if (msg.includes('Bulunamadı') || msg.includes('bulunamadı') || msg.includes('Aday')) status = 404;
+      else if (msg.includes('aktif') || msg.includes('yetkili')) status = 400;
+      else if (msg.includes('domain')) status = 403;
 
       res.status(status).json({
         message: msg || 'Oy kuyruğa eklenemedi',

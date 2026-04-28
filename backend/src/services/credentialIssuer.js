@@ -81,59 +81,6 @@ class CredentialIssuer {
         }
     }
 
-    async issueAuthorizationToken(email, electionID) {
-        try {
-            const emailHash = this.hashEmail(email);
-            const timestamp = Math.floor(Date.now() / 1000);
-
-            console.log('\n🎫 Issuing ZK-Email Authorization Token:');
-            console.log('   Email Hash:', emailHash);
-            console.log('   Election ID:', electionID);
-
-            return {
-                emailHash: emailHash,
-                electionID: electionID,
-                timestamp: timestamp,
-                issuer: this.issuerWallet.address,
-                validUntil: timestamp + 3600
-            };
-
-        } catch (error) {
-            console.error('❌ Error issuing authorization:', error);
-            throw error;
-        }
-    }
-
-    async verifyCredential(credential) {
-        try {
-            const voteProof = {
-                emailHash: credential.emailHash,
-                electionID: BigInt(credential.electionID),
-                candidateID: BigInt(credential.candidateID),
-                timestamp: BigInt(credential.timestamp)
-            };
-
-            const recoveredAddress = ethers.verifyTypedData(
-                this.domain,
-                this.types,
-                voteProof,
-                credential.signature
-            );
-
-            const isValid = recoveredAddress.toLowerCase() === this.issuerWallet.address.toLowerCase();
-            console.log('\n🔍 Credential Verification:');
-            console.log('   Expected:', this.issuerWallet.address);
-            console.log('   Recovered:', recoveredAddress);
-            console.log('   Valid:', isValid);
-
-            return isValid;
-
-        } catch (error) {
-            console.error('❌ Error verifying credential:', error);
-            return false;
-        }
-    }
-
     getDomain() {
         return this.domain;
     }

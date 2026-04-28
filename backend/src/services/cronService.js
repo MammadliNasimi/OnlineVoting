@@ -1,6 +1,8 @@
 const cron = require('node-cron');
 const db = require('../config/database-sqlite');
 const { createMailTransporter } = require('../utils/helpers');
+const { getEligibleVoters, sendBulkEmail } = require('./announcementService');
+const { electionEnded: electionEndedTemplate } = require('./emailTemplates');
 
 class CronService {
     start() {
@@ -10,6 +12,32 @@ class CronService {
         cron.schedule('*/5 * * * *', async () => {
             console.log('🔍 Zamanlanmış Görev: Biten seçimler kontrol ediliyor...');
             this.checkEndedElections();
+        });
+
+        // Saatte bir OTP / sifre sifirlama kayitlarini temizle (tablo şişmesin).
+        cron.schedule('0 * * * *', () => {
+            try {
+                const result = db.cleanupOldOtpRecords ? db.cleanupOldOtpRecords() : null;
+                if (result) {
+                    console.log(`🧹 OTP cleanup: ${result.emailVerifications} email_verifications, ${result.passwordResets} password_resets silindi.`);
+                }
+                // Stuck 'processing' job'lari (10 dk+) yeniden 'pending' yap — sunucu restart vs.
+                const stuck = db.db.prepare(
+                    "UPDATE vote_queue SET status = 'pending' WHERE status = 'processing' AND datetime(created_at) <= datetime('now', '-10 minutes')"
+                ).run();
+                if (stuck.changes > 0) {
+                    console.log(`♻️ ${stuck.changes} stuck 'processing' job pending'e cevrildi.`);
+                }
+                // Cok eski 'failed' job'lari (>30 gun) sil.
+                const old = db.db.prepare(
+                    "DELETE FROM vote_queue WHERE status = 'failed' AND datetime(created_at) <= datetime('now', '-30 days')"
+                ).run();
+                if (old.changes > 0) {
+                    console.log(`🧹 ${old.changes} eski failed job temizlendi.`);
+                }
+            } catch (err) {
+                console.error('Cleanup cron error:', err.message);
+            }
         });
     }
 
@@ -51,61 +79,24 @@ class CronService {
                     }
                 }
 
-                // 2. Oy kullananları (veya tüm kullanıcıları) bul
-                // Opsiyon 1: Sadece oy kullananlara bildir:
-                // SELECT u.email FROM vote_status vs JOIN users u ON vs.user_id = u.id WHERE vs.election_id = ? AND u.email IS NOT NULL AND u.email != ''
-                // Opsiyon 2: Sistemdeki herkese bildir (Burada sadece oy kullananlara bildirim yapacağız)
-                const usersStmt = db.db.prepare(`
-                    SELECT u.email, u.name 
-                    FROM vote_status vs 
-                    JOIN users u ON vs.user_id = u.id 
-                    WHERE vs.election_id = ? AND u.email IS NOT NULL AND u.email != ''
-                `);
-                const voters = usersStmt.all(election.id);
-
+                // 2. Uygun domain'deki tüm seçmenlere sonuç maili gönder.
+                const voters = getEligibleVoters(election.id);
                 if (voters.length > 0) {
-                    console.log(`📧 ${voters.length} adet seçmene sonuçlar mail atılacak...`);
-                    const transporter = createMailTransporter();
-                    
-                    for (const voter of voters) {
-                        try {
-                            const mailOptions = {
-                                from: process.env.EMAIL_USER || 'no-reply@onlinevoting.com',
-                                to: voter.email,
-                                subject: `Seçim Sonucu: ${election.title}`,
-                                html: `
-                                    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                                        <h2>Sayın ${voter.name},</h2>
-                                        <p>Katılmış olduğunuz <strong>"${election.title}"</strong> başlıklı seçim sona ermiştir.</p>
-                                        <div style="background: #f4f6f8; padding: 15px; border-left: 4px solid #4f46e5; margin: 20px 0;">
-                                            <h3 style="margin: 0; color: #4f46e5;">Sonuçlar:</h3>
-                                            <p style="font-size: 16px; font-weight: bold;">${winnerText}</p>
-                                        </div>
-                                        <p>Sistemi kullanarak demokratik sürece katkıda bulunduğunuz için teşekkür ederiz.</p>
-                                        <br/>
-                                        <p style="font-size: 12px; color: #777;">OnlineVoting SSI Sistem Yönetimi</p>
-                                    </div>
-                                `
-                            };
-                            
-                            await transporter.sendMail(mailOptions);
-                            console.log(`✅ Mail gönderildi: ${voter.email}`);
-                        } catch (err) {
-                            console.error(`❌ Mail gönderilemedi (${voter.email}):`, err.message);
-                        }
-                    }
+                    console.log(`📧 ${voters.length} uygun seçmene sonuç maili gönderiliyor...`);
+                    const mailResult = await sendBulkEmail(
+                        voters,
+                        () => electionEndedTemplate(election, winnerText)
+                    );
+                    console.log(`📊 Mail sonucu: ${mailResult.sent} gönderildi, ${mailResult.failed} başarısız`);
                 } else {
-                    console.log('ℹ️ Bu seçime katılan/email adresi olan kimse bulunamadı.');
+                    console.log('ℹ️ Bu seçim için uygun seçmen bulunamadı.');
                 }
 
-                // 3. Seçimi kapat ve mail durumu güncellendi olarak işaretle
-                const updateStmt = db.db.prepare(`
-                    UPDATE elections 
-                    SET is_active = 0, results_emailed = 1 
-                    WHERE id = ?
-                `);
-                updateStmt.run(election.id);
-                console.log(`🔒 Seçim (#${election.id}) kapatıldı ve mail gönderimi tamamlandı olarak işaretlendi.`);
+                // 3. Seçimi kapat ve mail gönderildi olarak işaretle.
+                db.db.prepare(
+                    'UPDATE elections SET is_active = 0, results_emailed = 1 WHERE id = ?'
+                ).run(election.id);
+                console.log(`🔒 Seçim (#${election.id}) kapatıldı.`);
             }
 
         } catch (error) {

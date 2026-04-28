@@ -23,8 +23,12 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import PauseCircleIcon from '@mui/icons-material/PauseCircle';
-import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import AnalyticsTab from './AnalyticsTab';
+import ResultsArchiveTab from './ResultsArchiveTab';
+import UsersTab from './UsersTab';
+import SecurityTab from './SecurityTab';
+import ElectionsTab from './ElectionsTab';
+import VotingHistoryTab from './VotingHistoryTab';
 
 function AdminTabsContent({
   activeTab,
@@ -52,9 +56,16 @@ function AdminTabsContent({
   addDomainMutation,
   deleteDomainMutation,
   securityLogs,
-  loadingLogs
+  loadingLogs,
+  sessionId
 }) {
   switch (activeTab) {
+    case 'analytics':
+      return <AnalyticsTab sessionId={sessionId} />;
+
+    case 'results':
+      return <ResultsArchiveTab sessionId={sessionId} />;
+
     case 'overview':
       return (
         <Box>
@@ -77,98 +88,31 @@ function AdminTabsContent({
 
     case 'users':
       return (
-        <Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-            <Typography variant="h5" fontWeight="bold">Kullanici Yonetimi</Typography>
-            <Button variant="contained" startIcon={<AddIcon />}>Yeni Kullanici</Button>
-          </Box>
-          <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 3 }}>
-            <Table>
-              <TableHead sx={{ bgcolor: 'grey.100' }}>
-                <TableRow>
-                  <TableCell><strong>ID</strong></TableCell>
-                  <TableCell><strong>Isim</strong></TableCell>
-                  <TableCell><strong>E-Posta</strong></TableCell>
-                  <TableCell><strong>Rol</strong></TableCell>
-                  <TableCell><strong>Yuz Verisi</strong></TableCell>
-                  <TableCell align="right"><strong>Islemler</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {loadingUsers ? (
-                  <TableRow><TableCell colSpan={6} align="center"><CircularProgress /></TableCell></TableRow>
-                ) : (Array.isArray(users) ? users : (users?.users || [])).map((u) => (
-                  <TableRow key={u.id} hover>
-                    <TableCell>{u.id}</TableCell>
-                    <TableCell fontWeight="medium">{u.name}</TableCell>
-                    <TableCell>{u.email || '-'}</TableCell>
-                    <TableCell><Chip size="small" label={u.role} color={u.role === 'admin' ? 'secondary' : 'default'} /></TableCell>
-                    <TableCell><Chip size="small" label={u.has_face_descriptor ? 'Var' : 'Yok'} color={u.has_face_descriptor ? 'success' : 'default'} variant="outlined" /></TableCell>
-                    <TableCell align="right">
-                      <IconButton color="error" onClick={() => deleteUserMutation.mutate(u.id)} disabled={u.role === 'admin' && users.length === 1}>
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
+        <UsersTab
+          users={users}
+          loadingUsers={loadingUsers}
+          deleteUserMutation={deleteUserMutation}
+          sessionId={sessionId}
+        />
       );
 
     case 'elections':
       return (
-        <Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-            <Typography variant="h5" fontWeight="bold">Secimler ve Adaylar</Typography>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setElectionModalOpen(true)}>Yeni Secim Ekle</Button>
-          </Box>
-          <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 3 }}>
-            <Table>
-              <TableHead sx={{ bgcolor: 'grey.100' }}>
-                <TableRow>
-                  <TableCell><strong>ID</strong></TableCell>
-                  <TableCell><strong>Secim Basligi</strong></TableCell>
-                  <TableCell><strong>Aciklama</strong></TableCell>
-                  <TableCell><strong>Baslangic - Bitis Tarihi</strong></TableCell>
-                  <TableCell><strong>Durum</strong></TableCell>
-                  <TableCell align="right"><strong>Islemler</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {loadingElections ? (
-                  <TableRow><TableCell colSpan={6} align="center"><CircularProgress /></TableCell></TableRow>
-                ) : elections.map((e) => (
-                  <TableRow key={e.id} hover>
-                    <TableCell>{e.id}</TableCell>
-                    <TableCell><strong>{e.title}</strong></TableCell>
-                    <TableCell>{e.description || '-'}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <Typography variant="caption">B: {new Date(e.start_date || e.created_at).toLocaleString()}</Typography>
-                        <Typography variant="caption">B: {new Date(e.end_date || new Date().getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleString()}</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell><Chip size="small" label={e.is_active ? 'Aktif' : 'Pasif'} color={e.is_active ? 'success' : 'default'} /></TableCell>
-                    <TableCell align="right">
-                      <IconButton size="small" color={e.is_active ? 'error' : 'success'} onClick={() => toggleElectionMutation.mutate(e.id)} title={e.is_active ? 'Secimi Bitir' : 'Secimi Baslat'}>
-                        {e.is_active ? <PauseCircleIcon /> : <PlayCircleIcon />}
-                      </IconButton>
-                      <Button size="small" variant="text" sx={{ mr: 1 }} onClick={() => { setSelectedElection(e); setElectionDomainsModalOpen(true); }}>Kisitlamalar</Button>
-                      <Button size="small" variant="outlined" sx={{ mr: 1 }} onClick={() => { setSelectedElection(e); setCandidatesModalOpen(true); }}>Adaylar</Button>
-                      <IconButton color="error" onClick={() => deleteElectionMutation.mutate(e.id)}><DeleteIcon /></IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {elections.length === 0 && !loadingElections && (
-                  <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}>Kayitli secim bulunmamaktadir.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
+        <ElectionsTab
+          elections={elections}
+          loadingElections={loadingElections}
+          setElectionModalOpen={setElectionModalOpen}
+          toggleElectionMutation={toggleElectionMutation}
+          setSelectedElection={setSelectedElection}
+          setElectionDomainsModalOpen={setElectionDomainsModalOpen}
+          setCandidatesModalOpen={setCandidatesModalOpen}
+          deleteElectionMutation={deleteElectionMutation}
+          sessionId={sessionId}
+        />
       );
+
+    case 'votes':
+      return <VotingHistoryTab sessionId={sessionId} />;
 
     case 'queue':
       return (
@@ -269,39 +213,11 @@ function AdminTabsContent({
 
     case 'security':
       return (
-        <Box p={3}>
-          <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>Guvenlik Loglari</Typography>
-          <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
-            Sistemdeki son aktiviteler ve denetim kayitlari. Otomatik olarak guncellenir.
-          </Alert>
-          <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 3, maxHeight: '600px', overflowY: 'auto' }}>
-            <Table stickyHeader>
-              <TableHead sx={{ bgcolor: 'grey.100' }}>
-                <TableRow>
-                  <TableCell><strong>Zaman</strong></TableCell>
-                  <TableCell><strong>Seviye</strong></TableCell>
-                  <TableCell><strong>Servis</strong></TableCell>
-                  <TableCell><strong>Mesaj</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {loadingLogs ? (
-                  <TableRow><TableCell colSpan={4} align="center"><CircularProgress /></TableCell></TableRow>
-                ) : securityLogs.map((log, i) => (
-                  <TableRow key={i} hover>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{log.timestamp || '-'}</TableCell>
-                    <TableCell><Chip label={log.level || 'bilinmiyor'} color={log.level === 'error' ? 'error' : log.level === 'warn' ? 'warning' : 'info'} size="small" /></TableCell>
-                    <TableCell>{log.service || '-'}</TableCell>
-                    <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{log.message}</TableCell>
-                  </TableRow>
-                ))}
-                {securityLogs.length === 0 && !loadingLogs && (
-                  <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3 }}>Kayitli log bulunamadi.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
+        <SecurityTab
+          sessionId={sessionId}
+          securityLogs={securityLogs}
+          loadingLogs={loadingLogs}
+        />
       );
 
     default:

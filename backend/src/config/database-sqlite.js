@@ -62,7 +62,98 @@ async createUser(name, hashedPassword, role = 'user', studentId = null, email = 
   }
 
   async getAllUsers() {
-    return this.db.prepare('SELECT id, name, role, student_id, email, created_at FROM users').all();
+    // GUVENLIK: password / face descriptor ASLA bu sorgudan donmemeli.
+    // Yeni kolonlar eklendiginde bu listeyi guncelleyin; SELECT * kullanmayin.
+    return this.db.prepare(
+      'SELECT id, name, first_name, last_name, role, student_id, email, created_at FROM users'
+    ).all();
+  }
+
+  // Hassas alanlari (password) sıyıran sanitizer — controller'larin direkt user nesnesi
+  // dondurdugu yerlerde kullanin.
+  sanitizeUser(user) {
+    if (!user || typeof user !== 'object') return user;
+    const { password, ...safe } = user;
+    return safe;
+  }
+
+  // ============== ACCOUNT LOCK (MANUEL) ==============
+
+  lockUser(userId, lockedUntil, reason = '') {
+    this.db.prepare(
+      'UPDATE users SET locked_until = ?, lock_reason = ? WHERE id = ?'
+    ).run(lockedUntil, reason || null, userId);
+    return this.db.prepare(
+      'SELECT id, name, role, locked_until, lock_reason FROM users WHERE id = ?'
+    ).get(userId);
+  }
+
+  unlockUser(userId) {
+    this.db.prepare(
+      "UPDATE users SET locked_until = NULL, lock_reason = NULL WHERE id = ?"
+    ).run(userId);
+    return this.db.prepare(
+      'SELECT id, name, role, locked_until, lock_reason FROM users WHERE id = ?'
+    ).get(userId);
+  }
+
+  // Sadece kilit durumunu döner — auth.service.js login kontrolü için hafif sorgu.
+  getUserLockStatus(userId) {
+    return this.db.prepare(
+      'SELECT locked_until, lock_reason FROM users WHERE id = ?'
+    ).get(userId);
+  }
+
+  // ============== AUTH ATTEMPTS ADMIN VIEW ==============
+
+  // Tüm auth_attempts kayıtları, kullanıcı adı/e-posta ile eşleştirilmiş.
+  getAllAuthAttempts() {
+    // auth_attempts.identifier kullanıcı adı veya e-posta (lowercase) olabilir.
+    // users tablosundaki name veya email ile LEFT JOIN deneyelim.
+    return this.db.prepare(`
+      SELECT
+        a.id,
+        a.identifier,
+        a.kind,
+        a.attempt_count,
+        a.locked_until,
+        a.last_attempt_at,
+        COALESCE(u_name.id, u_email.id) AS user_id,
+        COALESCE(u_name.name, u_email.name) AS user_name,
+        COALESCE(u_name.email, u_email.email) AS user_email
+      FROM auth_attempts a
+      LEFT JOIN users u_name ON LOWER(u_name.name) = a.identifier
+      LEFT JOIN users u_email ON LOWER(u_email.email) = a.identifier
+      ORDER BY a.last_attempt_at DESC
+    `).all();
+  }
+
+  resetAuthAttemptsByIdentifier(identifier) {
+    this.db.prepare(
+      'DELETE FROM auth_attempts WHERE identifier = ?'
+    ).run(identifier);
+  }
+
+  resetAllAuthAttemptsForUser(userId) {
+    const user = this.db.prepare('SELECT name, email FROM users WHERE id = ?').get(userId);
+    if (!user) return;
+    if (user.name) {
+      this.db.prepare('DELETE FROM auth_attempts WHERE identifier = ?').run(user.name.toLowerCase());
+    }
+    if (user.email) {
+      this.db.prepare('DELETE FROM auth_attempts WHERE identifier = ?').run(user.email.toLowerCase());
+    }
+  }
+
+  setUserRole(userId, role) {
+    const ALLOWED = ['user', 'admin', 'moderator'];
+    if (!ALLOWED.includes(role)) {
+      throw new Error(`Geçersiz rol: "${role}". İzin verilenler: ${ALLOWED.join(', ')}`);
+    }
+    this.db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, userId);
+    return this.db.prepare(
+      'SELECT id, name, first_name, last_name, role, student_id, email, created_at FROM users WHERE id = ?'
+    ).get(userId);
   }
 
   updateUser(id, fields) {
@@ -260,25 +351,52 @@ async createUser(name, hashedPassword, role = 'user', studentId = null, email = 
   }
 
   setUserFaceProfile(userId, descriptorArray) {
-    const descriptorJson = JSON.stringify(descriptorArray);
+    const { encryptDescriptor } = require('../utils/walletUtils');
+    const descriptorEncrypted = encryptDescriptor(descriptorArray);
+    // descriptor_json artik kullanilmiyor (placeholder) — KVKK gerekcesiyle plaintext degil.
     this.db.prepare(
-      `INSERT INTO user_face_profiles (user_id, descriptor_json, created_at, updated_at)
-       VALUES (?, ?, datetime('now'), datetime('now'))
+      `INSERT INTO user_face_profiles (user_id, descriptor_json, descriptor_encrypted, created_at, updated_at)
+       VALUES (?, '', ?, datetime('now'), datetime('now'))
        ON CONFLICT(user_id) DO UPDATE SET
-       descriptor_json = excluded.descriptor_json,
+       descriptor_json = '',
+       descriptor_encrypted = excluded.descriptor_encrypted,
        updated_at = datetime('now')`
-    ).run(userId, descriptorJson);
+    ).run(userId, descriptorEncrypted);
   }
 
   getUserFaceProfile(userId) {
     const row = this.db.prepare(
-      'SELECT user_id, descriptor_json, created_at, updated_at FROM user_face_profiles WHERE user_id = ?'
+      'SELECT user_id, descriptor_json, descriptor_encrypted, created_at, updated_at FROM user_face_profiles WHERE user_id = ?'
     ).get(userId);
     if (!row) return null;
-    return {
-      ...row,
-      descriptor: JSON.parse(row.descriptor_json)
-    };
+
+    const { decryptDescriptor } = require('../utils/walletUtils');
+    let descriptor = null;
+
+    if (row.descriptor_encrypted) {
+      try {
+        descriptor = decryptDescriptor(row.descriptor_encrypted);
+      } catch (e) {
+        console.error('[FaceProfile] Decryption failed:', e.message);
+        return null;
+      }
+    } else if (row.descriptor_json) {
+      // Geri uyumluluk: eski plaintext kayitlari okurken anında şifrele.
+      try {
+        descriptor = JSON.parse(row.descriptor_json);
+        const { encryptDescriptor } = require('../utils/walletUtils');
+        const migrated = encryptDescriptor(descriptor);
+        this.db.prepare(
+          'UPDATE user_face_profiles SET descriptor_encrypted = ?, descriptor_json = \'\' WHERE user_id = ?'
+        ).run(migrated, userId);
+        console.log(`[FaceProfile] Migrated plaintext descriptor for user ${userId}`);
+      } catch {
+        return null;
+      }
+    }
+
+    if (!descriptor) return null;
+    return { user_id: row.user_id, descriptor, created_at: row.created_at, updated_at: row.updated_at };
   }
   hasUserFaceProfile(userId) {
     const row = this.db.prepare('SELECT user_id FROM user_face_profiles WHERE user_id = ?').get(userId);
@@ -342,8 +460,39 @@ async createUser(name, hashedPassword, role = 'user', studentId = null, email = 
     ).get(email.toLowerCase(), otpHash);
   }
 
+  // Aktif (used=0, expires_at > now) son OTP kaydini doner — yanlis denemeyi takip etmek icin.
+  getActiveEmailVerification(email) {
+    return this.db.prepare(
+      `SELECT * FROM email_verifications
+       WHERE email = ? AND used = 0
+       AND datetime(expires_at) > datetime('now')
+       ORDER BY created_at DESC LIMIT 1`
+    ).get(email.toLowerCase());
+  }
+
+  incrementEmailVerificationAttempts(id) {
+    this.db.prepare(
+      'UPDATE email_verifications SET attempts = COALESCE(attempts, 0) + 1 WHERE id = ?'
+    ).run(id);
+  }
+
+  invalidateEmailVerification(id) {
+    this.db.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').run(id);
+  }
+
   markEmailVerificationUsed(id) {
     this.db.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').run(id);
+  }
+
+  cleanupOldOtpRecords() {
+    // 24 saatten eski / kullanilmis kayitlari sil — tablo şişmesin.
+    const a = this.db.prepare(
+      "DELETE FROM email_verifications WHERE datetime(expires_at) <= datetime('now', '-1 day')"
+    ).run();
+    const b = this.db.prepare(
+      "DELETE FROM password_resets WHERE datetime(expires_at) <= datetime('now', '-1 day')"
+    ).run();
+    return { emailVerifications: a.changes, passwordResets: b.changes };
   }
 
   getAllElections() {
@@ -435,6 +584,289 @@ async createUser(name, hashedPassword, role = 'user', studentId = null, email = 
       'SELECT id FROM election_domain_restrictions WHERE election_id = ? AND domain = ?'
     ).get(electionId, domain);
     return !!found;
+  }
+
+  // ============== AUTH ATTEMPTS (BRUTE FORCE GUARD) ==============
+
+  // Kayitli kullanici bulamadigimizda bile kullanim sayilarini ayni anahtar uzerinden
+  // takip edebilmek icin identifier olarak normalize edilmis e-posta / kullanici adi kullaniyoruz.
+  getAuthAttempt(identifier, kind) {
+    return this.db.prepare(
+      'SELECT * FROM auth_attempts WHERE identifier = ? AND kind = ?'
+    ).get(identifier, kind);
+  }
+
+  recordAuthFailure(identifier, kind, maxAttempts = 5, lockMinutes = 15) {
+    const row = this.getAuthAttempt(identifier, kind);
+    if (!row) {
+      this.db.prepare(
+        `INSERT INTO auth_attempts (identifier, kind, attempt_count, last_attempt_at)
+         VALUES (?, ?, 1, datetime('now'))`
+      ).run(identifier, kind);
+      return { count: 1, lockedUntil: null };
+    }
+
+    const newCount = (row.attempt_count || 0) + 1;
+    let lockedUntil = null;
+    if (newCount >= maxAttempts) {
+      lockedUntil = new Date(Date.now() + lockMinutes * 60 * 1000).toISOString();
+    }
+    this.db.prepare(
+      `UPDATE auth_attempts SET attempt_count = ?, last_attempt_at = datetime('now'), locked_until = ?
+       WHERE identifier = ? AND kind = ?`
+    ).run(newCount, lockedUntil, identifier, kind);
+    return { count: newCount, lockedUntil };
+  }
+
+  resetAuthAttempts(identifier, kind) {
+    this.db.prepare(
+      'DELETE FROM auth_attempts WHERE identifier = ? AND kind = ?'
+    ).run(identifier, kind);
+  }
+
+  isAuthLocked(identifier, kind) {
+    const row = this.getAuthAttempt(identifier, kind);
+    if (!row || !row.locked_until) return { locked: false };
+    const lockedUntil = new Date(row.locked_until);
+    if (Number.isNaN(lockedUntil.getTime()) || lockedUntil <= new Date()) {
+      // Lockout suresi gecmis — sayaclari sifirla.
+      this.resetAuthAttempts(identifier, kind);
+      return { locked: false };
+    }
+    return { locked: true, until: row.locked_until, retryAfterMs: lockedUntil.getTime() - Date.now() };
+  }
+
+  // ============== USER DETAIL ==============
+
+  // Tek kullanıcının tüm detaylarını tek sorguda toplar (admin paneli için).
+  getUserDetail(userId) {
+    const user = this.db.prepare(
+      'SELECT id, name, first_name, last_name, role, student_id, email, created_at, locked_until, lock_reason FROM users WHERE id = ?'
+    ).get(userId);
+    if (!user) return null;
+
+    // Son session = "son login zamanı"
+    const lastSession = this.db.prepare(
+      `SELECT created_at, expires_at FROM sessions
+       WHERE user_id = ?
+       ORDER BY created_at DESC LIMIT 1`
+    ).get(userId);
+
+    // Aktif session sayısı
+    const activeSessionCount = this.db.prepare(
+      `SELECT COUNT(*) AS c FROM sessions
+       WHERE user_id = ? AND datetime(expires_at) > datetime('now')`
+    ).get(userId)?.c || 0;
+
+    // Face profil durumu
+    const faceProfile = this.db.prepare(
+      'SELECT created_at, updated_at FROM user_face_profiles WHERE user_id = ?'
+    ).get(userId);
+
+    // Brute force kayıtları (tüm kind'lar)
+    const authAttempts = this.db.prepare(
+      `SELECT kind, attempt_count, locked_until, last_attempt_at
+       FROM auth_attempts WHERE identifier = ? OR identifier = ?`
+    ).all(
+      (user.name || '').toLowerCase(),
+      (user.email || '').toLowerCase()
+    );
+
+    // Oy geçmişi (son 20) — hangi seçimlere katıldığı
+    const voteHistory = this.db.prepare(
+      `SELECT
+         vs.election_id,
+         vs.voted_at,
+         vs.transaction_hash,
+         e.title AS election_title,
+         c.name AS candidate_name
+       FROM vote_status vs
+       LEFT JOIN elections e ON e.id = vs.election_id
+       LEFT JOIN votes v ON v.election_id = vs.election_id AND v.transaction_hash = vs.transaction_hash
+       LEFT JOIN candidates c ON c.id = v.candidate_id
+       WHERE vs.user_id = ?
+       ORDER BY vs.voted_at DESC
+       LIMIT 20`
+    ).all(userId);
+
+    // Katılım özeti
+    const voteCount = this.db.prepare(
+      'SELECT COUNT(*) AS c FROM vote_status WHERE user_id = ?'
+    ).get(userId)?.c || 0;
+
+    return {
+      user,
+      lastSession,
+      activeSessionCount,
+      faceProfile,
+      authAttempts,
+      voteHistory,
+      voteCount
+    };
+  }
+
+  // ============== USER LOOKUP (CASE-INSENSITIVE) ==============
+
+  findUserByEmailCaseInsensitive(email) {
+    if (!email) return null;
+    return this.db.prepare(
+      'SELECT * FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1'
+    ).get(email);
+  }
+
+  // ============== ELECTION CANDIDATE LOCKING ==============
+
+  lockElectionCandidates(id) {
+    this.db.prepare('UPDATE elections SET candidates_locked = 1 WHERE id = ?').run(id);
+  }
+
+  markElectionEndedPermanently(id) {
+    this.db.prepare(
+      'UPDATE elections SET ended_permanently = 1, is_active = 0 WHERE id = ?'
+    ).run(id);
+  }
+
+  getElectionRow(id) {
+    return this.db.prepare('SELECT * FROM elections WHERE id = ?').get(id);
+  }
+
+  // ============== PASSWORD RESET (RATE LIMITED) ==============
+
+  // ============== ANALYTICS ==============
+
+  // Son N saat icindeki oylari saatlik bucket'lara grupla.
+  // electionId verilirse sadece o secim, verilmezse tum oylar.
+  getHourlyVoteDistribution(hours = 24, electionId = null) {
+    const params = [`-${hours} hours`];
+    let where = "datetime(v.created_at) >= datetime('now', ?)";
+    if (electionId) {
+      where += ' AND v.election_id = ?';
+      params.push(electionId);
+    }
+    const rows = this.db.prepare(`
+      SELECT
+        strftime('%Y-%m-%dT%H:00:00', v.created_at) AS hour_bucket,
+        COUNT(*) AS vote_count
+      FROM votes v
+      WHERE ${where}
+      GROUP BY hour_bucket
+      ORDER BY hour_bucket ASC
+    `).all(...params);
+    return rows;
+  }
+
+  // Domain bazli katilim: hangi domainden kac kullanici oy attı.
+  getDomainParticipation(electionId = null) {
+    const params = [];
+    let where = '';
+    if (electionId) {
+      where = 'WHERE vs.election_id = ?';
+      params.push(electionId);
+    }
+    return this.db.prepare(`
+      SELECT
+        COALESCE(LOWER(SUBSTR(u.email, INSTR(u.email, '@') + 1)), 'unknown') AS domain,
+        COUNT(DISTINCT vs.user_id) AS voter_count
+      FROM vote_status vs
+      LEFT JOIN users u ON u.id = vs.user_id
+      ${where}
+      GROUP BY domain
+      ORDER BY voter_count DESC
+    `).all(...params);
+  }
+
+  // Toplam katilim: kayitli kullanici, oy atan, oran.
+  getTurnoutStats(electionId = null) {
+    const totalUsersRow = this.db.prepare(
+      "SELECT COUNT(*) AS c FROM users WHERE role = 'user'"
+    ).get();
+
+    if (electionId) {
+      // Bu secim icin uygun (domain'e gore) seçmen sayisi.
+      const electionDomains = this.db.prepare(
+        'SELECT domain FROM election_domain_restrictions WHERE election_id = ?'
+      ).all(electionId);
+
+      let eligibleVoters;
+      if (electionDomains.length === 0) {
+        // Domain kisitlamasi yok: tum kayitli kullanicilar uygun.
+        eligibleVoters = totalUsersRow.c;
+      } else {
+        const placeholders = electionDomains.map(() => '?').join(',');
+        const params = electionDomains.map(d => d.domain.toLowerCase());
+        const eligibleRow = this.db.prepare(`
+          SELECT COUNT(*) AS c FROM users
+          WHERE role = 'user'
+          AND email IS NOT NULL
+          AND LOWER(SUBSTR(email, INSTR(email, '@') + 1)) IN (${placeholders})
+        `).get(...params);
+        eligibleVoters = eligibleRow.c;
+      }
+
+      const votedRow = this.db.prepare(
+        'SELECT COUNT(DISTINCT user_id) AS c FROM vote_status WHERE election_id = ?'
+      ).get(electionId);
+
+      const total = eligibleVoters || 0;
+      const voted = votedRow.c || 0;
+      return {
+        eligibleVoters: total,
+        votedCount: voted,
+        turnoutPct: total > 0 ? Number(((voted / total) * 100).toFixed(2)) : 0,
+        scope: 'election',
+        electionId
+      };
+    }
+
+    // Genel istatistik: tüm seçimler için birleşik.
+    const distinctVotersRow = this.db.prepare(
+      'SELECT COUNT(DISTINCT user_id) AS c FROM vote_status'
+    ).get();
+    const totalVotesRow = this.db.prepare('SELECT COUNT(*) AS c FROM votes').get();
+    const activeElectionsRow = this.db.prepare(
+      "SELECT COUNT(*) AS c FROM elections WHERE is_active = 1 AND datetime('now') BETWEEN start_date AND end_date"
+    ).get();
+
+    const total = totalUsersRow.c || 0;
+    const voters = distinctVotersRow.c || 0;
+    return {
+      totalRegistered: total,
+      uniqueVoters: voters,
+      totalVotes: totalVotesRow.c || 0,
+      activeElections: activeElectionsRow.c || 0,
+      turnoutPct: total > 0 ? Number(((voters / total) * 100).toFixed(2)) : 0,
+      scope: 'global'
+    };
+  }
+
+  // Aday bazli sonuclar (canli/bittikten sonra gosterim icin).
+  getElectionResults(electionId) {
+    return this.db.prepare(`
+      SELECT
+        c.id AS candidate_id,
+        c.blockchain_candidate_id,
+        c.name AS candidate_name,
+        c.description AS candidate_description,
+        COALESCE(c.vote_count, 0) AS vote_count
+      FROM candidates c
+      WHERE c.election_id = ?
+      ORDER BY c.blockchain_candidate_id ASC, c.id ASC
+    `).all(electionId);
+  }
+
+  countRecentPasswordResets(email, windowMinutes = 15) {
+    const row = this.db.prepare(
+      `SELECT COUNT(*) as c FROM password_resets
+       WHERE LOWER(email) = LOWER(?)
+       AND datetime(created_at) > datetime('now', ?)`
+    ).get(email, `-${windowMinutes} minutes`);
+    return row?.c || 0;
+  }
+
+  invalidateOldPasswordResets(email) {
+    this.db.prepare(
+      "UPDATE password_resets SET used = 1 WHERE LOWER(email) = LOWER(?) AND used = 0"
+    ).run(email);
   }
 }
 

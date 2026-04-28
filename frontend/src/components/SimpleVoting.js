@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, Box, CircularProgress } from '@mui/material';
 import { io } from 'socket.io-client';
-import { getBurnerWallet, signVoteClientSide } from '../LocalIdentity';
+import Confetti from 'react-confetti';
+import { getBurnerAddress, signVoteClientSide } from '../LocalIdentity';
 import VotingHeader from './voting/VotingHeader';
 import VotingMainPanel from './voting/VotingMainPanel';
 import VotingSidebar from './voting/VotingSidebar';
@@ -25,6 +26,18 @@ function SimpleVoting({ user, sessionId, onLogout }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [walletCopied, setWalletCopied] = useState(false);
 
+  // Konfeti state — oy blokzincire yazıldığında 5 sn patlıyor.
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const confettiTimerRef = useRef(null);
+
+  // Ekran boyutu değişince konfeti alanını güncelle.
+  useEffect(() => {
+    const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const {
     showFaceModal,
     setShowFaceModal,
@@ -35,14 +48,18 @@ function SimpleVoting({ user, sessionId, onLogout }) {
     handleRegisterFace
   } = useFaceRegistration(sessionId, API_BASE);
 
+  // Konfeti'yi tetikle — balonları 5 sn sonra durdur.
+  const triggerConfetti = () => {
+    setShowConfetti(true);
+    if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
+    confettiTimerRef.current = setTimeout(() => setShowConfetti(false), 5000);
+  };
+
   useEffect(() => {
     if (!user || !user.id) return;
 
-    try {
-      getBurnerWallet();
-    } catch {
-      // Burner wallet üretimi başarısız olursa sessizce devam et; oy verirken yeniden denenir.
-    }
+    // Burner cüzdan artik PIN ile şifreli; ilk oy verme anına kadar açmıyoruz.
+    // Sadece adres okuyabilmek için kasada kayıt varsa o yeterli.
 
     const socket = io(SOCKET_URL, { withCredentials: true });
     socket.on('connect', () => socket.emit('join', user.id));
@@ -51,6 +68,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
       if (data.success) {
         setSuccessMsg(data.message || 'Oyunuz basariyla blokzincire yazildi!');
         setQueueMsg('');
+        triggerConfetti();
         queryClient.invalidateQueries({ queryKey: ['votingHistory'] });
         queryClient.invalidateQueries({ queryKey: ['elections'] });
         setTimeout(() => setSuccessMsg(''), 5000);
@@ -68,8 +86,11 @@ function SimpleVoting({ user, sessionId, onLogout }) {
       setTimeout(() => setErrorMsg(''), 5000);
     });
 
-    return () => socket.disconnect();
-  }, [user, queryClient]);
+    return () => {
+      socket.disconnect();
+      if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
+    };
+  }, [user, queryClient]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: elections = [], isLoading: isLoadingElections, error: electionsError } = useQuery({
     queryKey: ['elections'],
@@ -119,7 +140,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
 
   const walletAddress = useMemo(() => {
     try {
-      return getBurnerWallet().address;
+      return getBurnerAddress();
     } catch {
       return '';
     }
@@ -158,11 +179,20 @@ function SimpleVoting({ user, sessionId, onLogout }) {
         setTimeout(() => setQueueMsg(''), 6000);
       } else {
         setSuccessMsg(res.data.message || 'Oyunuz basariyla kaydedildi!');
+        triggerConfetti();
         queryClient.invalidateQueries({ queryKey: ['votingHistory'] });
         queryClient.invalidateQueries({ queryKey: ['elections'] });
         setTimeout(() => setSuccessMsg(''), 5000);
       }
       setSelectedCandidate(null);
+    },
+    onError: (err) => {
+      // PIN iptali / yanlis PIN durumlari kullanici dostu mesaj olarak gosterilsin.
+      const local = err?.message;
+      const remote = err?.response?.data?.message;
+      const msg = remote || local || 'Oy işlemi başarısız oldu';
+      setErrorMsg(msg);
+      setTimeout(() => setErrorMsg(''), 6000);
     }
   });
 
@@ -189,6 +219,19 @@ function SimpleVoting({ user, sessionId, onLogout }) {
     : (user.student_id || '-');
 
   return (
+    <>
+    {/* Konfeti — fixed pozisyonda tüm viewport üzerinde patlıyor */}
+    {showConfetti && (
+      <Confetti
+        width={windowSize.width}
+        height={windowSize.height}
+        recycle={false}
+        numberOfPieces={340}
+        gravity={0.28}
+        colors={['#10b981', '#34d399', '#4f46e5', '#a78bfa', '#fbbf24', '#f59e0b', '#06b6d4', '#fff']}
+        style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, pointerEvents: 'none' }}
+      />
+    )}
     <Box
       sx={{
         minHeight: '100vh',
@@ -260,6 +303,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
         onClose={() => setShowHistory(false)}
         isLoadingHistory={isLoadingHistory}
         votingHistory={votingHistory}
+        burnerAddress={walletAddress}
       />
 
       <FaceDialog
@@ -288,6 +332,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
         onCopyWallet={handleCopyWallet}
       />
     </Box>
+    </>
   );
 }
 

@@ -1,3 +1,40 @@
+import { useEffect, useRef, useState } from 'react';
+
+// ─── Geri sayım hook ─────────────────────────────────────────────
+// targetDate: ISO string veya Date — o zamana kadar say.
+// Null döner (süre dolmuşsa veya geçersizse).
+export function useCountdown(targetDate) {
+  const calcDiff = () => {
+    const diff = new Date(targetDate).getTime() - Date.now();
+    if (!Number.isFinite(diff) || diff <= 0) return null;
+    const totalSecs = Math.floor(diff / 1000);
+    return {
+      days: Math.floor(totalSecs / 86400),
+      hours: Math.floor((totalSecs % 86400) / 3600),
+      minutes: Math.floor((totalSecs % 3600) / 60),
+      seconds: totalSecs % 60,
+      totalMs: diff
+    };
+  };
+
+  const [remaining, setRemaining] = useState(() => calcDiff());
+  const ref = useRef();
+
+  useEffect(() => {
+    setRemaining(calcDiff());
+    ref.current = setInterval(() => setRemaining(calcDiff()), 1000);
+    return () => clearInterval(ref.current);
+  }, [targetDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return remaining;
+}
+
+export function padTwo(n) {
+  return String(n).padStart(2, '0');
+}
+
+// ─────────────────────────────────────────────────────────────────
+
 export const formatVoteDate = (vote) => {
   const raw = vote.voted_at ?? vote.timestamp ?? vote.created_at ?? vote.createdAt ?? vote.date;
   if (!raw) return 'Tarih yok';

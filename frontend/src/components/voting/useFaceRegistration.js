@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
+import { waitForBlink } from '../auth/livenessCheck';
+import { loadFaceModels, stopFaceStream } from '../auth/faceApiLoader';
 
 function useFaceRegistration(sessionId, apiBase) {
   const [showFaceModal, setShowFaceModal] = useState(false);
@@ -8,74 +10,46 @@ function useFaceRegistration(sessionId, apiBase) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
-  const stopFaceCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-  };
+  const stopFaceCamera = () => stopFaceStream(videoRef, streamRef);
 
   useEffect(() => {
     if (!showFaceModal) stopFaceCamera();
-  }, [showFaceModal]);
+  }, [showFaceModal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startFaceCamera = async () => {
-    setFaceMessage('Kamera aciliyor...');
+    setFaceMessage('Kamera açılıyor...');
     try {
-      const ensureFaceApiLoaded = async () => {
-        if (window.faceapi) return window.faceapi;
-        await new Promise((resolve, reject) => {
-          const existing = document.querySelector('script[data-faceapi="1"]');
-          if (existing) {
-            existing.addEventListener('load', resolve, { once: true });
-            existing.addEventListener('error', reject, { once: true });
-            return;
-          }
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
-          script.async = true;
-          script.dataset.faceapi = '1';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.body.appendChild(script);
-        });
-        return window.faceapi;
-      };
-
-      const faceapi = await ensureFaceApiLoaded();
-      const modelBase = 'https://justadudewhohacks.github.io/face-api.js/models';
-      await faceapi.nets.tinyFaceDetector.loadFromUri(modelBase);
-      await faceapi.nets.faceLandmark68Net.loadFromUri(modelBase);
-      await faceapi.nets.faceRecognitionNet.loadFromUri(modelBase);
-
+      await loadFaceModels();
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-      setFaceMessage('Yuzunuzu kameraya gosterin ve butona basin.');
+      setFaceMessage('Yüzünüzü kameraya gösterin ve butona basın.');
     } catch {
-      setFaceMessage('Kamera veya yuz modeli baslatilamadi.');
+      setFaceMessage('Kamera veya yüz modeli başlatılamadı.');
     }
   };
 
   const handleRegisterFace = async () => {
     if (!videoRef.current || !window.faceapi) return;
     setFaceLoading(true);
-    setFaceMessage('Yuz verisi aliniyor...');
+    setFaceMessage('Lütfen kameraya bakın ve bir kez göz kırpın...');
     try {
       const faceapi = window.faceapi;
-      const detection = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+      const { detection } = await waitForBlink({
+        video: videoRef.current,
+        faceapi,
+        onState: (s) => {
+          if (s === 'searching') setFaceMessage('Yüzünüz aranıyor...');
+          if (s === 'open') setFaceMessage('Göz açıldı — şimdi kapatıp açın...');
+          if (s === 'closed') setFaceMessage('Göz kapalı algılandı — açın...');
+        }
+      });
 
-      if (!detection) {
-        setFaceMessage('Yuz algilanamadi. Lutfen kameraya net bakin.');
+      if (!detection || !detection.descriptor) {
+        setFaceMessage('Yüz algılanamadı. Lütfen kameraya net bakın.');
         setFaceLoading(false);
         return;
       }
@@ -86,10 +60,14 @@ function useFaceRegistration(sessionId, apiBase) {
         { faceDescriptor: descriptor },
         { headers: { 'x-session-id': sessionId }, withCredentials: true }
       );
-      setFaceMessage('Yuz profilinize eklendi!');
+      setFaceMessage('Yüz profilinize eklendi!');
       setTimeout(() => setShowFaceModal(false), 2000);
     } catch (err) {
-      setFaceMessage(err.response?.data?.message || 'Bir hata olustu.');
+      if (err && err.code === 'LIVENESS_FAILED') {
+        setFaceMessage('Canlılık doğrulanamadı. Lütfen kameraya bakıp göz kırpın ve tekrar deneyin.');
+      } else {
+        setFaceMessage(err.response?.data?.message || err.message || 'Bir hata oluştu.');
+      }
     } finally {
       setFaceLoading(false);
     }

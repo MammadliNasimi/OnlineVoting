@@ -25,10 +25,31 @@ function attachQueueMethods(DatabaseService) {
   };
 
   DatabaseService.prototype.addVoteToQueue = function(jobData) {
+    // Race condition guard: ayni user/election icin pending/processing job varsa hata fırlat.
+    // Partial unique index zaten engelliyor; mesaj kullanıcı dostu olsun diye önce sorgulayalım.
+    const existing = this.db.prepare(
+      `SELECT id, status FROM vote_queue
+       WHERE user_id = ? AND election_id = ? AND status IN ('pending', 'processing')
+       LIMIT 1`
+    ).get(jobData.userId, jobData.electionID);
+    if (existing) {
+      const err = new Error('Bu seçim için zaten bekleyen bir oyunuz var. Lütfen sonucu bekleyin.');
+      err.code = 'DUPLICATE_PENDING_VOTE';
+      throw err;
+    }
     const info = this.db.prepare(
       'INSERT INTO vote_queue (user_id, candidate_id, election_id, signature, burner_address) VALUES (?, ?, ?, ?, ?)'
     ).run(jobData.userId, jobData.candidateID, jobData.electionID, jobData.signature, jobData.burnerAddress);
     return info.lastInsertRowid;
+  };
+
+  DatabaseService.prototype.hasCompletedVote = function(userId, electionId) {
+    const row = this.db.prepare(
+      `SELECT id FROM vote_queue
+       WHERE user_id = ? AND election_id = ? AND status = 'completed'
+       LIMIT 1`
+    ).get(userId, electionId);
+    return !!row;
   };
 
   DatabaseService.prototype.getNextPendingVote = function() {

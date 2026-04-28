@@ -1,4 +1,4 @@
-﻿const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 const authService = require('../services/auth.service');
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -11,8 +11,9 @@ class AuthController {
     } catch (error) {
       console.error('Register send-otp error:', error);
       let status = 500;
-      if (error.message.includes('izin listesinde yok')) status = 403;
-      if (error.message.includes('Geçerli bir e-posta')) status = 400;
+      if (error.locked) status = 429;
+      else if (error.message && error.message.includes('izin listesinde yok')) status = 403;
+      else if (error.message && error.message.includes('Geçerli bir e-posta')) status = 400;
       res.status(status).json({ message: error.message || 'OTP gönderilemedi' });
     }
   }
@@ -69,9 +70,11 @@ class AuthController {
     } catch (error) {
       console.error('Login error:', error);
       let status = 500;
-      if (error.message === 'Database not available') status = 503;
-      if (error.message === 'Invalid credentials') status = 401;
-      if (error.message.startsWith('Forbidden')) status = 403;
+      if (error.locked) status = 429;
+      else if (error.message === 'Database not available') status = 503;
+      else if (error.message === 'Invalid credentials') status = 401;
+      else if (error.message && error.message.startsWith('Forbidden')) status = 403;
+      else if (error.message && error.message.startsWith('Çok fazla')) status = 429;
       res.status(status).json({ message: error.message || 'Login failed' });
     }
   }
@@ -124,10 +127,12 @@ class AuthController {
     } catch (error) {
       console.error('Face login error:', error);
       let status = 500;
-      if (error.message === 'Database not available') status = 503;
-      if (error.message.includes('required')) status = 400;
-      if (error.message.includes('failed') || error.message.includes('No face profile')) status = 401;
-      if (error.message.startsWith('Forbidden')) status = 403;
+      if (error.locked) status = 429;
+      else if (error.message === 'Database not available') status = 503;
+      else if (error.message && error.message.includes('required')) status = 400;
+      else if (error.message && (error.message.includes('failed') || error.message.includes('No face profile'))) status = 401;
+      else if (error.message && error.message.startsWith('Forbidden')) status = 403;
+      else if (error.message && error.message.startsWith('Çok fazla')) status = 429;
       res.status(status).json({ message: error.message || 'Face login failed' });
     }
   }

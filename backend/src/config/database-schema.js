@@ -18,6 +18,10 @@ function initializeSchema(db) {
     db.exec('ALTER TABLE users ADD COLUMN last_name TEXT;');
   } catch (_) {}
 
+  // Manuel hesap kilitleme: admin tarafından belirli bir tarihe kadar kilit koyulabilir.
+  try { db.exec('ALTER TABLE users ADD COLUMN locked_until DATETIME'); } catch (_) {}
+  try { db.exec('ALTER TABLE users ADD COLUMN lock_reason TEXT'); } catch (_) {}
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,11 +45,17 @@ function initializeSchema(db) {
       is_active INTEGER DEFAULT 1,
       results_emailed INTEGER DEFAULT 0,
       blockchain_election_id INTEGER,
+      candidates_locked INTEGER DEFAULT 0,
+      ended_permanently INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   try { db.exec('ALTER TABLE elections ADD COLUMN results_emailed INTEGER DEFAULT 0'); } catch (_) {}
+  // candidates_locked: on-chain createElection çağrıldıktan sonra aday düzenlemeyi yasakla.
+  try { db.exec('ALTER TABLE elections ADD COLUMN candidates_locked INTEGER DEFAULT 0'); } catch (_) {}
+  // ended_permanently: bir kez bitirilen seçimin yeniden aktivasyonu yeni on-chain ID üretmesin.
+  try { db.exec('ALTER TABLE elections ADD COLUMN ended_permanently INTEGER DEFAULT 0'); } catch (_) {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS candidates (
@@ -132,6 +142,11 @@ function initializeSchema(db) {
     )
   `);
 
+  // KVKK / biyometrik veri: descriptor artık AES-256-GCM ile şifrelenmiş tutulur.
+  // descriptor_json eski plaintext değerleri içerebilir (geri uyumluluk),
+  // descriptor_encrypted ise yeni şifreli format için ek kolon.
+  try { db.exec('ALTER TABLE user_face_profiles ADD COLUMN descriptor_encrypted TEXT'); } catch (_) {}
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS allowed_email_domains (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,9 +198,38 @@ function initializeSchema(db) {
       otp_hash TEXT NOT NULL,
       expires_at DATETIME NOT NULL,
       used INTEGER DEFAULT 0,
+      attempts INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // OTP brute force korumasi: 5 yanlis denemeden sonra OTP iptal.
+  try { db.exec('ALTER TABLE email_verifications ADD COLUMN attempts INTEGER DEFAULT 0'); } catch (_) {}
+  try { db.exec('ALTER TABLE password_resets ADD COLUMN attempts INTEGER DEFAULT 0'); } catch (_) {}
+
+  // Brute-force / spam korumasi icin tek tablo: e-posta + amac (login, otp, reset) bazinda
+  // basarisiz denemeleri sayar ve gecici lockout uygular.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS auth_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      identifier TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      attempt_count INTEGER DEFAULT 0,
+      locked_until DATETIME,
+      last_attempt_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(identifier, kind)
+    )
+  `);
+
+  // vote_queue uzerine partial unique index: ayni kullanici ayni secimde
+  // pending/processing job ile ikinci kez kuyruga giremez.
+  try {
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_vote_queue_active_job
+      ON vote_queue (user_id, election_id)
+      WHERE status IN ('pending', 'processing')
+    `);
+  } catch (_) {}
 
   const adminExists = db.prepare('SELECT id FROM users WHERE name = ?').get('admin');
   if (!adminExists) {

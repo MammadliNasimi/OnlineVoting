@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Avatar,
@@ -13,7 +13,7 @@ import {
   IconButton,
   List,
   ListItem,
-  ListItemText,
+  Paper,
   Stack,
   Tooltip,
   Typography
@@ -25,38 +25,222 @@ import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import PersonIcon from '@mui/icons-material/Person';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ShareIcon from '@mui/icons-material/Share';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { getPublicEmailType, formatVoteDate } from './utils';
 import { outlineButtonSx, primaryButtonSx } from './styles';
+import { downloadVoteReceipt } from '../../services/receiptPdf';
+import { explorerTxUrl, EXPLORER_BASE_URL, CONTRACT_ADDRESS } from '../../config';
 
-export function HistoryDialog({ open, onClose, isLoadingHistory, votingHistory }) {
+// ─── Paylaşma yardımcısı ──────────────────────────────────────
+function buildShareText(vote) {
+  const name = vote.election_title || 'Seçim';
+  const date = vote.voted_at
+    ? new Date(vote.voted_at).toLocaleDateString('tr-TR')
+    : '';
+  return `SSI Blockchain Oylama'da "${name}" seçimine${date ? ' ' + date + ' tarihinde' : ''} güvenli şekilde oy kullandım. 🗳️ #SSIVoting #BlockchainDemocracy`;
+}
+
+async function shareOrCopy(text) {
+  if (navigator.share) {
+    try { await navigator.share({ text }); return; } catch { /* fall through */ }
+  }
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+  }
+}
+
+// ─── Oy Doğrulama mini paneli ─────────────────────────────────
+function VoteVerifyPanel({ vote, burnerAddress }) {
+  const txUrl = EXPLORER_BASE_URL ? explorerTxUrl(vote.transaction_hash) : null;
+  const contractUrl = CONTRACT_ADDRESS && EXPLORER_BASE_URL
+    ? `${EXPLORER_BASE_URL}/address/${CONTRACT_ADDRESS}`
+    : null;
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
-      <DialogTitle sx={{ fontWeight: 900 }}>Oy Gecmisi</DialogTitle>
-      <DialogContent dividers>
+    <Paper
+      elevation={0}
+      sx={{
+        mt: 1,
+        p: 1.5,
+        borderRadius: 2,
+        bgcolor: 'rgba(16,185,129,0.06)',
+        border: '1px solid rgba(16,185,129,0.18)'
+      }}
+    >
+      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
+        <VerifiedIcon sx={{ fontSize: 16, color: '#10b981' }} />
+        <Typography variant="caption" fontWeight="bold" sx={{ color: '#065f46' }}>
+          Blokzincir Doğrulaması
+        </Typography>
+      </Stack>
+
+      <Stack spacing={0.5}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <CheckCircleOutlineIcon sx={{ fontSize: 14, color: '#10b981', flexShrink: 0 }} />
+          <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+            <strong>TX:</strong> {vote.transaction_hash
+              ? vote.transaction_hash.slice(0, 20) + '…'
+              : 'Yok'}
+          </Typography>
+          {txUrl && (
+            <IconButton size="small" href={txUrl} target="_blank" rel="noopener noreferrer" component="a" sx={{ p: 0.25 }}>
+              <OpenInNewIcon sx={{ fontSize: 13 }} />
+            </IconButton>
+          )}
+        </Stack>
+        {burnerAddress && (
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <CheckCircleOutlineIcon sx={{ fontSize: 14, color: '#10b981', flexShrink: 0 }} />
+            <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+              <strong>Burner:</strong> {burnerAddress.slice(0, 16) + '…'}
+            </Typography>
+          </Stack>
+        )}
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <CheckCircleOutlineIcon sx={{ fontSize: 14, color: '#10b981', flexShrink: 0 }} />
+          <Typography variant="caption" color="text.secondary">
+            <strong>Sözleşme:</strong> {CONTRACT_ADDRESS ? CONTRACT_ADDRESS.slice(0, 14) + '…' : '—'}
+          </Typography>
+          {contractUrl && (
+            <IconButton size="small" href={contractUrl} target="_blank" rel="noopener noreferrer" component="a" sx={{ p: 0.25 }}>
+              <OpenInNewIcon sx={{ fontSize: 13 }} />
+            </IconButton>
+          )}
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+}
+
+// ─── Her oy satırı ────────────────────────────────────────────
+function VoteRow({ vote, burnerAddress }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const txUrl = EXPLORER_BASE_URL ? explorerTxUrl(vote.transaction_hash) : null;
+
+  const handleShare = async () => {
+    const text = buildShareText(vote);
+    await shareOrCopy(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <ListItem
+      alignItems="flex-start"
+      sx={{
+        bgcolor: 'background.paper',
+        borderRadius: 2,
+        border: '1px solid',
+        borderColor: 'divider',
+        flexDirection: 'column',
+        p: 1.75,
+        gap: 0.5
+      }}
+    >
+      {/* Başlık satırı */}
+      <Box sx={{ width: '100%' }}>
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+            <Typography variant="subtitle2" fontWeight="900">
+              {vote.election_title || '(Seçim başlığı yok)'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+              {vote.candidate_name
+                ? `→ ${vote.candidate_name}`
+                : <em>Anonim tercih</em>}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+              {formatVoteDate(vote)}
+            </Typography>
+          </Box>
+
+          {/* Aksiyon butonları */}
+          <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+            {txUrl && (
+              <Tooltip title="Etherscan'de Görüntüle">
+                <IconButton size="small" href={txUrl} target="_blank" rel="noopener noreferrer" component="a">
+                  <OpenInNewIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Tooltip title={copied ? 'Kopyalandı!' : 'Paylaş'}>
+              <IconButton size="small" onClick={handleShare}>
+                <ShareIcon fontSize="small" sx={{ color: copied ? '#10b981' : 'inherit' }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="PDF Makbuz İndir">
+              <IconButton size="small" onClick={() => downloadVoteReceipt(vote, burnerAddress)}>
+                <PictureAsPdfIcon fontSize="small" sx={{ color: '#ef4444' }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={expanded ? 'Doğrulamayı Gizle' : 'Oyumu Doğrula'}>
+              <IconButton size="small" onClick={() => setExpanded(v => !v)}>
+                <VerifiedIcon fontSize="small" sx={{ color: expanded ? '#10b981' : 'text.secondary' }} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        </Stack>
+      </Box>
+
+      {/* Doğrulama paneli */}
+      {expanded && (
+        <Box sx={{ width: '100%' }}>
+          <VoteVerifyPanel vote={vote} burnerAddress={burnerAddress} />
+        </Box>
+      )}
+    </ListItem>
+  );
+}
+
+// ─── Ana HistoryDialog ────────────────────────────────────────
+export function HistoryDialog({ open, onClose, isLoadingHistory, votingHistory, burnerAddress = '' }) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{ sx: { borderRadius: 2 } }}
+    >
+      <DialogTitle sx={{ fontWeight: 900 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <span>Oy Geçmişim</span>
+          {votingHistory.length > 0 && (
+            <Chip
+              size="small"
+              label={`${votingHistory.length} oy`}
+              sx={{ bgcolor: '#d1fae5', color: '#065f46', fontWeight: 700 }}
+            />
+          )}
+        </Stack>
+      </DialogTitle>
+
+      <DialogContent dividers sx={{ px: 2, py: 1.5 }}>
+        {!EXPLORER_BASE_URL && votingHistory.length > 0 && (
+          <Alert severity="info" sx={{ mb: 1.5, borderRadius: 1.5, fontSize: 12 }}>
+            Etherscan linkleri için production (Sepolia) ağına bağlanın.
+          </Alert>
+        )}
         {isLoadingHistory ? (
           <CircularProgress sx={{ display: 'block', mx: 'auto', my: 4, color: '#10b981' }} />
         ) : votingHistory.length === 0 ? (
-          <Typography color="text.secondary" align="center" sx={{ py: 4 }}>Henuz oy kullanilmamis</Typography>
+          <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
+            Henüz oy kullanılmamış.
+          </Typography>
         ) : (
-          <List sx={{ display: 'grid', gap: 1 }}>
+          <List sx={{ display: 'grid', gap: 1, p: 0 }}>
             {votingHistory.map((vote, idx) => (
-              <ListItem key={idx} alignItems="flex-start" sx={{ bgcolor: '#f7fbfd', borderRadius: 1.5, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
-                <ListItemText
-                  primary={<Typography variant="subtitle1" fontWeight="900">Secim: {vote.election_title}</Typography>}
-                  secondary={(
-                    <>
-                      <Typography component="span" variant="body2" color="text.primary" display="block">
-                        Aday: {vote.candidate_name}
-                      </Typography>
-                      Tarih: {formatVoteDate(vote)}
-                    </>
-                  )}
-                />
-              </ListItem>
+              <VoteRow key={idx} vote={vote} burnerAddress={burnerAddress} />
             ))}
           </List>
         )}
       </DialogContent>
+
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={onClose} sx={outlineButtonSx}>Kapat</Button>
       </DialogActions>
