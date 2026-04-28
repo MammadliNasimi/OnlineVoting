@@ -159,6 +159,12 @@ function SimpleVoting({ user, sessionId, onLogout }) {
   const visibleHistory = votingHistory.slice(0, 3);
 
   const voteMutation = useMutation({
+    onMutate: () => {
+      // Yeni oy denemesinde eski durum mesajlarını temizle.
+      setErrorMsg('');
+      setSuccessMsg('');
+      setQueueMsg('');
+    },
     mutationFn: async () => {
       const currentElection = elections.find(e => e.id === Number(selectedElectionId));
       const electionBlockchainId = currentElection
@@ -184,6 +190,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
       );
     },
     onSuccess: (res) => {
+      setErrorMsg('');
       if (res.data.status === 'queued') {
         setQueueMsg(res.data.message || 'Oyunuz havuza alindi, isleniyor...');
         setTimeout(() => setQueueMsg(''), 6000);
@@ -197,6 +204,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
       setSelectedCandidate(null);
     },
     onError: (err) => {
+      setQueueMsg('');
       // PIN iptali / yanlis PIN durumlari kullanici dostu mesaj olarak gosterilsin.
       const local = err?.message;
       const remote = err?.response?.data?.message;

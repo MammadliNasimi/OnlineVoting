@@ -3,6 +3,9 @@ const state = require('../config/state');
 const { voteJobQueue } = require('./voteQueue.service');
 const { isDomainAllowed } = require('../utils/voteHelpers');
 
+const REPEAT_VOTE_MAX_ATTEMPTS = 5;
+const REPEAT_VOTE_LOCK_MINUTES = 15;
+
 class VoteService {
   isElectionWithinWindow(election) {
     const now = Date.now();
@@ -58,6 +61,7 @@ class VoteService {
     const email = userDetails.email;
 
     const normalizedElectionId = Number(electionId);
+    const repeatVoteLockKey = `vote_retry:${user.id}:${normalizedElectionId}`;
     const allElections = db.getAllElections();
     const election = allElections.find(e => e.id === normalizedElectionId);
 
@@ -86,13 +90,32 @@ class VoteService {
     }
 
     // Zaten basariyla oy atilmis mi? (DB tarafi, asil engel on-chain nullifier).
-    if (db.hasUserVoted && (await db.hasUserVoted(user.id, normalizedElectionId))) {
-      const err = new Error('Bu seçim için zaten oy kullandınız.');
-      err.code = 'ALREADY_VOTED';
-      throw err;
-    }
-    if (db.hasCompletedVote && db.hasCompletedVote(user.id, normalizedElectionId)) {
-      const err = new Error('Bu seçim için zaten oy kullandınız.');
+    const hasVoteStatus = db.hasUserVoted && (await db.hasUserVoted(user.id, normalizedElectionId));
+    const hasCompleted = db.hasCompletedVote && db.hasCompletedVote(user.id, normalizedElectionId);
+    if (hasVoteStatus || hasCompleted) {
+      // Ilk oyu etkilemeyen, sadece oy verdikten sonra tekrar denemeleri sınırlayan kalkan.
+      const lock = db.isAuthLocked(repeatVoteLockKey, 'repeat_vote_after_success');
+      if (lock.locked) {
+        const mins = Math.max(1, Math.ceil((lock.retryAfterMs || 0) / 60000));
+        const err = new Error(`Bu seçim için zaten oy kullandınız. Çok sık tekrar deneme nedeniyle ${mins} dakika bekleyin.`);
+        err.code = 'ALREADY_VOTED';
+        throw err;
+      }
+
+      const result = db.recordAuthFailure(
+        repeatVoteLockKey,
+        'repeat_vote_after_success',
+        REPEAT_VOTE_MAX_ATTEMPTS,
+        REPEAT_VOTE_LOCK_MINUTES
+      );
+      if (result.lockedUntil) {
+        const err = new Error(`Bu seçim için zaten oy kullandınız. Tekrar deneme limiti aşıldı; ${REPEAT_VOTE_LOCK_MINUTES} dakika kilitlendi.`);
+        err.code = 'ALREADY_VOTED';
+        throw err;
+      }
+
+      const remaining = Math.max(0, REPEAT_VOTE_MAX_ATTEMPTS - (result.attemptCount || 0));
+      const err = new Error(`Bu seçim için zaten oy kullandınız. Kalan tekrar deneme hakkı: ${remaining}`);
       err.code = 'ALREADY_VOTED';
       throw err;
     }
@@ -120,6 +143,8 @@ class VoteService {
         burnerAddress: burnerAddress,
         signature: JSON.stringify(completeVoteProof)
       });
+      // Geçerli oy akışında aynı seçim için eski tekrar-deneme sayaçlarını temizle.
+      db.resetAuthAttempts(repeatVoteLockKey, 'repeat_vote_after_success');
     } catch (queueErr) {
       // Race kontrolu: ayni anda 2 istek geldi, partial-unique index ikinciyi reddetti.
       if (queueErr.code === 'DUPLICATE_PENDING_VOTE' || (queueErr.message && queueErr.message.includes('UNIQUE'))) {
