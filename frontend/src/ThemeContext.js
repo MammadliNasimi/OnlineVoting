@@ -13,19 +13,19 @@ export function useThemeMode() {
 }
 
 function buildTheme(mode) {
-  const isDark = mode === 'dark';
   return createTheme({
     palette: {
-      mode,
+      // Referans frontend branch ile uyum: globalde tek, stabil light palet.
+      mode: 'light',
       primary: { main: '#10b981' },
       secondary: { main: '#4f46e5' },
       background: {
-        default: isDark ? '#0f172a' : '#dbe6eb',
-        paper: isDark ? '#1e293b' : '#ffffff'
+        default: '#f4f6f8',
+        paper: '#ffffff'
       },
       text: {
-        primary: isDark ? '#f1f5f9' : '#111827',
-        secondary: isDark ? '#94a3b8' : '#475569'
+        primary: '#111827',
+        secondary: '#475569'
       }
     },
     components: {
@@ -41,21 +41,13 @@ function buildTheme(mode) {
 }
 
 export function AppThemeProvider({ children }) {
-  const [mode, setMode] = useState(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'dark' || stored === 'light') return stored;
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-    return 'light';
-  });
+  // Mevcut ekranların çoğu light tasarımla yazıldığı için dark mode kontrast
+  // problemleri yaratıyor. Referans branch davranışı için light'a sabitliyoruz.
+  const [mode, setMode] = useState('light');
 
   const toggleMode = useCallback(() => {
-    setMode((prev) => {
-      const next = prev === 'light' ? 'dark' : 'light';
-      localStorage.setItem(STORAGE_KEY, next);
-      return next;
-    });
+    setMode('light');
+    localStorage.setItem(STORAGE_KEY, 'light');
   }, []);
 
   const theme = useMemo(() => buildTheme(mode), [mode]);
