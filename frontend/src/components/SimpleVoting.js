@@ -1,10 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, Box, CircularProgress } from '@mui/material';
 import { io } from 'socket.io-client';
 import Confetti from 'react-confetti';
-import { getBurnerAddress, signVoteClientSide } from '../LocalIdentity';
+import {
+  changeBurnerPin,
+  getBurnerAddress,
+  resetBurnerWallet,
+  signVoteClientSide
+} from '../LocalIdentity';
 import VotingHeader from './voting/VotingHeader';
 import VotingMainPanel from './voting/VotingMainPanel';
 import VotingSidebar from './voting/VotingSidebar';
@@ -25,6 +30,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
   const [queueMsg, setQueueMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [walletCopied, setWalletCopied] = useState(false);
+  const [walletAddress, setWalletAddress] = useState('');
 
   // Konfeti state — oy blokzincire yazıldığında 5 sn patlıyor.
   const [showConfetti, setShowConfetti] = useState(false);
@@ -138,13 +144,17 @@ function SimpleVoting({ user, sessionId, onLogout }) {
     [elections, selectedElectionId]
   );
 
-  const walletAddress = useMemo(() => {
+  const refreshWalletAddress = useCallback(() => {
     try {
-      return getBurnerAddress();
+      setWalletAddress(getBurnerAddress());
     } catch {
-      return '';
+      setWalletAddress('');
     }
   }, []);
+
+  useEffect(() => {
+    refreshWalletAddress();
+  }, [refreshWalletAddress]);
 
   const visibleHistory = votingHistory.slice(0, 3);
 
@@ -210,6 +220,46 @@ function SimpleVoting({ user, sessionId, onLogout }) {
     await navigator.clipboard.writeText(walletAddress);
     setWalletCopied(true);
     setTimeout(() => setWalletCopied(false), 1800);
+  };
+
+  const handleChangePin = async () => {
+    const oldPin = window.prompt('Mevcut PIN girin');
+    if (oldPin === null) return;
+    const newPin = window.prompt('Yeni PIN girin (en az 4 karakter)');
+    if (newPin === null) return;
+    const confirmPin = window.prompt('Yeni PIN tekrar girin');
+    if (confirmPin === null) return;
+
+    if (!newPin || newPin.length < 4) {
+      setErrorMsg('Yeni PIN en az 4 karakter olmalı.');
+      setTimeout(() => setErrorMsg(''), 5000);
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setErrorMsg('Yeni PIN alanları eşleşmiyor.');
+      setTimeout(() => setErrorMsg(''), 5000);
+      return;
+    }
+
+    try {
+      await changeBurnerPin(oldPin, newPin);
+      setSuccessMsg('PIN başarıyla değiştirildi.');
+      setTimeout(() => setSuccessMsg(''), 5000);
+    } catch (err) {
+      setErrorMsg(err?.message || 'PIN değiştirilemedi.');
+      setTimeout(() => setErrorMsg(''), 5000);
+    }
+  };
+
+  const handleResetWallet = () => {
+    const ok = window.confirm(
+      'Cüzdan sıfırlanırsa mevcut burner cüzdan erişimi kaybolur. Devam etmek istiyor musunuz?'
+    );
+    if (!ok) return;
+    resetBurnerWallet();
+    refreshWalletAddress();
+    setSuccessMsg('Cüzdan sıfırlandı. İlk oy işleminde yeni PIN belirleyerek yeni cüzdan oluşturabilirsiniz.');
+    setTimeout(() => setSuccessMsg(''), 7000);
   };
 
   const userRole = user.role === 'admin' ? 'Yonetici' : 'Vatandas';
@@ -323,6 +373,8 @@ function SimpleVoting({ user, sessionId, onLogout }) {
           setShowFaceModal(true);
           startFaceCamera();
         }}
+        onChangePin={handleChangePin}
+        onResetWallet={handleResetWallet}
         user={user}
         userInitial={userInitial}
         userRole={userRole}

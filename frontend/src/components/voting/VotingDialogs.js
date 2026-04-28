@@ -272,7 +272,20 @@ export function FaceDialog({ open, onClose, videoRef, faceMessage, faceLoading, 
   );
 }
 
-export function ProfileDialog({ open, onClose, onOpenFace, user, userInitial, userRole, studentLabel, walletAddress, walletCopied, onCopyWallet }) {
+export function ProfileDialog({
+  open,
+  onClose,
+  onOpenFace,
+  onChangePin,
+  onResetWallet,
+  user,
+  userInitial,
+  userRole,
+  studentLabel,
+  walletAddress,
+  walletCopied,
+  onCopyWallet
+}) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2, overflow: 'hidden' } }}>
       <Box sx={{ p: 3, color: '#f8fafc', backgroundColor: '#101820', backgroundImage: `
@@ -351,6 +364,34 @@ export function ProfileDialog({ open, onClose, onOpenFace, user, userInitial, us
         </Box>
       </DialogContent>
       <DialogActions sx={{ p: 2, backgroundColor: '#ffffff' }}>
+        <Button
+          onClick={onChangePin}
+          sx={{
+            borderRadius: 1.5,
+            fontWeight: 800,
+            textTransform: 'none',
+            color: '#0f172a',
+            border: '1px solid rgba(15, 23, 42, 0.18)',
+            backgroundColor: '#f8fafc',
+            '&:hover': { borderColor: '#0f9f8f', backgroundColor: '#eefcf8' }
+          }}
+        >
+          PIN Degistir
+        </Button>
+        <Button
+          onClick={onResetWallet}
+          sx={{
+            borderRadius: 1.5,
+            fontWeight: 800,
+            textTransform: 'none',
+            color: '#7f1d1d',
+            border: '1px solid rgba(239, 68, 68, 0.30)',
+            backgroundColor: 'rgba(254, 226, 226, 0.78)',
+            '&:hover': { borderColor: '#ef4444', backgroundColor: 'rgba(254, 202, 202, 0.9)' }
+          }}
+        >
+          Cuzdani Sifirla
+        </Button>
         <Button onClick={onOpenFace} startIcon={<FaceIcon />} sx={{ py: 1, borderRadius: 1.5, fontWeight: 900, textTransform: 'none', color: '#064e3b', background: 'linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 48%, #34d399 100%)', boxShadow: '0 12px 28px rgba(16, 185, 129, 0.18)', '&:hover': { background: 'linear-gradient(135deg, #8ff0c1 0%, #5bdca8 48%, #2cc98f 100%)', boxShadow: '0 14px 32px rgba(16, 185, 129, 0.24)' } }}>
           Yuz Ekle
         </Button>

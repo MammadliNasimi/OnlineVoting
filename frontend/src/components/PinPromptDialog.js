@@ -13,6 +13,8 @@ import {
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { registerPinPrompt } from '../LocalIdentity';
 
+const PIN_NOTICE_SEEN_KEY = 'ov_pin_notice_seen_v1';
+
 // Burner cüzdanın PIN'i ile kilidini açan global dialog. App.js seviyesinde tek
 // instance olarak mount edilir. LocalIdentity modülü bunu `registerPinPrompt`
 // üzerinden çağırır; her çağrı bir promise döner.
@@ -23,6 +25,7 @@ function PinPromptDialog() {
   const [pinConfirm, setPinConfirm] = useState('');
   const [error, setError] = useState('');
   const [confirmMode, setConfirmMode] = useState(false);
+  const [showOneTimeNotice, setShowOneTimeNotice] = useState(false);
   const resolverRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -35,6 +38,12 @@ function PinPromptDialog() {
       // İlk kez kullanım gibi durumlarda confirm alanı göster.
       const firstTime = /belirleyin/i.test(reasonText || '');
       setConfirmMode(firstTime);
+      if (firstTime) {
+        const hasSeen = localStorage.getItem(PIN_NOTICE_SEEN_KEY) === '1';
+        setShowOneTimeNotice(!hasSeen);
+      } else {
+        setShowOneTimeNotice(false);
+      }
       setOpen(true);
       return new Promise((resolve) => {
         resolverRef.current = resolve;
@@ -67,6 +76,10 @@ function PinPromptDialog() {
       setError('PIN’ler eşleşmiyor.');
       return;
     }
+    if (confirmMode && showOneTimeNotice) {
+      localStorage.setItem(PIN_NOTICE_SEEN_KEY, '1');
+      setShowOneTimeNotice(false);
+    }
     finish(pin);
   };
 
@@ -82,12 +95,19 @@ function PinPromptDialog() {
     >
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 800 }}>
         <LockOutlinedIcon sx={{ color: '#10b981' }} />
-        Burner Cüzdan PIN
+        {confirmMode ? 'Yeni PIN Oluştur' : 'Burner Cüzdan PIN'}
       </DialogTitle>
       <DialogContent>
         <Typography variant="body2" sx={{ color: '#475569', mb: 2 }}>
           {reason}
         </Typography>
+
+        {confirmMode && showOneTimeNotice && (
+          <Alert severity="warning" sx={{ mb: 2, borderRadius: 1.5 }}>
+            PIN’i güvenli bir yerde saklayın. Unutulursa kurtarılamaz ve cüzdan
+            sıfırlanmalıdır.
+          </Alert>
+        )}
 
         <Box sx={{ display: 'grid', gap: 1.5 }}>
           <TextField
