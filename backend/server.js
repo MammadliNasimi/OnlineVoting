@@ -92,11 +92,6 @@ app.use((req, res, next) => {
   return res.status(503).json({ success: false, message: 'Database not initialized yet' });
 });
 
-app.use('/api', authRoutes);
-app.use('/api', voteRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/elections', electionRoutes);
-
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
@@ -104,6 +99,11 @@ app.get('/api/health', (_req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+app.use('/api', authRoutes);
+app.use('/api', voteRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/elections', electionRoutes);
 
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
