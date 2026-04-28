@@ -31,7 +31,7 @@ class RelayerService {
         );
 
         this.submissionHistory = new Map();
-        this.MAX_SUBMISSIONS_PER_HOUR = 5;
+        this.MAX_SUBMISSIONS_PER_HOUR = Number(process.env.RELAYER_MAX_SUBMISSIONS_PER_HOUR || 20);
 
         console.log('✅ Relayer Service initialized');
         console.log('   Relayer Address:', this.relayerWallet.address);

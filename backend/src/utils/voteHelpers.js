@@ -6,6 +6,15 @@ function parseContractError(err) {
   if (msg.includes('0xe55099ca') || msg.includes('ElectionNotStarted') || msg.includes('not started')) return 'Seçim henüz başlamadı.';
   if (msg.includes('0x66ec7230') || msg.includes('ElectionEnded') || msg.includes('has ended')) return 'Bu seçim sona erdi.';
   if (msg.includes('0xe66ea08f') || msg.includes('InvalidCandidate')) return 'Geçersiz aday seçimi.';
+  if (msg.includes('Rate limit') || msg.includes('Rate limit aşıldı') || msg.includes('limitine ulaşıldı')) {
+    return 'Çok sık oy gönderme denemesi yapıldı. Lütfen bir süre bekleyip tekrar deneyin.';
+  }
+  if (msg.includes('Relayer balance too low')) {
+    return 'Sistem yoğun veya relayer bakiyesi yetersiz. Lütfen daha sonra tekrar deneyin.';
+  }
+  if (msg.includes('Credential expired') || msg.includes('Proof expired') || msg.includes('ProofExpired')) {
+    return 'İmza süresi doldu. Lütfen oyu yeniden gönderin.';
+  }
   return 'İşlem başarısız oldu. ' + (msg.includes('user rejected') ? 'İmza reddedildi.' : '');
 }
 
