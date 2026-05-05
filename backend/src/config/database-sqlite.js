@@ -276,11 +276,32 @@ async createUser(name, hashedPassword, role = 'user', studentId = null, email = 
         c.name as candidate_name
        FROM vote_status vs
        JOIN elections e ON vs.election_id = e.id
-       JOIN votes v ON vs.election_id = v.election_id AND vs.transaction_hash = v.transaction_hash
-       JOIN candidates c ON v.candidate_id = c.id
+       LEFT JOIN votes v ON vs.election_id = v.election_id AND vs.transaction_hash = v.transaction_hash
+       LEFT JOIN candidates c ON v.candidate_id = c.id
        WHERE vs.user_id = ?
        ORDER BY vs.voted_at DESC`
     ).all(userId);
+  }
+
+  hasEffectiveUserVote(userId, electionId) {
+    // Gerçek "oy kullanıldı" kararı için sadece vote_status yeterli değil.
+    // vote_status ve votes kaydı tutarlıysa veya kuyruk completed ise true sayıyoruz.
+    const statusBackedByVote = this.db.prepare(
+      `SELECT 1
+       FROM vote_status vs
+       JOIN votes v ON v.election_id = vs.election_id AND v.transaction_hash = vs.transaction_hash
+       WHERE vs.user_id = ? AND vs.election_id = ? AND vs.has_voted = 1
+       LIMIT 1`
+    ).get(userId, electionId);
+    if (statusBackedByVote) return true;
+
+    const queueCompleted = this.db.prepare(
+      `SELECT 1
+       FROM vote_queue
+       WHERE user_id = ? AND election_id = ? AND status = 'completed'
+       LIMIT 1`
+    ).get(userId, electionId);
+    return !!queueCompleted;
   }
 
   getVoteResultsByElection(electionId = null) {

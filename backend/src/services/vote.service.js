@@ -90,9 +90,8 @@ class VoteService {
     }
 
     // Zaten basariyla oy atilmis mi? (DB tarafi, asil engel on-chain nullifier).
-    const hasVoteStatus = db.hasUserVoted && (await db.hasUserVoted(user.id, normalizedElectionId));
-    const hasCompleted = db.hasCompletedVote && db.hasCompletedVote(user.id, normalizedElectionId);
-    if (hasVoteStatus || hasCompleted) {
+    const hasEffectiveVote = db.hasEffectiveUserVote && db.hasEffectiveUserVote(user.id, normalizedElectionId);
+    if (hasEffectiveVote) {
       // Ilk oyu etkilemeyen, sadece oy verdikten sonra tekrar denemeleri sınırlayan kalkan.
       const lock = db.isAuthLocked(repeatVoteLockKey, 'repeat_vote_after_success');
       if (lock.locked) {
