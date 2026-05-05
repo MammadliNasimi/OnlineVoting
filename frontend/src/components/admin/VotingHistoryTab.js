@@ -99,7 +99,7 @@ function VotingHistoryTab({ sessionId }) {
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2.5 }}>
         <TextField
           size="small"
-          placeholder="Kullanıcı adı, e-posta, seçim, aday..."
+          placeholder="Kullanıcı adı, e-posta, seçim..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -141,7 +141,6 @@ function VotingHistoryTab({ sessionId }) {
               <TableCell><strong>Kullanıcı</strong></TableCell>
               <TableCell><strong>E-Posta</strong></TableCell>
               <TableCell><strong>Seçim</strong></TableCell>
-              <TableCell><strong>Aday</strong></TableCell>
               <TableCell><strong>Oy Tarihi</strong></TableCell>
               <TableCell align="center"><strong>TX</strong></TableCell>
             </TableRow>
@@ -149,13 +148,13 @@ function VotingHistoryTab({ sessionId }) {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                   <CircularProgress size={28} />
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                   {search || selectedElectionId ? 'Filtreyle eşleşen oy kaydı bulunamadı.' : 'Henüz hiçbir oy kullanılmadı.'}
                 </TableCell>
               </TableRow>
@@ -177,11 +176,6 @@ function VotingHistoryTab({ sessionId }) {
                       title={row.election_title}
                     >
                       {row.election_title || `#${row.election_id}`}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" noWrap sx={{ maxWidth: 160 }} title={row.candidate_name}>
-                      {row.candidate_name || <em style={{ color: '#94a3b8' }}>Anonim</em>}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ fontSize: 12, whiteSpace: 'nowrap' }}>

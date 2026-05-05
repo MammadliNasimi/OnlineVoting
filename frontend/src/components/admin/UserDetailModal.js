@@ -650,7 +650,6 @@ function UserDetailModal({ userId, sessionId, open, onClose }) {
                     <TableHead>
                       <TableRow>
                         <TableCell><strong>Seçim</strong></TableCell>
-                        <TableCell><strong>Oy Verilen Aday</strong></TableCell>
                         <TableCell><strong>Tarih</strong></TableCell>
                         <TableCell align="center"><strong>TX</strong></TableCell>
                       </TableRow>
@@ -663,11 +662,6 @@ function UserDetailModal({ userId, sessionId, open, onClose }) {
                             <TableCell>
                               <Typography variant="body2" fontWeight="medium" noWrap sx={{ maxWidth: 180 }} title={v.election_title}>
                                 {v.election_title || `Seçim #${v.election_id}`}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" noWrap sx={{ maxWidth: 140 }} title={v.candidate_name}>
-                                {v.candidate_name ?? <em style={{ color: '#94a3b8' }}>Gizli (anonim)</em>}
                               </Typography>
                             </TableCell>
                             <TableCell sx={{ fontSize: 12, whiteSpace: 'nowrap' }}>

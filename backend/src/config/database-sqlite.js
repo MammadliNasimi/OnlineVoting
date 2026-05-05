@@ -699,12 +699,9 @@ async createUser(name, hashedPassword, role = 'user', studentId = null, email = 
          vs.election_id,
          vs.voted_at,
          vs.transaction_hash,
-         e.title AS election_title,
-         c.name AS candidate_name
+         e.title AS election_title
        FROM vote_status vs
        LEFT JOIN elections e ON e.id = vs.election_id
-       LEFT JOIN votes v ON v.election_id = vs.election_id AND v.transaction_hash = vs.transaction_hash
-       LEFT JOIN candidates c ON c.id = v.candidate_id
        WHERE vs.user_id = ?
        ORDER BY vs.voted_at DESC
        LIMIT 20`

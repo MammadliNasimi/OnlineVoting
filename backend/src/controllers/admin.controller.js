@@ -341,22 +341,18 @@ class AdminController {
           vs.voted_at,
           vs.transaction_hash,
           e.id AS election_id,
-          e.title AS election_title,
-          c.name AS candidate_name,
-          c.blockchain_candidate_id
+          e.title AS election_title
         FROM vote_status vs
         LEFT JOIN users u ON u.id = vs.user_id
         LEFT JOIN elections e ON e.id = vs.election_id
-        LEFT JOIN votes v ON v.election_id = vs.election_id AND v.transaction_hash = vs.transaction_hash
-        LEFT JOIN candidates c ON c.id = v.candidate_id
       `;
       const params = [];
       const wheres = [];
       if (electionId) { wheres.push('vs.election_id = ?'); params.push(electionId); }
       if (search) {
-        wheres.push("(LOWER(u.name) LIKE ? OR LOWER(u.email) LIKE ? OR LOWER(e.title) LIKE ? OR LOWER(c.name) LIKE ?)");
+        wheres.push("(LOWER(u.name) LIKE ? OR LOWER(u.email) LIKE ? OR LOWER(e.title) LIKE ?)");
         const term = `%${search}%`;
-        params.push(term, term, term, term);
+        params.push(term, term, term);
       }
       if (wheres.length > 0) query += ' WHERE ' + wheres.join(' AND ');
       query += ' ORDER BY vs.voted_at DESC LIMIT ? OFFSET ?';
