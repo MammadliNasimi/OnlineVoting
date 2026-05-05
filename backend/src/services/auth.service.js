@@ -33,6 +33,8 @@ const FACE_THRESHOLD_DEFAULT = 0.48;
 const SHOULD_LOG_OTP = process.env.DEBUG_OTP === 'true' && process.env.NODE_ENV !== 'production';
 const FROM_FALLBACK = '"SSI Voting" <noreply@voting.local>';
 const SMTP_FROM = process.env.SMTP_FROM || process.env.SNTP_FROM || FROM_FALLBACK;
+const RESEND_API_KEY = (process.env.RESEND_API_KEY || '').trim();
+const RESEND_FROM = (process.env.RESEND_FROM || SMTP_FROM).trim();
 
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 const hashOtp = (otp, email) => crypto.createHash('sha256').update(otp + email.toLowerCase()).digest('hex');
@@ -41,6 +43,39 @@ const normalizeEmail = (email) => (email || '').toString().trim().toLowerCase();
 const normalizeName = (name) => (name || '').toString().trim().toLowerCase();
 
 async function dispatchOtpEmail(email, otpEmail) {
+  if (RESEND_API_KEY && RESEND_FROM) {
+    try {
+      const resendResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: RESEND_FROM,
+          to: [email],
+          subject: otpEmail.subject,
+          html: otpEmail.html
+        })
+      });
+
+      if (resendResponse.ok) {
+        return { sent: true, provider: 'resend' };
+      }
+
+      let errorText = `HTTP ${resendResponse.status}`;
+      try {
+        const payload = await resendResponse.json();
+        errorText = payload?.message || payload?.error || JSON.stringify(payload);
+      } catch {
+        // ignore non-json body
+      }
+      return { sent: false, error: `Resend error: ${errorText}` };
+    } catch (error) {
+      return { sent: false, error: `Resend request failed: ${error.message}` };
+    }
+  }
+
   const transporter = createMailTransporter();
   if (!transporter) return { sent: false, error: 'No SMTP transporter configured' };
 
