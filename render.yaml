@@ -19,6 +19,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: "22"
       - key: HOST
         value: 0.0.0.0
       # Render free: PORT'u kendisi atar, ama default 10000
