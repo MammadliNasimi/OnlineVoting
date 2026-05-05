@@ -32,6 +32,7 @@ const FACE_LOGIN_LOCK_MINUTES = 15;
 const FACE_THRESHOLD_DEFAULT = 0.48;
 const SHOULD_LOG_OTP = process.env.DEBUG_OTP === 'true' && process.env.NODE_ENV !== 'production';
 const FROM_FALLBACK = '"SSI Voting" <noreply@voting.local>';
+const SMTP_FROM = process.env.SMTP_FROM || process.env.SNTP_FROM || FROM_FALLBACK;
 
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 const hashOtp = (otp, email) => crypto.createHash('sha256').update(otp + email.toLowerCase()).digest('hex');
@@ -45,7 +46,7 @@ async function dispatchOtpEmail(email, otpEmail) {
 
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || FROM_FALLBACK,
+      from: SMTP_FROM,
       to: email,
       ...otpEmail
     });

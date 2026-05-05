@@ -136,11 +136,12 @@ async function createSessionForUser(user) {
 // Trim her değer — panel paste'lerinden arkaya kaçan `\n` / boşluk DNS resolve'i (ENOTFOUND)
 // veya auth handshake'i bozar. SSLv3 cipher hack'i yalnızca eski Office365 için gereklidir.
 function createMailTransporter() {
-  const host = (process.env.SMTP_HOST || '').trim();
-  const user = (process.env.SMTP_USER || '').trim();
-  const pass = (process.env.SMTP_PASS || '').trim();
-  const port = parseInt((process.env.SMTP_PORT || '587').trim(), 10);
-  const secure = (process.env.SMTP_SECURE || '').trim() === 'true';
+  const host = (process.env.SMTP_HOST || process.env.SNTP_HOST || '').trim();
+  const user = (process.env.SMTP_USER || process.env.SNTP_USER || '').trim();
+  const pass = (process.env.SMTP_PASS || process.env.SNTP_PASS || '').trim();
+  const port = parseInt((process.env.SMTP_PORT || process.env.SNTP_PORT || '587').trim(), 10);
+  const secureRaw = (process.env.SMTP_SECURE || process.env.SNTP_SECURE || '').trim().toLowerCase();
+  const secure = secureRaw === 'true';
 
   if (!host || !user || !pass) return null;
 
