@@ -35,6 +35,7 @@ const FROM_FALLBACK = '"SSI Voting" <noreply@voting.local>';
 const SMTP_FROM = process.env.SMTP_FROM || process.env.SNTP_FROM || FROM_FALLBACK;
 const RESEND_API_KEY = (process.env.RESEND_API_KEY || '').trim();
 const RESEND_FROM = (process.env.RESEND_FROM || SMTP_FROM).trim();
+const MAIL_PROVIDER = (process.env.MAIL_PROVIDER || 'auto').trim().toLowerCase();
 
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 const hashOtp = (otp, email) => crypto.createHash('sha256').update(otp + email.toLowerCase()).digest('hex');
@@ -42,8 +43,20 @@ const hashOtp = (otp, email) => crypto.createHash('sha256').update(otp + email.t
 const normalizeEmail = (email) => (email || '').toString().trim().toLowerCase();
 const normalizeName = (name) => (name || '').toString().trim().toLowerCase();
 
+const smtpConfigured = () => {
+  const host = (process.env.SMTP_HOST || process.env.SNTP_HOST || '').trim();
+  const user = (process.env.SMTP_USER || process.env.SNTP_USER || '').trim();
+  const pass = (process.env.SMTP_PASS || process.env.SNTP_PASS || '').trim();
+  return Boolean(host && user && pass);
+};
+
+console.log(
+  `[mail] provider=${MAIL_PROVIDER} resendConfigured=${Boolean(RESEND_API_KEY && RESEND_FROM)} smtpConfigured=${smtpConfigured()}`
+);
+
 async function dispatchOtpEmail(email, otpEmail) {
-  if (RESEND_API_KEY && RESEND_FROM) {
+  const preferResend = MAIL_PROVIDER === 'resend' || (MAIL_PROVIDER === 'auto' && RESEND_API_KEY && RESEND_FROM);
+  if (preferResend) {
     try {
       const resendResponse = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -74,6 +87,10 @@ async function dispatchOtpEmail(email, otpEmail) {
     } catch (error) {
       return { sent: false, error: `Resend request failed: ${error.message}` };
     }
+  }
+
+  if (MAIL_PROVIDER === 'resend') {
+    return { sent: false, error: 'MAIL_PROVIDER=resend ama RESEND_API_KEY/RESEND_FROM eksik' };
   }
 
   const transporter = createMailTransporter();

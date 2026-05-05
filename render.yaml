@@ -61,6 +61,8 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
+      - key: MAIL_PROVIDER
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM
