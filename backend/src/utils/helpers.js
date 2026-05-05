@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const dns = require('dns');
 const nodemailer = require('nodemailer');
 const { ethers } = require('ethers');
 
@@ -146,11 +147,18 @@ function createMailTransporter() {
   if (!host || !user || !pass) return null;
 
   const isOffice365 = /office365|outlook/.test(host);
+  const lookupIpv4 = (hostname, _options, callback) => {
+    dns.lookup(hostname, { family: 4, all: false }, callback);
+  };
   return nodemailer.createTransport({
     host,
     port,
     secure,
     auth: { user, pass },
+    lookup: lookupIpv4,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
     ...(isOffice365 ? { tls: { ciphers: 'SSLv3', rejectUnauthorized: false } } : {})
   });
 }
