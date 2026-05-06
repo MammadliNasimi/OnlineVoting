@@ -93,11 +93,10 @@ class ElectionController {
             message: 'Bu seçim on-chain üzerinde sonlandırılmış. Yeniden aktive edilemez; oylar korunur. Yeni seçim oluşturun.'
           });
         }
-      } else if (chainElection.isActive) {
-        const tx = await contract.endElection(election.blockchain_election_id);
-        await tx.wait();
-        // DB tarafinda kalici bitis isaretini koy ki yeniden aktivasyon yeni on-chain ID üretmesin.
-        db.markElectionEndedPermanently(id);
+      } else {
+        // "Durdur" işlemi bir "pause" davranışıdır:
+        // seçim sadece uygulama (DB) tarafında pasife alınır.
+        // On-chain endElection çağırırsak seçim kalıcı kapanır ve tekrar başlatılamaz.
       }
 
       db.db.prepare('UPDATE elections SET is_active = ? WHERE id = ?').run(newActive, id);
