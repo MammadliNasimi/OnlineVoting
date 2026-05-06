@@ -144,56 +144,56 @@ function AdminDashboard({ user, sessionId, onLogout }) {
 
   const retryJobMutation = useMutation({
     mutationFn: (id) => axios.post(`${API_BASE}/admin/queue/${id}/retry`, {}, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['admin_queue'])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin_queue'] })
   });
   const deleteUserMutation = useMutation({
     mutationFn: (id) => axios.delete(`${API_BASE}/admin/users/${id}`, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['users'])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] })
   });
   const deleteDomainMutation = useMutation({
     mutationFn: (id) => axios.delete(`${API_BASE}/admin/email-domains/${id}`, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['admin_domains'])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin_domains'] })
   });
   const createElectionMutation = useMutation({
     mutationFn: (elect) => axios.post(`${API_BASE}/admin/elections`, elect, authHeaders),
     onSuccess: () => {
-      queryClient.invalidateQueries(['admin_elections']);
+      queryClient.invalidateQueries({ queryKey: ['admin_elections'] });
       setElectionModalOpen(false);
       setNewElection({ title: '', description: '', startDate: '', endDate: '' });
     }
   });
   const createCandidateMutation = useMutation({
     mutationFn: (cand) => axios.post(`${API_BASE}/elections/${selectedElection?.id}/candidates`, cand, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['admin_candidates', selectedElection?.id])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin_candidates', selectedElection?.id] })
   });
   const updateCandidateMutation = useMutation({
     mutationFn: ({ cid, data }) => axios.put(`${API_BASE}/elections/${selectedElection?.id}/candidates/${cid}/update`, data, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['admin_candidates', selectedElection?.id])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin_candidates', selectedElection?.id] })
   });
   const deleteCandidateMutation = useMutation({
     mutationFn: (cid) => axios.delete(`${API_BASE}/elections/${selectedElection?.id}/candidates/${cid}`, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['admin_candidates', selectedElection?.id])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin_candidates', selectedElection?.id] })
   });
   const toggleElectionMutation = useMutation({
     mutationFn: (id) => axios.put(`${API_BASE}/elections/${id}/toggle`, {}, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['admin_elections'])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin_elections'] })
   });
   const deleteElectionMutation = useMutation({
     mutationFn: (id) => axios.delete(`${API_BASE}/admin/elections/${id}`, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['admin_elections'])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin_elections'] })
   });
   const addElectionDomainMutation = useMutation({
     mutationFn: (domain) => axios.post(`${API_BASE}/elections/${selectedElection?.id}/domains`, { domain }, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['election_domains', selectedElection?.id])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['election_domains', selectedElection?.id] })
   });
   const removeElectionDomainMutation = useMutation({
     mutationFn: (did) => axios.delete(`${API_BASE}/elections/${selectedElection?.id}/domains/${did}`, authHeaders),
-    onSuccess: () => queryClient.invalidateQueries(['election_domains', selectedElection?.id])
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['election_domains', selectedElection?.id] })
   });
   const addDomainMutation = useMutation({
     mutationFn: (domain) => axios.post(`${API_BASE}/admin/email-domains`, { domain }, authHeaders),
     onSuccess: () => {
-      queryClient.invalidateQueries(['admin_domains']);
+      queryClient.invalidateQueries({ queryKey: ['admin_domains'] });
       setDomainModalOpen(false);
       setNewDomain('');
     }
