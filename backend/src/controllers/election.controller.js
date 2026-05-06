@@ -24,15 +24,6 @@ class ElectionController {
       const currentActive = election.is_active;
       const newActive = currentActive === 1 ? 0 : 1;
 
-      // Kalici olarak bitirilmis seçim yeniden aktive edilemez — aksi halde
-      // chainElection.isActive=false olduğu için yeni bir on-chain election oluşturulup
-      // önceki blockchain_election_id ezilir ve ESKİ OYLAR ERİŞİLEMEZ olur.
-      if (newActive === 1 && election.ended_permanently === 1) {
-        return res.status(409).json({
-          message: 'Bu seçim kalıcı olarak sona ermiştir; yeniden aktif edilemez. Yeni bir seçim oluşturun.'
-        });
-      }
-
       const provider = state.relayerService.provider;
       const contractAddress = state.relayerService.contractAddress;
       const contractABI = state.relayerService.contractABI;
@@ -87,11 +78,49 @@ class ElectionController {
             election.blockchain_election_id = newBcId;
           }
         } else if (!chainElection.isActive) {
-          // On-chain ID var ama isActive=false (endElection çağrılmış). Eski oylar
-          // silinmesin diye yeniden createElection ÇAĞIRMIYORUZ; admin'i uyaralım.
-          return res.status(409).json({
-            message: 'Bu seçim on-chain üzerinde sonlandırılmış. Yeniden aktive edilemez; oylar korunur. Yeni seçim oluşturun.'
+          // Geriye dönük uyumluluk:
+          // Eski sürümde "durdur" => endElection çağırdığı için seçim zincirde kapanmış olabilir.
+          // Eğer bu seçimde henüz oy yoksa güvenli şekilde yeni on-chain election oluşturarak
+          // yeniden başlatmaya izin veriyoruz.
+          const voteCount = db.db.prepare('SELECT COUNT(*) AS c FROM votes WHERE election_id = ?').get(id)?.c || 0;
+          const votedUsers = db.db.prepare('SELECT COUNT(*) AS c FROM vote_status WHERE election_id = ?').get(id)?.c || 0;
+          if (voteCount > 0 || votedUsers > 0) {
+            return res.status(409).json({
+              message: 'Bu seçim on-chain üzerinde sonlandırılmış ve oy içeriyor. Veri bütünlüğü için yeniden aktive edilemez; yeni seçim oluşturun.'
+            });
+          }
+
+          const candidates = db.db.prepare('SELECT * FROM candidates WHERE election_id = ? ORDER BY id').all(id);
+          const candidateNames = candidates.map(c => c.name);
+          if (candidateNames.length === 0) {
+            return res.status(400).json({ message: 'Seçimi başlatmak için en az bir aday eklemelisiniz.' });
+          }
+
+          const startTime = Math.floor(new Date(election.start_date).getTime() / 1000);
+          const endTime = Math.floor(new Date(election.end_date).getTime() / 1000);
+          const tx = await contract.createElection(election.title, startTime, endTime, candidateNames);
+          const receipt = await tx.wait();
+          const event = receipt.logs.find(log => {
+            try {
+              const parsed = contract.interface.parseLog(log);
+              return parsed && parsed.name === 'ElectionCreated';
+            } catch {
+              return false;
+            }
           });
+          if (event) {
+            const parsedLog = contract.interface.parseLog(event);
+            const newBcId = Number(parsedLog.args[0]);
+            db.db.prepare(
+              'UPDATE elections SET blockchain_election_id = ?, candidates_locked = 1, ended_permanently = 0 WHERE id = ?'
+            ).run(newBcId, id);
+            for (let i = 0; i < candidates.length; i += 1) {
+              db.db.prepare(
+                'UPDATE candidates SET blockchain_candidate_id = ? WHERE id = ?'
+              ).run(i, candidates[i].id);
+            }
+            election.blockchain_election_id = newBcId;
+          }
         }
       } else {
         // "Durdur" işlemi bir "pause" davranışıdır:
@@ -99,7 +128,11 @@ class ElectionController {
         // On-chain endElection çağırırsak seçim kalıcı kapanır ve tekrar başlatılamaz.
       }
 
-      db.db.prepare('UPDATE elections SET is_active = ? WHERE id = ?').run(newActive, id);
+      if (newActive === 1) {
+        db.db.prepare('UPDATE elections SET is_active = 1, ended_permanently = 0 WHERE id = ?').run(id);
+      } else {
+        db.db.prepare('UPDATE elections SET is_active = 0 WHERE id = ?').run(id);
+      }
 
       // Seçim aktifleştirildiğinde uygun seçmenlere otomatik bildirim gönder (fire-and-forget).
       if (newActive === 1) {
