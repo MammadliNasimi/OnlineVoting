@@ -7,7 +7,7 @@
   [![Backend](https://img.shields.io/badge/Backend-ssi--voting--backend.onrender.com-7c3aed?style=for-the-badge&logo=render)](https://ssi-voting-backend.onrender.com/api/health)
   [![Network](https://img.shields.io/badge/Network-Sepolia_Testnet-orange?style=for-the-badge&logo=ethereum)](https://sepolia.etherscan.io/address/0x62a8878de43d5d6fd9B199d92556843a57F39aae)
 
-  [![Node](https://img.shields.io/badge/Node.js-18+-43853d?style=flat-square&logo=nodedotjs)](https://nodejs.org/)
+  [![Node](https://img.shields.io/badge/Node.js-22+-43853d?style=flat-square&logo=nodedotjs)](https://nodejs.org/)
   [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
   [![Solidity](https://img.shields.io/badge/Solidity-0.8.x-363636?style=flat-square&logo=solidity)](https://soliditylang.org/)
   [![Ethers](https://img.shields.io/badge/Ethers-v6-2535A0?style=flat-square)](https://docs.ethers.org/)
@@ -46,10 +46,17 @@ Oy yazımı `p-queue` ile sıralanır ve arka planda işlenir. Kullanıcı her a
 Seçmen ETH ödemez. **Relayer Service** tüm işlem ücretlerini üstlenir; oy verme deneyimi tamamen kripto-bağımsızdır.
 
 ### 🛠️ Yönetici Paneli
-- Seçim oluşturma & başlatma/sonlandırma
+- Seçim oluşturma & başlatma/durdurma (pause/resume)
 - Aday yönetimi
 - E-posta domain whitelist (örn. yalnızca `ogr.akdeniz.edu.tr`)
 - Canlı oy durumu, kuyruk takibi ve sistem logları
+
+### 🔁 Seçim Yaşam Döngüsü (Güncel Davranış)
+- **Durdur** işlemi seçim verisini silmez, yalnızca uygulama tarafında (`is_active=0`) pasife alır.
+- **Yeniden Başlat** işlemi, aktif olmayan seçimi tekrar açar.
+- Geçmiş sürümde on-chain `endElection` ile kapanmış seçimler için:
+  - Seçimde hiç oy yoksa sistem yeni on-chain election oluşturarak yeniden başlatabilir.
+  - Oy varsa veri bütünlüğü için yeniden başlatma engellenir ve yeni seçim açılması gerekir.
 
 ---
 
@@ -79,7 +86,7 @@ Seçmen ETH ödemez. **Relayer Service** tüm işlem ücretlerini üstlenir; oy 
 ## 🚀 Yerel Geliştirme
 
 ### Gereksinimler
-- Node.js 18+
+- Node.js 22+
 - Git
 - (Opsiyonel) Hardhat lokal node
 
