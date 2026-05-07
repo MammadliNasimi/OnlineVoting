@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { waitForBlink } from '../auth/livenessCheck';
 import { loadFaceModels, stopFaceStream } from '../auth/faceApiLoader';
 
 function useFaceRegistration(sessionId, apiBase) {
@@ -35,18 +34,13 @@ function useFaceRegistration(sessionId, apiBase) {
   const handleRegisterFace = async () => {
     if (!videoRef.current || !window.faceapi) return;
     setFaceLoading(true);
-    setFaceMessage('Lütfen kameraya bakın ve bir kez göz kırpın...');
+    setFaceMessage('Lütfen kameraya bakın...');
     try {
       const faceapi = window.faceapi;
-      const { detection } = await waitForBlink({
-        video: videoRef.current,
-        faceapi,
-        onState: (s) => {
-          if (s === 'searching') setFaceMessage('Yüzünüz aranıyor...');
-          if (s === 'open') setFaceMessage('Göz açıldı — şimdi kapatıp açın...');
-          if (s === 'closed') setFaceMessage('Göz kapalı algılandı — açın...');
-        }
-      });
+      const detection = await faceapi
+        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
 
       if (!detection || !detection.descriptor) {
         setFaceMessage('Yüz algılanamadı. Lütfen kameraya net bakın.');
@@ -63,11 +57,7 @@ function useFaceRegistration(sessionId, apiBase) {
       setFaceMessage('Yüz profilinize eklendi!');
       setTimeout(() => setShowFaceModal(false), 2000);
     } catch (err) {
-      if (err && err.code === 'LIVENESS_FAILED') {
-        setFaceMessage('Canlılık doğrulanamadı. Lütfen kameraya bakıp göz kırpın ve tekrar deneyin.');
-      } else {
-        setFaceMessage(err.response?.data?.message || err.message || 'Bir hata oluştu.');
-      }
+      setFaceMessage(err.response?.data?.message || err.message || 'Bir hata oluştu.');
     } finally {
       setFaceLoading(false);
     }

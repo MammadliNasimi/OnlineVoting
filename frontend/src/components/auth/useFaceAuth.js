@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pickPreferredCameraId } from './cameraUtils';
-import { waitForBlink } from './livenessCheck';
 import { loadFaceModels as loadModels, stopFaceStream } from './faceApiLoader';
 
 function useFaceAuth(currentPage) {
@@ -126,25 +125,17 @@ function useFaceAuth(currentPage) {
       throw new Error('Yuz modeli hazir degil. Once kamerayi baslatin.');
     }
     const faceapi = window.faceapi;
-
-    // Liveness: kullaniciya goz kirpma istiyoruz; bu sayede telefonda gosterilen
-    // sabit bir fotoğraf reddedilir.
-    setFaceMessage('Lutfen kameraya bakin ve bir kez goz kirpin...');
-    const { detection } = await waitForBlink({
-      video: videoRef.current,
-      faceapi,
-      onState: (s) => {
-        if (s === 'searching') setFaceMessage('Yuzunuz aranıyor...');
-        if (s === 'open') setFaceMessage('Goz acildi — simdi kapatip acin...');
-        if (s === 'closed') setFaceMessage('Goz kapali algilandi — gozunuzu acin...');
-      }
-    });
+    setFaceMessage('Yuzunuz taraniyor...');
+    const detection = await faceapi
+      .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptor();
 
     if (!detection || !detection.descriptor) {
       throw new Error('Yuz algilanamadi. Kameraya daha net bakin.');
     }
 
-    setFaceMessage('Canlilik dogrulandi.');
+    setFaceMessage('Yuz dogrulama hazir.');
     return Array.from(detection.descriptor);
   };
 
