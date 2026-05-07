@@ -196,10 +196,9 @@ Sistem hâlihazırda canlıdır:
 ### Maliyet
 | Servis | Plan | Aylık |
 |--------|------|-------|
-| Vercel Hobby | Frontend | $0 |
+| Vercel | Frontend | $0 |
 | Render Free | Backend | $0 |
 | Sepolia ETH | Faucet | $0 |
-| Gmail SMTP | App Password | $0 |
 | **Toplam** | | **$0** |
 
 ---
