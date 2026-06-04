@@ -23,7 +23,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "prebuild": "npx update-browserslist-db@latest --quiet",
+    "build": "GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -48,4 +49,5 @@
   "devDependencies": {
     "eslint-plugin-react": "^7.37.5"
   }
+
 }
