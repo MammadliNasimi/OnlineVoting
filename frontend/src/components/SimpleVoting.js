@@ -17,7 +17,6 @@ import { getPublicEmailType } from './voting/utils';
 import useFaceRegistration from './voting/useFaceRegistration';
 
 import { API_BASE, SOCKET_URL } from '../config';
-import ReceiptDialog from './ReceiptDialog';
 import { trackEvent } from '../utils/analytics';
 
 function SimpleVoting({ user, sessionId, onLogout }) {
@@ -32,8 +31,6 @@ function SimpleVoting({ user, sessionId, onLogout }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [walletCopied, setWalletCopied] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
-  const [receiptOpen, setReceiptOpen] = useState(false);
-  const [receiptData, setReceiptData] = useState(null);
 
   // Konfeti state — oy blokzincire yazıldığında 5 sn patlıyor.
   const [showConfetti, setShowConfetti] = useState(false);
@@ -180,15 +177,6 @@ function SimpleVoting({ user, sessionId, onLogout }) {
         : selectedCandidate.id;
 
       const voteData = await signVoteClientSide(candidateBlockchainId, electionBlockchainId);
-      // keep local receipt copy for user verifiability
-      setReceiptData({
-        electionId: selectedElectionId,
-        candidateId: selectedCandidate?.id,
-        burnerAddress: voteData.burnerAddress,
-        burnerSignature: voteData.burnerSignature,
-        timestamp: voteData.timestamp
-      });
-
       return axios.post(
         `${API_BASE}/vote/simple`,
         {
@@ -204,8 +192,6 @@ function SimpleVoting({ user, sessionId, onLogout }) {
     onSuccess: (res) => {
       setErrorMsg('');
       trackEvent('vote_success');
-      // show receipt dialog when available
-      setReceiptOpen(true);
       if (res.data.status === 'queued') {
         setQueueMsg(res.data.message || 'Oyunuz havuza alindi, isleniyor...');
         setTimeout(() => setQueueMsg(''), 6000);
@@ -383,7 +369,6 @@ function SimpleVoting({ user, sessionId, onLogout }) {
         walletCopied={walletCopied}
         onCopyWallet={handleCopyWallet}
       />
-      <ReceiptDialog open={receiptOpen} onClose={() => setReceiptOpen(false)} receipt={receiptData} />
     </Box>
     </>
   );
