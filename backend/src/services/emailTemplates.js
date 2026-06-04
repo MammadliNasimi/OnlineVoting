@@ -65,14 +65,28 @@ const renderElectionCard = ({ headerTitle, headerSubtitle, bodyHtml }) => `
   </div>
 `;
 
+const turkishDateTime = (value) => {
+  if (!value) return 'Belirtilmemiş';
+  const raw = typeof value === 'number' ? value : Number(value);
+  const date = Number.isFinite(raw)
+    ? new Date(String(raw).length <= 10 ? raw * 1000 : raw)
+    : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Belirtilmemiş';
+  return new Intl.DateTimeFormat('tr-TR', {
+    dateStyle: 'full',
+    timeStyle: 'short',
+    timeZone: 'Europe/Istanbul'
+  }).format(date);
+};
+
 const electionStarted = (election) => ({
   subject: `🗳️ "${election.title}" seçimi başladı — Oyunuzu kullanın!`,
   html: renderElectionCard({
     headerSubtitle: 'Seçim Başladı',
     headerTitle: election.title,
     bodyHtml: `
-      <p>Oylama <strong style="color:#34d399">${new Date(election.start_date).toLocaleString('tr-TR')}</strong> tarihinde başlamıştır.</p>
-      <p>Bitiş: <strong style="color:#fbbf24">${new Date(election.end_date).toLocaleString('tr-TR')}</strong></p>
+      <p>Oylama <strong style="color:#34d399">${turkishDateTime(election.start_date)}</strong> tarihinde başlamıştır.</p>
+      <p>Bitiş: <strong style="color:#fbbf24">${turkishDateTime(election.end_date)}</strong></p>
       ${election.description ? `<p style="color:#94a3b8">${election.description}</p>` : ''}
       <p>Oy kullanmak için sisteme giriş yapmanız yeterlidir.</p>
     `
@@ -85,7 +99,7 @@ const electionEnded = (election, winnerText) => ({
     headerSubtitle: 'Seçim Sonuçlandı',
     headerTitle: election.title,
     bodyHtml: `
-      <p>Seçim <strong style="color:#f87171">${new Date(election.end_date).toLocaleString('tr-TR')}</strong> tarihinde sona ermiştir.</p>
+      <p>Seçim <strong style="color:#f87171">${turkishDateTime(election.end_date)}</strong> tarihinde sona ermiştir.</p>
       <div style="background:#1e293b;border-left:4px solid #10b981;padding:16px;border-radius:8px;margin:16px 0">
         <p style="margin:0;font-weight:700;color:#34d399">Sonuç: ${winnerText}</p>
       </div>
@@ -103,30 +117,45 @@ const electionAnnouncement = (election, subject, htmlBody) => ({
   })
 });
 
-module.exports = { registrationOtp, passwordResetOtp, electionStarted, electionEnded, electionAnnouncement };
-// ------------------------
-// Oy makbuzu şablonu
-// ------------------------
 const voteReceipt = (receipt) => {
   const { electionTitle, candidateName, txHash, burnerAddress, timestamp } = receipt;
+  const shortHash = txHash ? `${txHash.slice(0, 10)}…${txHash.slice(-8)}` : '—';
+  const shortBurner = burnerAddress ? `${burnerAddress.slice(0, 8)}…${burnerAddress.slice(-6)}` : 'Gizli';
   return {
     subject: `🧾 Oy Makbuzunuz — ${electionTitle || 'Seçim'}`,
     html: renderElectionCard({
       headerSubtitle: 'Oy Makbuzu',
       headerTitle: electionTitle || 'Oy Makbuzu',
       bodyHtml: `
-        <p>Oyunuz başarıyla blokzincire yazıldı.</p>
-        <p><strong>Seçim:</strong> ${electionTitle || '-'}<br/>
-           <strong>Aday:</strong> ${candidateName || '-'}<br/>
-           <strong>Transaction:</strong> <code>${txHash || '-'}</code><br/>
-           <strong>Burner Address:</strong> <code>${burnerAddress || '-'}</code><br/>
-           <strong>Zaman (TS):</strong> ${timestamp ? new Date(Number(timestamp) * 1000).toLocaleString('tr-TR') : '-'}</p>
-        <hr/>
-        <p style="font-size:13px;color:#94a3b8">Bu makbuz, imza ve işlem verilerini içerir. Herhangi bir sorun halinde seçim yöneticisine başvurun.</p>
-        <pre style="background:#0b1220;padding:12px;border-radius:8px;color:#e2e8f0;overflow:auto">${JSON.stringify(receipt, null, 2)}</pre>
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px 18px;margin-bottom:16px">
+          <p style="margin:0 0 10px;color:#d1fae5;font-size:14px;font-weight:700">Oyunuz başarıyla blokzincire yazıldı.</p>
+          <div style="display:grid;grid-template-columns:1fr;gap:10px">
+            <div style="display:flex;justify-content:space-between;gap:14px;padding:10px 12px;background:#0b1220;border-radius:10px">
+              <span style="color:#94a3b8;font-size:12px">Seçim</span>
+              <strong style="color:#fff;font-size:13px;text-align:right">${electionTitle || '—'}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:14px;padding:10px 12px;background:#0b1220;border-radius:10px">
+              <span style="color:#94a3b8;font-size:12px">Aday</span>
+              <strong style="color:#fff;font-size:13px;text-align:right">${candidateName || 'Gizli'}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:14px;padding:10px 12px;background:#0b1220;border-radius:10px">
+              <span style="color:#94a3b8;font-size:12px">İşlem No</span>
+              <strong style="color:#fff;font-size:13px;text-align:right;font-family:monospace">${shortHash}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:14px;padding:10px 12px;background:#0b1220;border-radius:10px">
+              <span style="color:#94a3b8;font-size:12px">Burner Cüzdan</span>
+              <strong style="color:#fff;font-size:13px;text-align:right;font-family:monospace">${shortBurner}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:14px;padding:10px 12px;background:#0b1220;border-radius:10px">
+              <span style="color:#94a3b8;font-size:12px">Tarih ve Saat</span>
+              <strong style="color:#fff;font-size:13px;text-align:right">${timestamp ? turkishDateTime(Number(timestamp) * 1000) : 'Belirtilmemiş'}</strong>
+            </div>
+          </div>
+        </div>
+        <p style="margin:0;color:#94a3b8;font-size:13px;line-height:1.6">Bu makbuz, oyunuzun zincire işlendiğini gösteren özet bilgileri içerir. Daha fazla teknik ayrıntıya ihtiyacınız olursa seçim yöneticisine başvurabilirsiniz.</p>
       `
     })
   };
 };
 
-module.exports.voteReceipt = voteReceipt;
+module.exports = { registrationOtp, passwordResetOtp, electionStarted, electionEnded, electionAnnouncement, voteReceipt };
