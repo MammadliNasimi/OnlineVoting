@@ -23,6 +23,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import EmailIcon from '@mui/icons-material/Email';
 import ElectionPreviewModal from './ElectionPreviewModal';
 import AnnouncementModal from './AnnouncementModal';
+import { formatLocalDateTimeTR } from '../../utils/dateTime';
 
 function ElectionsTab({
   elections,
@@ -86,10 +87,10 @@ function ElectionsTab({
                 <TableCell>
                   <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                     <Typography variant="caption">
-                      Baş: {new Date(e.start_date || e.created_at).toLocaleString('tr-TR')}
+                      Başlangıç: {formatLocalDateTimeTR(e.start_date || e.created_at)}
                     </Typography>
                     <Typography variant="caption">
-                      Bit: {new Date(e.end_date || new Date().getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleString('tr-TR')}
+                      Bitiş: {formatLocalDateTimeTR(e.end_date || new Date().getTime() + 30 * 24 * 60 * 60 * 1000)}
                     </Typography>
                   </Box>
                 </TableCell>

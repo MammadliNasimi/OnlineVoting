@@ -54,7 +54,7 @@ function useFaceRegistration(sessionId, apiBase) {
         { faceDescriptor: descriptor },
         { headers: { 'x-session-id': sessionId }, withCredentials: true }
       );
-      setFaceMessage('Yüz profilinize eklendi!');
+      setFaceMessage('Yüz profiliniz başarıyla eklendi!');
       setTimeout(() => setShowFaceModal(false), 2000);
     } catch (err) {
       setFaceMessage(err.response?.data?.message || err.message || 'Bir hata oluştu.');

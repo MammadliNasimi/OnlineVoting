@@ -40,6 +40,7 @@ import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import GroupIcon from '@mui/icons-material/Group';
 import { API_BASE, explorerContractUrl, explorerTxUrl, EXPLORER_BASE_URL } from '../../config';
+import { formatLocalDateTimeTR } from '../../utils/dateTime';
 
 const BAR_COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899', '#22c55e'];
 
@@ -266,7 +267,7 @@ function ElectionResultsView({ electionId, sessionId, onBack }) {
             <Box>
               <Typography variant="caption" color="text.secondary">BİTİŞ</Typography>
               <Typography variant="body1" fontWeight="bold">
-                {new Date(election.end_date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {formatLocalDateTimeTR(election.end_date)}
               </Typography>
             </Box>
           </Stack>
@@ -398,7 +399,7 @@ function ElectionResultsView({ electionId, sessionId, onBack }) {
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
               <RTooltip
                 formatter={(v) => [`${v} oy`, 'Oy']}
-                labelFormatter={(_, p) => p?.[0] ? new Date(p[0].payload.hour).toLocaleString('tr-TR') : ''}
+                labelFormatter={(_, p) => (p?.[0] ? formatLocalDateTimeTR(p[0].payload.hour) : '')}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Line
@@ -433,7 +434,7 @@ function ElectionResultsView({ electionId, sessionId, onBack }) {
           <Box sx={{ flexGrow: 1 }}>
             <Typography variant="caption" color="text.secondary" display="block">Başlangıç → Bitiş</Typography>
             <Typography variant="body2">
-              {new Date(election.start_date).toLocaleString('tr-TR')} → {new Date(election.end_date).toLocaleString('tr-TR')}
+              {formatLocalDateTimeTR(election.start_date)} → {formatLocalDateTimeTR(election.end_date)}
             </Typography>
           </Box>
           {EXPLORER_BASE_URL && election.blockchain_election_id !== null && (

@@ -7,6 +7,7 @@
  */
 import { jsPDF } from 'jspdf';
 import { keccak256, toUtf8Bytes } from 'ethers';
+import { formatLocalDateTimeTR, formatLocalDateTR } from '../utils/dateTime';
 
 // Nullifier = keccak256(emailHash + electionId) — biz burada email'i bilmiyoruz,
 // bu yüzden sadece "TX bazlı doğrulama kodu" olarak txHash slice'ı gösteriyoruz.
@@ -58,7 +59,7 @@ export function downloadVoteReceipt(vote, burnerAddress = '') {
 
   // Oluşturma tarihi (sağ üst)
   doc.setFontSize(7.5);
-  doc.text(`Oluşturulma: ${new Date().toLocaleString('tr-TR')}`, W - 14, 11, { align: 'right' });
+  doc.text(`Oluşturulma: ${formatLocalDateTimeTR(new Date())}`, W - 14, 11, { align: 'right' });
 
   // ── Anonimlik notu ───────────────────────────────────────────────
   doc.setFillColor(224, 251, 242);
@@ -94,9 +95,7 @@ export function downloadVoteReceipt(vote, burnerAddress = '') {
     line(doc, 'Tercih:', '(anonim / gizli)', y); y += gap;
   }
 
-  const dateStr = vote.voted_at
-    ? new Date(vote.voted_at).toLocaleString('tr-TR', { dateStyle: 'long', timeStyle: 'medium' })
-    : '—';
+  const dateStr = vote.voted_at ? formatLocalDateTimeTR(vote.voted_at) : '—';
   line(doc, 'Oy Tarihi:', dateStr, y); y += gap;
 
   y += 2;
@@ -140,6 +139,6 @@ export function downloadVoteReceipt(vote, burnerAddress = '') {
   // ── Kaydet ──────────────────────────────────────────────────────
   const safeTitle = (vote.election_title || 'secim')
     .toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 30);
-  const date = (vote.voted_at || new Date().toISOString()).slice(0, 10);
+  const date = vote.voted_at ? formatLocalDateTR(vote.voted_at).replace(/\./g, '-') : new Date().toISOString().slice(0, 10);
   doc.save(`oy-makbuzu-${safeTitle}-${date}.pdf`);
 }

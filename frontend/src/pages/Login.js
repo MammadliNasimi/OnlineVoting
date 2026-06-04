@@ -84,7 +84,7 @@ function Login({ onLoginComplete }) {
       if (res.data.walletFundingWarning) {
         setInfo(`⚠️ ${res.data.walletFundingWarning}`);
       }
-      setFaceMessage(`Hızlı giriş başarılı (distance: ${res.data.faceDistance})`);
+      setFaceMessage(`Hızlı giriş başarılı (mesafe: ${res.data.faceDistance})`);
       if (res.data.user?.role === 'admin') {
         if (onLoginComplete) onLoginComplete(res.data.user, res.data.sessionId);
         return;
@@ -101,7 +101,7 @@ function Login({ onLoginComplete }) {
     setError('');
     setInfo('');
     if (!form.name || !form.password) {
-      setError('Kullanıcı adı ve şifre giriniz');
+      setError('Kullanıcı adı ve şifre giriniz.');
       return;
     }
 
@@ -118,7 +118,7 @@ function Login({ onLoginComplete }) {
       }
       if (onLoginComplete) onLoginComplete(res.data.user, res.data.sessionId);
     } catch (err) {
-      setError(err.response?.data?.message || 'Giriş başarısız');
+      setError(err.response?.data?.message || 'Giriş başarısız.');
     } finally {
       setLoginLoading(false);
     }
@@ -128,7 +128,7 @@ function Login({ onLoginComplete }) {
     setError('');
     setInfo('');
     if (!form.name || !form.firstName || !form.lastName || !form.email || !form.password) {
-      setError('Kayıt için tüm alanları doldurunuz');
+      setError('Kayıt için tüm alanları doldurunuz.');
       return;
     }
 
@@ -139,7 +139,7 @@ function Login({ onLoginComplete }) {
       setInfo(res.data.message);
       if (res.data.devOtp) setRegisterOtp(res.data.devOtp);
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'OTP gönderilemedi');
+      setError(err.response?.data?.message || err.response?.data?.error || 'Doğrulama kodu gönderilemedi.');
     } finally {
       setOtpLoading(false);
     }
@@ -167,7 +167,7 @@ function Login({ onLoginComplete }) {
       setForm(f => ({ ...f, name: '', password: '', email: '', firstName: '', lastName: '' }));
       setInfo('Kayıt başarılı. Şimdi giriş yapabilirsiniz.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Kayıt başarısız');
+      setError(err.response?.data?.message || 'Kayıt başarısız.');
     } finally {
       setRegisterLoading(false);
     }
@@ -194,7 +194,7 @@ function Login({ onLoginComplete }) {
     setError('');
     setInfo('');
     if (!form.resetEmail) {
-      setError('Hesabınızla ilişkili e-posta adresini giriniz');
+      setError('Hesabınızla ilişkili e-posta adresini giriniz.');
       return;
     }
 
@@ -202,9 +202,9 @@ function Login({ onLoginComplete }) {
     try {
       const res = await axios.post('/api/forgot-password', { email: form.resetEmail });
       setForgotPasswordStep(1);
-      setInfo(res.data.message || `${form.resetEmail} adresine kod gönderildi`);
+      setInfo(res.data.message || `${form.resetEmail} adresine kod gönderildi.`);
     } catch (err) {
-      setError(err.response?.data?.message || 'E-posta gönderilemedi');
+      setError(err.response?.data?.message || 'E-posta gönderilemedi.');
     } finally {
       setForgotLoading(false);
     }
@@ -214,11 +214,11 @@ function Login({ onLoginComplete }) {
     setError('');
     setInfo('');
     if (!forgotPasswordOtp) {
-      setError('Doğrulama kodunu giriniz');
+      setError('Doğrulama kodunu giriniz.');
       return;
     }
     if (!form.resetPassword || form.resetPassword !== form.resetPasswordConfirm) {
-      setError('Yeni şifre alanları eşleşmelidir');
+      setError('Yeni şifre alanları eşleşmelidir.');
       return;
     }
 
@@ -238,7 +238,7 @@ function Login({ onLoginComplete }) {
         setError('');
       }, 1800);
     } catch (err) {
-      setError(err.response?.data?.message || 'Şifre sıfırlama başarısız');
+      setError(err.response?.data?.message || 'Şifre sıfırlama başarısız.');
     } finally {
       setResetPasswordConfirmLoading(false);
     }

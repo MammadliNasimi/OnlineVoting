@@ -36,6 +36,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { API_BASE } from '../../config';
+import { formatLocalDateTimeTR } from '../../utils/dateTime';
 
 const PIE_COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899', '#22c55e'];
 
@@ -111,7 +112,7 @@ function AnalyticsTab({ sessionId }) {
     <Box>
       <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
         <Box>
-          <Typography variant="h5" fontWeight="bold">Live Analytics</Typography>
+          <Typography variant="h5" fontWeight="bold">Canlı Analitik</Typography>
           <Typography variant="body2" color="text.secondary">
             Gerçek zamanlı oy istatistikleri ve katılım göstergeleri.
           </Typography>
@@ -237,7 +238,7 @@ function AnalyticsTab({ sessionId }) {
                     formatter={(v) => [`${v} oy`, 'Oy Sayısı']}
                     labelFormatter={(l, payload) => {
                       if (payload && payload[0]) {
-                        return new Date(payload[0].payload.hour).toLocaleString();
+                        return formatLocalDateTimeTR(payload[0].payload.hour);
                       }
                       return l;
                     }}

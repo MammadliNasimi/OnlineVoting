@@ -69,7 +69,7 @@ function PinPromptDialog() {
   const handleConfirm = () => {
     setError('');
     if (!pin || pin.length < 4) {
-      setError('PIN en az 4 karakter olmalı.');
+      setError('PIN en az 4 karakter olmalıdır.');
       return;
     }
     if (confirmMode && pin !== pinConfirm) {

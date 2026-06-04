@@ -47,6 +47,7 @@ import LockOpenIcon from '@mui/icons-material/LockOpen';
 import PasswordIcon from '@mui/icons-material/Password';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { API_BASE, explorerTxUrl, EXPLORER_BASE_URL } from '../../config';
+import { formatLocalDateTimeTR } from '../../utils/dateTime';
 
 const ROLE_OPTIONS = [
   { value: 'user', label: 'Kullanıcı', color: 'default' },
@@ -86,10 +87,7 @@ function InfoRow({ label, value }) {
 
 function fmtDate(str) {
   if (!str) return null;
-  return new Date(str).toLocaleString('tr-TR', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  });
+  return formatLocalDateTimeTR(str);
 }
 
 function kindLabel(kind) {

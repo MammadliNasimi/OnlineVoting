@@ -31,6 +31,7 @@ import ShareIcon from '@mui/icons-material/Share';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { getPublicEmailType, formatVoteDate } from './utils';
+import { formatLocalDateTR } from '../../utils/dateTime';
 import { outlineButtonSx, primaryButtonSx } from './styles';
 import { downloadVoteReceipt } from '../../services/receiptPdf';
 import { explorerTxUrl, EXPLORER_BASE_URL, CONTRACT_ADDRESS } from '../../config';
@@ -38,10 +39,8 @@ import { explorerTxUrl, EXPLORER_BASE_URL, CONTRACT_ADDRESS } from '../../config
 // ─── Paylaşma yardımcısı ──────────────────────────────────────
 function buildShareText(vote) {
   const name = vote.election_title || 'Seçim';
-  const date = vote.voted_at
-    ? new Date(vote.voted_at).toLocaleDateString('tr-TR')
-    : '';
-  return `SSI Blockchain Oylama'da "${name}" seçimine${date ? ' ' + date + ' tarihinde' : ''} güvenli şekilde oy kullandım. 🗳️ #SSIVoting #BlockchainDemocracy`;
+  const date = vote.voted_at ? formatLocalDateTR(vote.voted_at) : '';
+  return `SSI Blockchain Oylama'da "${name}" seçimine${date ? ` ${date} tarihinde` : ''} güvenli şekilde oy kullandım. 🗳️ #SSIVoting #BlockchainDemocracy`;
 }
 
 async function shareOrCopy(text) {
@@ -73,7 +72,7 @@ function VoteVerifyPanel({ vote, burnerAddress }) {
     >
       <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
         <VerifiedIcon sx={{ fontSize: 16, color: '#10b981' }} />
-        <Typography variant="caption" fontWeight="bold" sx={{ color: '#065f46' }}>
+          <Typography variant="caption" fontWeight="bold" sx={{ color: '#065f46' }}>
           Blokzincir Doğrulaması
         </Typography>
       </Stack>
@@ -223,7 +222,7 @@ export function HistoryDialog({ open, onClose, isLoadingHistory, votingHistory, 
       <DialogContent dividers sx={{ px: 2, py: 1.5 }}>
         {!EXPLORER_BASE_URL && votingHistory.length > 0 && (
           <Alert severity="info" sx={{ mb: 1.5, borderRadius: 1.5, fontSize: 12 }}>
-            Etherscan linkleri için production (Sepolia) ağına bağlanın.
+            Etherscan bağlantıları için üretim (Sepolia) ağına bağlanın.
           </Alert>
         )}
         {isLoadingHistory ? (
@@ -254,7 +253,7 @@ export function FaceDialog({ open, onClose, videoRef, faceMessage, faceLoading, 
       <DialogTitle sx={{ fontWeight: 900 }}>Yuz Profilimi Ekle</DialogTitle>
       <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Alert severity="info" sx={{ mb: 2, width: '100%', borderRadius: 1.5 }}>
-          Yuz verilerinizi ekleyerek sisteme hizli ve guvenli sekilde giris yapabilirsiniz.
+          Yüz verilerinizi ekleyerek sisteme hızlı ve güvenli şekilde giriş yapabilirsiniz.
         </Alert>
         <Box sx={{ width: '100%', maxWidth: 420, aspectRatio: '4 / 3', bgcolor: '#070d10', borderRadius: 2, overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

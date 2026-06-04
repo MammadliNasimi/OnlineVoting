@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { formatDateTimeTR, formatDateTR } from '../../utils/dateTime';
 
 // ─── Geri sayım hook ─────────────────────────────────────────────
 // targetDate: ISO string veya Date — o zamana kadar say.
@@ -37,15 +38,11 @@ export function padTwo(n) {
 
 export const formatVoteDate = (vote) => {
   const raw = vote.voted_at ?? vote.timestamp ?? vote.created_at ?? vote.createdAt ?? vote.date;
-  if (!raw) return 'Tarih yok';
-  const d = new Date(String(raw).replace(' ', 'T'));
-  return Number.isNaN(d.getTime()) ? 'Gecersiz tarih' : d.toLocaleString('tr-TR');
+  return raw ? formatDateTimeTR(raw) : 'Tarih yok';
 };
 
 export const formatElectionDate = (value) => {
-  if (!value) return 'Belirtilmemis';
-  const d = new Date(String(value).replace(' ', 'T'));
-  return Number.isNaN(d.getTime()) ? 'Belirtilmemis' : d.toLocaleDateString('tr-TR');
+  return value ? formatDateTR(value) : 'Belirtilmemiş';
 };
 
 export const shortAddress = (address = '') => {

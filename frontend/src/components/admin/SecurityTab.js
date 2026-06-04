@@ -30,13 +30,11 @@ import SearchIcon from '@mui/icons-material/Search';
 import SecurityIcon from '@mui/icons-material/Security';
 import ShieldIcon from '@mui/icons-material/Shield';
 import { API_BASE } from '../../config';
+import { formatLocalDateTimeTR } from '../../utils/dateTime';
 
 function fmtDate(str) {
   if (!str) return '—';
-  return new Date(str).toLocaleString('tr-TR', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit'
-  });
+  return formatLocalDateTimeTR(str);
 }
 
 function kindLabel(kind) {
@@ -96,7 +94,7 @@ function BruteForceTable({ sessionId }) {
         <Stack direction="row" alignItems="center" spacing={1.5}>
           <ShieldIcon color="warning" />
           <Box>
-            <Typography variant="h6" fontWeight="bold">Brute-Force Kilitleri</Typography>
+            <Typography variant="h6" fontWeight="bold">Brute-force kilitleri</Typography>
             <Typography variant="caption" color="text.secondary">
               Başarısız giriş denemeleri ve otomatik kilitler. Toplam {attempts.length} kayıt
               {lockedCount > 0 && (
@@ -117,7 +115,7 @@ function BruteForceTable({ sessionId }) {
       <TextField
         size="small"
         fullWidth
-        placeholder="Identifier, kullanıcı adı veya işlem türü ara..."
+        placeholder="Kimlik, kullanıcı adı veya işlem türü ara..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         sx={{ mb: 2 }}
@@ -134,7 +132,7 @@ function BruteForceTable({ sessionId }) {
         <Table size="small">
           <TableHead sx={{ bgcolor: 'grey.100' }}>
             <TableRow>
-              <TableCell><strong>Identifier</strong></TableCell>
+              <TableCell><strong>Kimlik</strong></TableCell>
               <TableCell><strong>Kullanıcı</strong></TableCell>
               <TableCell><strong>İşlem Türü</strong></TableCell>
               <TableCell align="center"><strong>Deneme</strong></TableCell>

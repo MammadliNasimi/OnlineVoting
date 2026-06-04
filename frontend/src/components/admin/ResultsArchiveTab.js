@@ -23,6 +23,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import HistoryIcon from '@mui/icons-material/History';
 import { API_BASE } from '../../config';
 import ElectionResultsView from './ElectionResultsView';
+import { formatLocalDateTR } from '../../utils/dateTime';
 
 // "active" | "ended" | "all"
 function classify(election) {
@@ -109,9 +110,9 @@ function ElectionCard({ election, onClick }) {
           </Stack>
 
           <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-            {new Date(election.start_date).toLocaleDateString('tr-TR')}
+            {formatLocalDateTR(election.start_date)}
             {' → '}
-            {new Date(election.end_date).toLocaleDateString('tr-TR')}
+            {formatLocalDateTR(election.end_date)}
           </Typography>
         </CardContent>
       </CardActionArea>
@@ -174,7 +175,7 @@ function ResultsArchiveTab({ sessionId }) {
         <Box>
           <Stack direction="row" alignItems="center" spacing={1}>
             <HistoryIcon color="primary" />
-            <Typography variant="h5" fontWeight="bold">Sonuçlar & Arşiv</Typography>
+            <Typography variant="h5" fontWeight="bold">Sonuçlar ve Arşiv</Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary">
             Tüm seçimleri ve detaylı sonuçlarını buradan görüntüleyebilirsiniz.

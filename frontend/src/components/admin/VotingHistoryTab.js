@@ -31,13 +31,11 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { API_BASE, explorerTxUrl, EXPLORER_BASE_URL } from '../../config';
+import { formatLocalDateTimeTR } from '../../utils/dateTime';
 
 function fmtDate(str) {
   if (!str) return '—';
-  return new Date(str).toLocaleString('tr-TR', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  });
+  return formatLocalDateTimeTR(str);
 }
 
 function VotingHistoryTab({ sessionId }) {
@@ -86,7 +84,7 @@ function VotingHistoryTab({ sessionId }) {
             <Typography variant="h5" fontWeight="bold">Geçmiş Oylar</Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary">
-            Tüm seçimlerde kullanılan oyların detaylı kaydı.
+            Tüm seçimlerde kullanılan oyların ayrıntılı kaydı.
             {total > 0 && <Chip size="small" label={`${total} toplam kayıt`} sx={{ ml: 1 }} />}
           </Typography>
         </Box>
@@ -120,7 +118,7 @@ function VotingHistoryTab({ sessionId }) {
             value={selectedElectionId}
             onChange={(e) => { setSelectedElectionId(e.target.value); setPage(1); }}
           >
-            <MenuItem value="">Tüm Seçimler</MenuItem>
+            <MenuItem value="">Tüm seçimler</MenuItem>
             {elections.map((e) => (
               <MenuItem key={e.id} value={e.id}>{e.title}</MenuItem>
             ))}
