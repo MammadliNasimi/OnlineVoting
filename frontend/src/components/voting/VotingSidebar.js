@@ -30,7 +30,7 @@ function VotingSidebar({ user, userInitial, userRole, walletAddress, isLoadingHi
           </Box>
           <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center' }}>
             <AccountBalanceWalletOutlinedIcon sx={{ color: '#0f9f8f' }} />
-            <Typography variant="body2" sx={{ color: '#475569', fontFamily: 'monospace' }}>{shortAddress(walletAddress)}</Typography>
+            <Typography variant="body2" sx={{ color: '#475569', fontFamily: 'monospace' }} aria-label="wallet-address">{shortAddress(walletAddress)}</Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center' }}>
             <ShieldOutlinedIcon sx={{ color: '#0f9f8f' }} />
