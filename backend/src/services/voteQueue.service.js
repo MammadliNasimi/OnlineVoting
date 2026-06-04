@@ -70,6 +70,35 @@ class VoteQueue {
             });
             state.io.emit('voteUpdated', { success: true, electionId: jobData.election_id });
           }
+          // Send voter a receipt email (best-effort)
+          try {
+            const userRow = db.db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(jobData.user_id);
+            if (userRow && userRow.email) {
+              const { createMailTransporter } = require('../utils/helpers');
+              const { voteReceipt } = require('./emailTemplates');
+              const transporter = createMailTransporter();
+              if (transporter) {
+                const receipt = {
+                  electionId: jobData.election_id,
+                  candidateId: jobData.candidate_id,
+                  electionTitle: (db.db.prepare('SELECT title FROM elections WHERE id = ?').get(jobData.election_id) || {}).title,
+                  candidateName: (db.db.prepare('SELECT name FROM candidates WHERE id = ?').get(jobData.candidate_id) || {}).name,
+                  burnerAddress: JSON.parse(jobData.signature || '{}').burnerAddress || null,
+                  burnerSignature: JSON.parse(jobData.signature || '{}').burnerSignature || null,
+                  timestamp: JSON.parse(jobData.signature || '{}').timestamp || null,
+                  txHash: result.txHash
+                };
+
+                const { subject, html } = voteReceipt(receipt);
+                const from = process.env.SMTP_FROM || '"SSI Voting" <noreply@voting.local>';
+                transporter.sendMail({ from, to: userRow.email, subject, html }).catch((e) => {
+                  console.error('[VoteQueue] Receipt email failed:', e.message);
+                });
+              }
+            }
+          } catch (mailErr) {
+            console.error('[VoteQueue] Error while sending receipt email:', mailErr.message);
+          }
         } catch(jobError) {
           console.error(`[VoteQueue] ❌ Job ${jobData.id} Failed:`, jobError.message);
           // Belirli kalıcı hatalarda direkt 'failed' (tekrar denemenin anlamı yok).

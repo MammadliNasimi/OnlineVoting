@@ -104,3 +104,29 @@ const electionAnnouncement = (election, subject, htmlBody) => ({
 });
 
 module.exports = { registrationOtp, passwordResetOtp, electionStarted, electionEnded, electionAnnouncement };
+// ------------------------
+// Oy makbuzu şablonu
+// ------------------------
+const voteReceipt = (receipt) => {
+  const { electionTitle, candidateName, txHash, burnerAddress, timestamp } = receipt;
+  return {
+    subject: `🧾 Oy Makbuzunuz — ${electionTitle || 'Seçim'}`,
+    html: renderElectionCard({
+      headerSubtitle: 'Oy Makbuzu',
+      headerTitle: electionTitle || 'Oy Makbuzu',
+      bodyHtml: `
+        <p>Oyunuz başarıyla blokzincire yazıldı.</p>
+        <p><strong>Seçim:</strong> ${electionTitle || '-'}<br/>
+           <strong>Aday:</strong> ${candidateName || '-'}<br/>
+           <strong>Transaction:</strong> <code>${txHash || '-'}</code><br/>
+           <strong>Burner Address:</strong> <code>${burnerAddress || '-'}</code><br/>
+           <strong>Zaman (TS):</strong> ${timestamp ? new Date(Number(timestamp) * 1000).toLocaleString('tr-TR') : '-'}</p>
+        <hr/>
+        <p style="font-size:13px;color:#94a3b8">Bu makbuz, imza ve işlem verilerini içerir. Herhangi bir sorun halinde seçim yöneticisine başvurun.</p>
+        <pre style="background:#0b1220;padding:12px;border-radius:8px;color:#e2e8f0;overflow:auto">${JSON.stringify(receipt, null, 2)}</pre>
+      `
+    })
+  };
+};
+
+module.exports.voteReceipt = voteReceipt;
