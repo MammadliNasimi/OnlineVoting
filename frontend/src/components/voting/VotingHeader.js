@@ -5,10 +5,10 @@ import HistoryIcon from '@mui/icons-material/History';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
-import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+// VerifiedUserIcon removed (header verification button removed)
 import { headerButtonSx, headerPrimaryButtonSx, panelSx } from './styles';
 
-function VotingHeader({ user, onLogout, onShowProfile, onShowFace, onShowHistory, onShowReceiptVerification }) {
+function VotingHeader({ user, onLogout, onShowProfile, onShowFace, onShowHistory }) {
   return (
     <Paper
       elevation={0}
@@ -61,11 +61,7 @@ function VotingHeader({ user, onLogout, onShowProfile, onShowFace, onShowHistory
               Gecmis
             </Button>
           </Tooltip>
-          <Tooltip title="Oyu dogrula (txHash)">
-            <Button variant="outlined" startIcon={<VerifiedUserIcon />} onClick={onShowReceiptVerification} sx={headerButtonSx}>
-              Dogrula
-            </Button>
-          </Tooltip>
+          {/* Front header 'Dogrula' button removed per request */}
           <Tooltip title="Cikis yap">
             <IconButton
               onClick={onLogout}

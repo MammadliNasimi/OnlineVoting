@@ -305,7 +305,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
             startFaceCamera();
           }}
           onShowHistory={() => setShowHistory(true)}
-          onShowReceiptVerification={() => setShowReceiptVerification(true)}
+          
         />
 
         {(electionsError || voteMutation.isError || errorMsg) && (
