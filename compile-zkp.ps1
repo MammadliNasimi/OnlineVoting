@@ -61,7 +61,6 @@ if (-not $SkipDocker) {
     
     # Run compilation
     Write-Host "Compiling nullifier.circom..."
-    $CircuitPath = Join-Path $ProjectRoot "backend\zkp\circuits\nullifier.circom"
     
     # Use relative path for docker mount on Windows
     Push-Location $ProjectRoot
