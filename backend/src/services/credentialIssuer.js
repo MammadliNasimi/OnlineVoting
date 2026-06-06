@@ -100,6 +100,14 @@ class CredentialIssuer {
             throw error;
         }
     }
+
+    getIssuerAddress() {
+        return this.issuerWallet.address;
+    }
+
+    getDomain() {
+        return this.domain;
+    }
 }
 
 module.exports = CredentialIssuer;
