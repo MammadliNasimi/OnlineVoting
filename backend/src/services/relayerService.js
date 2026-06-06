@@ -89,6 +89,20 @@ class RelayerService {
             console.log('   User Identifier:', userIdentifier);
             console.log('   Election ID:', credential.electionID);
             console.log('   Candidate ID:', credential.candidateID);
+            console.log('   Issuer Address (backend):', issuerAddress);
+
+            // DEBUG: Query contract issuer
+            try {
+              const contractIssuer = await this.contract.issuer();
+              console.log('   Issuer Address (contract):', contractIssuer);
+              if (contractIssuer.toLowerCase() !== issuerAddress.toLowerCase()) {
+                console.warn('⚠️  WARNING: Issuer address mismatch!');
+                console.warn('   Backend expects:', issuerAddress);
+                console.warn('   Contract has:', contractIssuer);
+              }
+            } catch (err) {
+              console.error('   Could not query contract issuer:', err.message);
+            }
 
               // checkRateLimit returns true if allowed, or throws an error.
               this.checkRateLimit(userIdentifier);

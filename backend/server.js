@@ -129,6 +129,11 @@ async function startServer() {
     const chainId = parseInt(cleanEnv(process.env.CHAIN_ID) || DEFAULT_CHAIN_ID, 10);
     if (issuerPrivateKey) {
       state.credentialIssuer = new CredentialIssuer(issuerPrivateKey, contractAddress, chainId);
+      // DEBUG: Log issuer details
+      logger.info('🔐 Credential Issuer Initialized:');
+      logger.info('   Issuer Address: ' + state.credentialIssuer.getIssuerAddress());
+      logger.info('   Contract Address: ' + contractAddress);
+      logger.info('   Chain ID: ' + chainId);
     }
 
     const relayerPrivateKey = cleanEnv(process.env.RELAYER_PRIVATE_KEY) || issuerPrivateKey;
