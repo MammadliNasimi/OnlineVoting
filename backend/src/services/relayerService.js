@@ -133,8 +133,18 @@ class RelayerService {
                 burnerSignature: credential.burnerSignature
             };
 
+            // DEBUG: Log signatures for verification
+            console.log('   📝 Vote Proof Details:');
+            console.log('      emailHash:', credential.emailHash);
+            console.log('      burner:', credential.burner);
+            console.log('      electionID:', credential.electionID);
+            console.log('      candidateID:', credential.candidateID);
+            console.log('      timestamp:', credential.timestamp);
+            console.log('      issuerSignature length:', credential.issuerSignature.length);
+            console.log('      burnerSignature length:', credential.burnerSignature.length);
+
             // Blockchain will naturally revert with exact reason via estimateGas
-      console.log(voteProof); const estimatedGas = await this.contract.vote.estimateGas(voteProof);
+            const estimatedGas = await this.contract.vote.estimateGas(voteProof);
             console.log('   Estimated Gas:', estimatedGas.toString());
 
             const balance = await this.provider.getBalance(this.relayerWallet.address);

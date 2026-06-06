@@ -63,7 +63,13 @@ export const signVoteClientSide = async (candidateID, electionID) => {
     timestamp
   };
 
+  console.log('[Frontend] Signing vote with EIP-712:');
+  console.log('  Domain:', domain);
+  console.log('  Message:', message);
+
   const signature = await wallet.signTypedData(domain, types, message);
+
+  console.log('[Frontend] ✅ Signature created:', signature.substring(0, 20) + '...');
 
   return {
     burnerAddress: wallet.address,
