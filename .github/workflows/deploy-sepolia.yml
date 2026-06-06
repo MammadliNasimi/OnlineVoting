@@ -25,7 +25,6 @@ jobs:
         working-directory: ./blockchain
         env:
           BLOCKCHAIN_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
-          ADMIN_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          ADMIN_PRIVATE_KEY: ${{ secrets.ADMIN_PRIVATE_KEY || secrets.DEPLOYER_PRIVATE_KEY }}
           CI: true
         run: npx hardhat run scripts/deploy-ssi.js --network sepolia
-
