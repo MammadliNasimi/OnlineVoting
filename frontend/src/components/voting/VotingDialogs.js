@@ -15,6 +15,7 @@ import {
   ListItem,
   Paper,
   Stack,
+  TextField,
   Tooltip,
   Typography
 } from '@mui/material';
@@ -455,7 +456,7 @@ export function ReceiptVerificationDialog({ open, onClose, onVerify, verificatio
                     ✗ Bulunamadi
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#9a3412' }}>
-                    {verificationResult.error || 'Oy bulunamadi. Hash'i kontrol edin.'}
+                    {verificationResult.error || `Oy bulunamadi. Hash'i kontrol edin.`}
                   </Typography>
                 </Box>
               )}

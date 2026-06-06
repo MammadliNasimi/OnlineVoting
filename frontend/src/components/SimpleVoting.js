@@ -27,7 +27,6 @@ function SimpleVoting({ user, sessionId, onLogout }) {
   const [showHistory, setShowHistory] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showReceiptVerification, setShowReceiptVerification] = useState(false);
-  const [receiptTxHash, setReceiptTxHash] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [queueMsg, setQueueMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -395,10 +394,8 @@ function SimpleVoting({ user, sessionId, onLogout }) {
         onClose={() => {
           setShowReceiptVerification(false);
           setVerificationResult(null);
-          setReceiptTxHash('');
         }}
         onVerify={(txHash) => {
-          setReceiptTxHash(txHash);
           verifyReceiptMutation.mutate(txHash);
         }}
         verificationResult={verificationResult}

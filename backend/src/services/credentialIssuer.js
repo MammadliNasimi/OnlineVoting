@@ -103,20 +103,3 @@ class CredentialIssuer {
 }
 
 module.exports = CredentialIssuer;
-
-        } catch (error) {
-            console.error('❌ Error issuing credential:', error);
-            throw error;
-        }
-    }
-
-    getDomain() {
-        return this.domain;
-    }
-
-    getIssuerAddress() {
-        return this.issuerWallet.address;
-    }
-}
-
-module.exports = CredentialIssuer;
