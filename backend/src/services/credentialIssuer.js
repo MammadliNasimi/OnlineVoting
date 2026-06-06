@@ -24,8 +24,9 @@ const { ethers } = require('ethers');
  */
 
 // EIP-712 type definition for credential signing
+// MUST match contract's CREDENTIAL_TYPEHASH: "Credential(bytes32 emailHash,address burner,uint256 electionID)"
 const VOTE_PROOF_TYPES = {
-    VoteProof: [
+    Credential: [
         { name: 'emailHash', type: 'bytes32' },
         { name: 'burner', type: 'address' },
         { name: 'electionID', type: 'uint256' }
