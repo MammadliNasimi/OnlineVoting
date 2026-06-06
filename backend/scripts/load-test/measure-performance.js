@@ -14,10 +14,23 @@
 const { ethers } = require('ethers');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+// Check test mode early BEFORE loading env
+const isTestMode = process.argv.includes('--test');
+
+// Load .env: test mode uses backend/.env (Hardhat accounts), production uses root/.env (Sepolia)
+const envPath = isTestMode 
+  ? path.join(__dirname, '../../.env')  // backend/.env for test
+  : path.join(__dirname, '../../../.env'); // root/.env for production
+require('dotenv').config({ path: envPath });
 
 // ============ CONFIG ============
-const RPC_URL = process.env.VOTING_RPC_URL || process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545';
+console.log('📋 Process argv:', process.argv);
+console.log('🧪 Test mode detected:', isTestMode);
+console.log('📂 Loading .env from:', envPath);
+
+// In test mode, always use local Hardhat node
+const RPC_URL = isTestMode ? 'http://127.0.0.1:8545' : (process.env.VOTING_RPC_URL || process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545');
+console.log('🔗 RPC URL:', RPC_URL);
 const CONTRACT_ADDRESS = process.env.VOTING_CONTRACT_ADDRESS;
 const ISSUER_PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY;
 const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY || process.env.ADMIN_PRIVATE_KEY; // Fallback to issuer key for local testing
@@ -29,7 +42,6 @@ if (!CONTRACT_ADDRESS || !ISSUER_PRIVATE_KEY) {
 
 // TEST SCENARIOS
 // Use --test flag for quick validation: npm run benchmark -- --test
-const isTestMode = process.argv.includes('--test');
 const TEST_SCENARIOS = isTestMode ? [
   { voters: 10, name: '10-voters' },
   { voters: 50, name: '50-voters' }
@@ -58,7 +70,13 @@ class PerformanceTest {
     this.issuerWallet = new ethers.Wallet(ISSUER_PRIVATE_KEY, this.provider);
     this.relayerWallet = new ethers.Wallet(RELAYER_PRIVATE_KEY, this.provider);
     
-    this.contractABI = require(path.join(__dirname, '../../src/../../../blockchain/artifacts/contracts/VotingSSI.sol/VotingSSI.json')).abi;
+    // Find ABI file (handle path traversal properly)
+    const abiPath = path.resolve(__dirname, '../../../blockchain/artifacts/contracts/VotingSSI.sol/VotingSSI.json');
+    if (!fs.existsSync(abiPath)) {
+      console.error(`❌ ABI file not found: ${abiPath}`);
+      throw new Error('VotingSSI.json not found');
+    }
+    this.contractABI = require(abiPath).abi;
     this.contract = new ethers.Contract(CONTRACT_ADDRESS, this.contractABI, this.issuerWallet);
     
     this.results = [];
@@ -170,25 +188,20 @@ class PerformanceTest {
     const relayerConnectedContract = this.contract.connect(this.relayerWallet);
 
     try {
-      const gasEstimate = await relayerConnectedContract.submitVote.estimateGas(
+      // Call vote() method with VoteProof struct
+      const proof = {
         emailHash,
-        burnerAddress,
-        this.currentElectionId,
+        burner: burnerAddress,  // field name is 'burner' not 'burnerAddress'
+        electionID: this.currentElectionId,
         candidateID,
         timestamp,
         issuerSignature,
         burnerSignature
-      );
+      };
 
-      const tx = await relayerConnectedContract.submitVote(
-        emailHash,
-        burnerAddress,
-        this.currentElectionId,
-        candidateID,
-        timestamp,
-        issuerSignature,
-        burnerSignature
-      );
+      const gasEstimate = await relayerConnectedContract.vote.estimateGas(proof);
+
+      const tx = await relayerConnectedContract.vote(proof);
 
       const receipt = await tx.wait();
       const gasUsed = receipt.gasUsed;
