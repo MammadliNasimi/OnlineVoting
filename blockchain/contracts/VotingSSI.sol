@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+// ========== INTERFACES ==========
+
+interface IVerifier {
+    function verifyProof(uint[2] memory a, uint[2][2] memory b, uint[2] memory c, uint[] memory input) external view returns (bool);
+}
+
 /**
  * @title Credential-Based Voting Contract
- * @notice Anonymous voting using EIP-712 structured data signing and nullifiers
- * @dev Credential-Issuer + Nullifier-Based Anonymity model (NOT Zero-Knowledge Proof)
+ * @notice Anonymous voting using EIP-712 structured data signing and ZK nullifier proofs
+ * @dev Credential-Issuer + Nullifier-Based Anonymity model + Groth16 ZKP verification
  * 
  * Architecture:
  * 1. Issuer (DAO/Admin) creates signed credentials for eligible voters
@@ -55,11 +61,14 @@ contract VotingSSI {
     error InvalidTimeRange();
     error NoCandidates();
     error ElectionAlreadyEnded();
-
-    // ========== STATE VARIABLES ==========
+    error InvalidZKProof();
     
+
     /// @notice Credential Issuer address (University/Admin)
     address public issuer;
+    
+    /// @notice ZK Verifier contract (for Groth16 proofs)
+    IVerifier public verifier;
     
     /// @notice Election metadata
     struct Election {
@@ -77,7 +86,15 @@ contract VotingSSI {
         uint256 voteCount;
     }
     
-    /// @notice Vote Proof structure for Burner Wallet SSI
+    /// @notice ZK Proof structure (from snarkjs)
+    struct ZKProof {
+        uint[2] a;              // Proof point a (x, y)
+        uint[2][2] b;           // Proof point b (x1, x2), (y1, y2)
+        uint[2] c;              // Proof point c (x, y)
+        uint[] publicSignals;   // Public inputs: [nullifier]
+    }
+    
+    /// @notice Vote Proof structure for Burner Wallet SSI + ZKP
     struct VoteProof {
         bytes32 emailHash;      // Unique hashed identifier
         address burner;         // One-time random address created by student
@@ -86,6 +103,7 @@ contract VotingSSI {
         uint256 timestamp;      // Vote operation timestamp
         bytes issuerSignature;  // Admin signs: (emailHash, burner, electionID)
         bytes burnerSignature;  // Burner signs: (candidateID, electionID, timestamp)
+        ZKProof zkProof;        // Groth16 proof of nullifier knowledge (Adım 2)
     }
 
     /// @notice Current election ID counter
@@ -140,9 +158,10 @@ contract VotingSSI {
     
     // ========== CONSTRUCTOR ==========
     
-    constructor(address _issuer, string memory _name, string memory _version) {
+    constructor(address _issuer, string memory _name, string memory _version, address _verifier) {
         if (_issuer == address(0)) revert InvalidIssuer();
         issuer = _issuer;
+        verifier = IVerifier(_verifier);
         
         // Initialize EIP-712 domain separator
         DOMAIN_SEPARATOR = keccak256(
@@ -184,25 +203,37 @@ contract VotingSSI {
             abi.encodePacked(proof.emailHash, proof.electionID)
         );
         
-        // 2. Check nullifier hasn't been used (prevents double voting)
+        // 2. Verify ZK proof of nullifier knowledge (if verifier is set)
+        if (address(verifier) != address(0)) {
+            // Prepare public signals for verifier: [nullifier_as_uint]
+            uint[] memory publicSignals = new uint[](1);
+            publicSignals[0] = uint256(nullifier);
+            
+            // Verify the proof
+            if (!verifier.verifyProof(proof.zkProof.a, proof.zkProof.b, proof.zkProof.c, publicSignals)) {
+                revert InvalidZKProof();
+            }
+        }
+        
+        // 3. Check nullifier hasn't been used (prevents double voting)
         if (usedNullifiers[nullifier]) revert DoubleVoting();
         
-        // 3. Verify candidate exists
+        // 4. Verify candidate exists
         if (proof.candidateID >= candidates[proof.electionID].length) revert InvalidCandidate();
         
-        // 4. Verify timestamp is recent (prevent replay attacks)
+        // 5. Verify timestamp is recent (prevent replay attacks)
         if (block.timestamp > proof.timestamp + 1 hours) revert ProofExpired();
         
-        // 5. Verify issuer's and burner's EIP-712 signatures
+        // 6. Verify issuer's and burner's EIP-712 signatures
         if (!verifyVoteProof(proof)) revert InvalidSignatures();
         
-        // 6. Mark nullifier as used (prevents reuse)
+        // 7. Mark nullifier as used (prevents reuse)
         usedNullifiers[nullifier] = true;
         
-        // 7. Record the vote
+        // 8. Record the vote
         unchecked { ++candidates[proof.electionID][proof.candidateID].voteCount; }
         
-        // 8. Emit event (nullifier indexed for verification, preserves anonymity)
+        // 9. Emit event (nullifier indexed for verification, preserves anonymity)
         emit VoteCast(proof.electionID, proof.candidateID, nullifier, proof.timestamp);
     }
     
@@ -356,6 +387,14 @@ contract VotingSSI {
         address oldIssuer = issuer;
         issuer = _newIssuer;
         emit IssuerUpdated(oldIssuer, _newIssuer);
+    }
+    
+    /**
+     * @notice Set or update ZK verifier contract (Groth16 verifier)
+     * @param _verifier Address of the verifier contract
+     */
+    function setVerifier(address _verifier) external onlyIssuer {
+        verifier = IVerifier(_verifier);
     }
     
     // ========== VIEW FUNCTIONS ==========

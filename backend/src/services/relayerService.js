@@ -130,7 +130,8 @@ class RelayerService {
                 candidateID: credential.candidateID,
                 timestamp: credential.timestamp,
                 issuerSignature: credential.issuerSignature,
-                burnerSignature: credential.burnerSignature
+                burnerSignature: credential.burnerSignature,
+                zkProof: credential.zkProof || { a: [0, 0], b: [[0, 0], [0, 0]], c: [0, 0], publicSignals: [] }
             };
 
             // DEBUG: Log signatures for verification
@@ -142,6 +143,7 @@ class RelayerService {
             console.log('      timestamp:', credential.timestamp);
             console.log('      issuerSignature length:', credential.issuerSignature.length);
             console.log('      burnerSignature length:', credential.burnerSignature.length);
+            console.log('      zkProof:', credential.zkProof ? 'present' : 'empty (fallback)');
 
             // Blockchain will naturally revert with exact reason via estimateGas
             const estimatedGas = await this.contract.vote.estimateGas(voteProof);

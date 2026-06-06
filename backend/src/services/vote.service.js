@@ -2,6 +2,7 @@ const db = require('../config/database-sqlite');
 const state = require('../config/state');
 const { voteJobQueue } = require('./voteQueue.service');
 const { isDomainAllowed } = require('../utils/voteHelpers');
+const { generateProof } = require('./zkp/proofGenerator');
 
 const REPEAT_VOTE_MAX_ATTEMPTS = 5;
 const REPEAT_VOTE_LOCK_MINUTES = 15;
@@ -124,6 +125,27 @@ class VoteService {
 
     const credentialData = await state.credentialIssuer.issueVoteCredential(email, election.blockchain_election_id, burnerAddress);
 
+    // Generate ZK proof for nullifier (Adım 2)
+    let zkProof;
+    try {
+      const { proof, publicSignals } = await generateProof(credentialData.credential.emailHash, election.blockchain_election_id);
+      zkProof = {
+        a: proof.a,
+        b: proof.b,
+        c: proof.c,
+        publicSignals: publicSignals
+      };
+    } catch (err) {
+      console.warn('⚠️  ZK proof generation failed:', err.message);
+      // Fallback: empty proof (contract will skip verification if verifier not set)
+      zkProof = {
+        a: [0, 0],
+        b: [[0, 0], [0, 0]],
+        c: [0, 0],
+        publicSignals: []
+      };
+    }
+
     const completeVoteProof = {
       emailHash: credentialData.credential.emailHash,
       burner: burnerAddress,
@@ -131,7 +153,8 @@ class VoteService {
       candidateID: candidate.blockchain_candidate_id,
       timestamp: timestamp,
       issuerSignature: credentialData.credential.issuerSignature,
-      burnerSignature: burnerSignature
+      burnerSignature: burnerSignature,
+      zkProof: zkProof
     };
 
     try {

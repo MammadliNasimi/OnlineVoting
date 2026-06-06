@@ -7,6 +7,7 @@
  * - Latency: p50, p95, p99 (signature → blockchain confirmation)
  * - Gas cost: per vote (Sepolia testnet)
  * - Relayer overhead: time between submission and confirmation
+ * - ZKP generation time: proof generation latency (Adım 2)
  * 
  * Output: CSV report + JSON results
  */
@@ -14,6 +15,7 @@
 const { ethers } = require('ethers');
 const fs = require('fs');
 const path = require('path');
+const { generateProof } = require('../../services/zkp/proofGenerator');
 // Check test mode early BEFORE loading env
 const isTestMode = process.argv.includes('--test');
 
@@ -188,11 +190,11 @@ class PerformanceTest {
     }
   }
 
-  async submitVote(emailHash, issuerSignature, burnerSignature, burnerAddress, candidateID, timestamp) {
+  async submitVote(emailHash, issuerSignature, burnerSignature, burnerAddress, candidateID, timestamp, zkProof) {
     const relayerConnectedContract = this.contract.connect(this.relayerWallet);
 
     try {
-      // Call vote() method with VoteProof struct
+      // Call vote() method with VoteProof struct (including ZK proof)
       const proof = {
         emailHash,
         burner: burnerAddress,  // field name is 'burner' not 'burnerAddress'
@@ -200,7 +202,8 @@ class PerformanceTest {
         candidateID,
         timestamp,
         issuerSignature,
-        burnerSignature
+        burnerSignature,
+        zkProof: zkProof || { a: [0, 0], b: [[0, 0], [0, 0]], c: [0, 0], publicSignals: [] } // Fallback to empty proof
       };
 
       const gasEstimate = await relayerConnectedContract.vote.estimateGas(proof);
@@ -257,7 +260,24 @@ class PerformanceTest {
         );
         const votingTime = Date.now() - votingStart;
 
-        // 3. SUBMIT TO BLOCKCHAIN (Relayer)
+        // 3. ZK PROOF GENERATION (Adım 2)
+        const zkpStart = Date.now();
+        let zkProof;
+        try {
+          const { proof, publicSignals } = await generateProof(emailHash, this.currentElectionId);
+          zkProof = {
+            a: proof.a,
+            b: proof.b,
+            c: proof.c,
+            publicSignals: publicSignals
+          };
+        } catch (err) {
+          console.warn(`  ⚠️  ZKP generation failed for voter ${i}: ${err.message.substring(0, 50)}`);
+          zkProof = { a: [0, 0], b: [[0, 0], [0, 0]], c: [0, 0], publicSignals: [] };
+        }
+        const zkpTime = Date.now() - zkpStart;
+
+        // 4. SUBMIT TO BLOCKCHAIN (Relayer)
         const submitStart = Date.now();
         const submitResult = await this.submitVote(
           emailHash,
@@ -265,17 +285,19 @@ class PerformanceTest {
           burnerSig,
           burner.address,
           candidateID,
-          timestamp
+          timestamp,
+          zkProof
         );
         const submitTime = Date.now() - submitStart;
 
-        const totalTime = credentialTime + votingTime + submitTime;
+        const totalTime = credentialTime + votingTime + zkpTime + submitTime;
 
         measurements.push({
           voter_id: i,
           email,
           credential_time_ms: credentialTime,
           signing_time_ms: votingTime,
+          zkp_time_ms: zkpTime,
           blockchain_time_ms: submitTime,
           total_time_ms: totalTime,
           gas_used: submitResult.gasUsed,

@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "C:\\Users\\Nasimi\\OneDrive - Akdeniz Üniversitesi\\Masaüstü\\OnlineVoting\\blockchain\\contracts\\VotingSSI.sol": {
-      "lastModificationDate": 1780737062661,
-      "contentHash": "a3175735dcde87b41088078fb531659d",
+      "lastModificationDate": 1780747673709,
+      "contentHash": "17f6fcc41b4e43423ec7f0296b4f6bd9",
       "sourceName": "contracts/VotingSSI.sol",
       "solcConfig": {
         "version": "0.8.28",
@@ -34,7 +34,44 @@
         "^0.8.0"
       ],
       "artifacts": [
+        "IVerifier",
         "VotingSSI"
+      ]
+    },
+    "C:\\Users\\Nasimi\\OneDrive - Akdeniz Üniversitesi\\Masaüstü\\OnlineVoting\\blockchain\\contracts\\Verifier.sol": {
+      "lastModificationDate": 1780747753800,
+      "contentHash": "040ad9a91335f6a741e846226116573b",
+      "sourceName": "contracts/Verifier.sol",
+      "solcConfig": {
+        "version": "0.8.28",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "Verifier"
       ]
     }
   }

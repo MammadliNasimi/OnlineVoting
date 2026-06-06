@@ -56,12 +56,23 @@ async function main() {
   console.log("   Chain ID:", hre.network.config.chainId || 31337);
   console.log("");
 
-  // Deploy contract with EIP-712 domain parameters
+  // Deploy Verifier contract (stub for now, will be replaced with snarkjs-generated)
+  console.log("📋 Deploying Verifier stub...");
+  const Verifier = await hre.ethers.getContractFactory("Verifier");
+  const verifier = await Verifier.deploy();
+  await verifier.waitForDeployment();
+  const verifierAddress = await verifier.getAddress();
+  console.log("✅ Verifier deployed at:", verifierAddress);
+  console.log("");
+
+  // Deploy VotingSSI contract with EIP-712 domain parameters and verifier
+  console.log("📋 Deploying VotingSSI contract...");
   const VotingSSI = await hre.ethers.getContractFactory("VotingSSI");
   const votingContract = await VotingSSI.deploy(
     issuerAddress,
     "VotingSSI",      // EIP-712 domain name
-    "1.0"             // EIP-712 version
+    "1.0",            // EIP-712 version
+    verifierAddress   // Verifier contract address (NEW - Adım 2)
   );
 
   await votingContract.waitForDeployment();
@@ -81,13 +92,14 @@ async function main() {
   console.log("   Vote TypeHash:", await votingContract.VOTE_TYPEHASH());
   console.log("");
 
-  // Update .env file with contract address
+  // Update .env file with contract addresses
   const rootEnvPath = path.resolve(__dirname, "../..", ".env");
   let envContent = fs.readFileSync(rootEnvPath, "utf8");
   envContent = updateEnvVar(envContent, 'CONTRACT_ADDRESS', contractAddress);
   envContent = updateEnvVar(envContent, 'VOTING_CONTRACT_ADDRESS', contractAddress);
+  envContent = updateEnvVar(envContent, 'VERIFIER_ADDRESS', verifierAddress);
   fs.writeFileSync(rootEnvPath, envContent);
-  console.log("📄 Updated .env with contract address");
+  console.log("📄 Updated .env with contract and verifier addresses");
   console.log("");
 
   // Create sample election
