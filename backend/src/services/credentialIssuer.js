@@ -22,8 +22,18 @@ const { ethers } = require('ethers');
  * - The issuer can be a multi-sig wallet or DAO treasury
  * - Multiple issuers can be rotated for decentralization
  */
-    constructor(issuerPrivateKey, contractAddress, chainId = 31337) {
 
+// EIP-712 type definition for credential signing
+const VOTE_PROOF_TYPES = {
+    VoteProof: [
+        { name: 'emailHash', type: 'bytes32' },
+        { name: 'burner', type: 'address' },
+        { name: 'electionID', type: 'uint256' }
+    ]
+};
+
+class CredentialIssuer {
+    constructor(issuerPrivateKey, contractAddress, chainId = 31337) {
         const cleanKey = typeof issuerPrivateKey === 'string' ? issuerPrivateKey.trim() : issuerPrivateKey;
         const cleanAddress = typeof contractAddress === 'string' ? contractAddress.trim() : contractAddress;
         const numericChainId = Number(chainId);
@@ -47,7 +57,6 @@ const { ethers } = require('ethers');
     }
 
     hashEmail(email) {
-
         const salt = 'ZKEMAIL_VOTING_SSI_2026';
         const normalized = email.trim().toLowerCase();
         return ethers.keccak256(ethers.toUtf8Bytes(normalized + salt));
@@ -55,7 +64,6 @@ const { ethers } = require('ethers');
 
     async issueVoteCredential(email, electionID, burnerAddress) {
         try {
-
             const emailHash = this.hashEmail(email);
 
             const credentialProof = {
@@ -87,6 +95,14 @@ const { ethers } = require('ethers');
                 issuer: this.issuerWallet.address,
                 issuedAt: new Date().toISOString()
             };
+        } catch (error) {
+            console.error('❌ Failed to issue credential:', error.message);
+            throw error;
+        }
+    }
+}
+
+module.exports = CredentialIssuer;
 
         } catch (error) {
             console.error('❌ Error issuing credential:', error);
