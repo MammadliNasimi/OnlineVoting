@@ -2,20 +2,25 @@
 pragma solidity ^0.8.0;
 
 /**
- * @title Self-Sovereign Identity Voting Contract
+ * @title Credential-Based Voting Contract
  * @notice Anonymous voting using EIP-712 structured data signing and nullifiers
- * @dev Implements verifiable credentials model with Issuer-Holder-Verifier pattern
+ * @dev Credential-Issuer + Nullifier-Based Anonymity model (NOT Zero-Knowledge Proof)
  * 
  * Architecture:
- * 1. Issuer (University/Admin) creates signed credentials for eligible voters
- * 2. Holder (Student) receives credential without revealing identity
+ * 1. Issuer (DAO/Admin) creates signed credentials for eligible voters
+ * 2. Holder (Participant) uses credential without revealing identity
  * 3. Smart Contract verifies credential and prevents double voting via nullifiers
  * 
  * Key Features:
- * - EIP-712 typed structured data for secure signing
+ * - EIP-712 typed structured data for secure dual signing
  * - Nullifier mechanism prevents double voting while preserving anonymity
  * - No on-chain identity storage - only hashed nullifiers
- * - Credential-based authorization (Self-Sovereign Identity principles)
+ * - DAO-compatible: multi-sig or on-chain governance can manage issuer role
+ * 
+ * Anonymity Model:
+ * - On-chain: only nullifier hash is stored (email/identity never revealed)
+ * - Prevents double voting: nullifier = hash(emailHash, electionID) is unique per voter per election
+ * - This is NOT Zero-Knowledge Proof; it's a credential + nullifier pattern
  */
 contract VotingSSI {
     // ========== EIP-712 DOMAIN ==========
@@ -173,7 +178,8 @@ contract VotingSSI {
         electionActive(proof.electionID)
     {
         // 1. Calculate nullifier (deterministic per email per election)
-        // ZK-Email: nullifier = keccak256(emailHash + electionID) — email never revealed
+        // Anonimlik: emailHash asla blockchain'e yazılmaz; sadece nullifier kaydedilir
+        // Nullifier = hash(emailHash + electionID) — her oy için benzersiz, değiştirilemez
         bytes32 nullifier = keccak256(
             abi.encodePacked(proof.emailHash, proof.electionID)
         );

@@ -1,15 +1,27 @@
 const { ethers } = require('ethers');
 
-
-const VOTE_PROOF_TYPES = {
-    Credential: [
-        { name: 'emailHash', type: 'bytes32' },
-        { name: 'burner', type: 'address' },
-        { name: 'electionID', type: 'uint256' }
-    ]
-};
-
-class CredentialIssuer {
+/**
+ * Credential Issuer Service
+ * 
+ * Allows an authorized entity (DAO, Admin, or Multi-sig) to issue signed credentials
+ * that permit participants to vote. Credentials are NOT Self-Sovereign Identity (SSI).
+ * 
+ * How it works:
+ * 1. Admin/DAO signs a credential (emailHash, burner address, electionID) with their private key
+ * 2. The signature is sent to the blockchain as part of the VoteProof
+ * 3. Smart contract verifies the issuer's signature before accepting the vote
+ * 4. This ensures only authorized voters can submit votes
+ * 
+ * Anonymity:
+ * - The email itself is never stored on-chain; only the hash is used
+ * - A "nullifier" is computed from this hash + electionID
+ * - Nullifier is marked as "used" to prevent double voting
+ * - Email is known only to the issuer and the participant
+ * 
+ * DAO-Compatible:
+ * - The issuer can be a multi-sig wallet or DAO treasury
+ * - Multiple issuers can be rotated for decentralization
+ */
     constructor(issuerPrivateKey, contractAddress, chainId = 31337) {
 
         const cleanKey = typeof issuerPrivateKey === 'string' ? issuerPrivateKey.trim() : issuerPrivateKey;

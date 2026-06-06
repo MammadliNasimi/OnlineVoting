@@ -1,6 +1,7 @@
 <div align="center">
-  <h1>🗳️ SSI Voting</h1>
-  <p><strong>Self-Sovereign Identity tabanlı, anonim, blockchain ile doğrulanan oylama sistemi</strong></p>
+  <h1>🗳️ OnlineVoting</h1>
+  <p><strong>DAO & Web3 topluluklarına yönelik, anonimlik-korumalı blockchain oylama sistemi</strong></p>
+  <p><em>Credential-Issuer + Nullifier-Based Anonymity + EIP-712 (ZKP değil)</em></p>
   <p>TÜBİTAK 2209-A Araştırma Projesi kapsamında geliştirilmiştir.</p>
 
   [![Live Demo](https://img.shields.io/badge/Live_Demo-onlinevoting--phi.vercel.app-22c55e?style=for-the-badge&logo=vercel)](https://onlinevoting-phi.vercel.app)
@@ -18,9 +19,16 @@
 
 ## 📖 Genel Bakış
 
-SSI Voting; geleneksel ve mevcut elektronik oylama sistemlerindeki **şeffaflık eksikliği** ve **manipülasyon riski** problemlerine karşı, Ethereum akıllı sözleşmeleri ve **Self-Sovereign Identity** (kullanıcı egemenliğinde kimlik) prensipleri ile tasarlanmış bir referans uygulamadır.
+**OnlineVoting**, DAO'lar ve Web3 topluluklarının iç yönetişim ve gözetim seçimlerine yönelik bir blockchain oylama sistemidir. Geleneksel ve merkezi elektronik oylama sistemlerindeki **şeffaflık eksikliği** ve **manipülasyon riski** sorunlarını çözmek için tasarlanmıştır.
 
-Sistem, seçmen kimliğini açığa çıkarmadan oy bütünlüğünü garanti eder; her oy yalnızca bir kez kullanılabilir, sonradan değiştirilemez ve dış cüzdan eklentisine ihtiyaç duymaz. Web3 güvenliğini Web2 kullanım kolaylığıyla birleştirir.
+### Anahtar Avantajlar:
+- **Anonimlik (Nullifier-Based)**: Seçmen kimliği blockchain'e yazılmaz; `nullifier = hash(email + electionID)` ile çift oy engellenir.
+- **Denetlenebilirlik**: Tüm oylar blockchain'de kalıcı olarak kaydedilir; dış gözlemciler `txHash` ile doğrulama yapabilir.
+- **Gasless**: Seçmenler ETH ödemez; Relayer Service tüm işlem ücretlerini üstlenir.
+- **Cüzdan Bağımsız**: Dış cüzdan eklentisine ihtiyaç yok; tarayıcıda otomatik burner wallet oluşturulur.
+- **DAO-Optimized**: Merkezi olmayan yönetişim modelleri için başlatan yetkisi multi-sig/DAO'ya uyarlanabilir.
+
+**Not**: Bu sistem ZKP (Zero-Knowledge Proof) kullanmaz. Anonimlik ve çift oy engelleme, nullifier hash + EIP-712 imzası kombinasyonundan sağlanır.
 
 ---
 
