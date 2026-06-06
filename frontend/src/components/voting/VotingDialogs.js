@@ -13,9 +13,7 @@ import {
   IconButton,
   List,
   ListItem,
-  Paper,
   Stack,
-  TextField,
   Tooltip,
   Typography
 } from '@mui/material';
@@ -33,7 +31,7 @@ import { getPublicEmailType, formatVoteDate } from './utils';
 import { formatLocalDateTR } from '../../utils/dateTime';
 import { outlineButtonSx, primaryButtonSx } from './styles';
 import { downloadVoteReceipt } from '../../services/receiptPdf';
-import { explorerTxUrl, EXPLORER_BASE_URL, CONTRACT_ADDRESS } from '../../config';
+import { explorerTxUrl, EXPLORER_BASE_URL } from '../../config';
 
 // ─── Paylaşma yardımcısı ──────────────────────────────────────
 function buildShareText(vote) {
@@ -51,72 +49,10 @@ async function shareOrCopy(text) {
   }
 }
 
-// ─── Oy Doğrulama mini paneli ─────────────────────────────────
-function VoteVerifyPanel({ vote, burnerAddress }) {
-  const txUrl = EXPLORER_BASE_URL ? explorerTxUrl(vote.transaction_hash) : null;
-  const contractUrl = CONTRACT_ADDRESS && EXPLORER_BASE_URL
-    ? `${EXPLORER_BASE_URL}/address/${CONTRACT_ADDRESS}`
-    : null;
-
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        mt: 1,
-        p: 1.5,
-        borderRadius: 2,
-        bgcolor: 'rgba(16,185,129,0.06)',
-        border: '1px solid rgba(16,185,129,0.18)'
-      }}
-    >
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-        <VerifiedIcon sx={{ fontSize: 16, color: '#10b981' }} />
-          <Typography variant="caption" fontWeight="bold" sx={{ color: '#065f46' }}>
-          Blokzincir Doğrulaması
-        </Typography>
-      </Stack>
-
-      <Stack spacing={0.5}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <CheckCircleOutlineIcon sx={{ fontSize: 14, color: '#10b981', flexShrink: 0 }} />
-          <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
-            <strong>TX:</strong> {vote.transaction_hash
-              ? vote.transaction_hash.slice(0, 20) + '…'
-              : 'Yok'}
-          </Typography>
-          {txUrl && (
-            <IconButton size="small" href={txUrl} target="_blank" rel="noopener noreferrer" component="a" sx={{ p: 0.25 }}>
-              <OpenInNewIcon sx={{ fontSize: 13 }} />
-            </IconButton>
-          )}
-        </Stack>
-        {burnerAddress && (
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <CheckCircleOutlineIcon sx={{ fontSize: 14, color: '#10b981', flexShrink: 0 }} />
-            <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
-              <strong>Burner:</strong> {burnerAddress.slice(0, 16) + '…'}
-            </Typography>
-          </Stack>
-        )}
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <CheckCircleOutlineIcon sx={{ fontSize: 14, color: '#10b981', flexShrink: 0 }} />
-          <Typography variant="caption" color="text.secondary">
-            <strong>Sözleşme:</strong> {CONTRACT_ADDRESS ? CONTRACT_ADDRESS.slice(0, 14) + '…' : '—'}
-          </Typography>
-          {contractUrl && (
-            <IconButton size="small" href={contractUrl} target="_blank" rel="noopener noreferrer" component="a" sx={{ p: 0.25 }}>
-              <OpenInNewIcon sx={{ fontSize: 13 }} />
-            </IconButton>
-          )}
-        </Stack>
-      </Stack>
-    </Paper>
-  );
-}
+// Vote verification panel removed per request
 
 // ─── Her oy satırı ────────────────────────────────────────────
 function VoteRow({ vote, burnerAddress }) {
-  const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const txUrl = EXPLORER_BASE_URL ? explorerTxUrl(vote.transaction_hash) : null;
 
@@ -176,21 +112,11 @@ function VoteRow({ vote, burnerAddress }) {
                 <PictureAsPdfIcon fontSize="small" sx={{ color: '#ef4444' }} />
               </IconButton>
             </Tooltip>
-            <Tooltip title={expanded ? 'Doğrulamayı Gizle' : 'Oyumu Doğrula'}>
-              <IconButton size="small" onClick={() => setExpanded(v => !v)}>
-                <VerifiedIcon fontSize="small" sx={{ color: expanded ? '#10b981' : 'text.secondary' }} />
-              </IconButton>
-            </Tooltip>
+            {/* Verification toggle removed */}
           </Stack>
         </Stack>
       </Box>
-
-      {/* Doğrulama paneli */}
-      {expanded && (
-        <Box sx={{ width: '100%' }}>
-          <VoteVerifyPanel vote={vote} burnerAddress={burnerAddress} />
-        </Box>
-      )}
+      
     </ListItem>
   );
 }
@@ -386,90 +312,4 @@ export function ProfileDialog({
   );
 }
 
-export function ReceiptVerificationDialog({ open, onClose, onVerify, verificationResult, isLoading }) {
-  const [txHash, setTxHash] = useState('');
-
-  const handleVerify = () => {
-    if (txHash.trim()) {
-      onVerify(txHash);
-    }
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 900, color: '#111827' }}>
-        Oyunuzu Dogru (Blockchain)
-      </DialogTitle>
-      <DialogContent dividers sx={{ p: 2.5 }}>
-        <Box sx={{ display: 'grid', gap: 2 }}>
-          <Typography variant="body2" sx={{ color: '#475569' }}>
-            Oyunuzun blockchain'deki durumunu dogrulamak icin islem hash'ini (TX Hash) girin.
-          </Typography>
-          <TextField
-            fullWidth
-            label="Transaction Hash (0x...)"
-            placeholder="0x..."
-            value={txHash}
-            onChange={(e) => setTxHash(e.target.value)}
-            disabled={isLoading}
-            size="small"
-            helperText="Blockchain'e yazilan islemin unique ID'si"
-          />
-
-          {isLoading && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-              <CircularProgress size={32} />
-            </Box>
-          )}
-
-          {verificationResult && !isLoading && (
-            <Box sx={{ p: 2, borderRadius: 2, backgroundColor: verificationResult.verified ? '#ecfdf5' : '#fef2f2', border: `1px solid ${verificationResult.verified ? '#d1fae5' : '#fee2e2'}` }}>
-              {verificationResult.verified ? (
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 900, color: '#065f46', mb: 1 }}>
-                    ✓ Dogrulanmis Oy
-                  </Typography>
-                  <Stack spacing={1}>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: '#047857' }}>Secim</Typography>
-                      <Typography variant="body2" sx={{ color: '#111827', fontWeight: 800 }}>{verificationResult.electionTitle}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: '#047857' }}>Aday</Typography>
-                      <Typography variant="body2" sx={{ color: '#111827', fontWeight: 800 }}>{verificationResult.candidateName}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: '#047857' }}>Oy Zamani</Typography>
-                      <Typography variant="body2" sx={{ color: '#111827', fontWeight: 800 }}>{new Date(verificationResult.votedAt).toLocaleString('tr-TR')}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: '#047857' }}>Blok Numarasi</Typography>
-                      <Typography variant="body2" sx={{ color: '#111827', fontWeight: 800 }}>{verificationResult.blockNumber} (Confirms: {verificationResult.confirmations})</Typography>
-                    </Box>
-                  </Stack>
-                </Box>
-              ) : (
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 900, color: '#7c2d12', mb: 1 }}>
-                    ✗ Bulunamadi
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#9a3412' }}>
-                    {verificationResult.error || `Oy bulunamadi. Hash'i kontrol edin.`}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          )}
-        </Box>
-      </DialogContent>
-      <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} sx={{ borderRadius: 1.5, fontWeight: 800, textTransform: 'none', color: '#7f1d1d', border: '1px solid rgba(239, 68, 68, 0.26)', backgroundColor: 'rgba(254, 226, 226, 0.86)', '&:hover': { borderColor: '#ef4444', backgroundColor: 'rgba(254, 202, 202, 0.95)' } }}>
-          Kapat
-        </Button>
-        <Button onClick={handleVerify} disabled={!txHash.trim() || isLoading} variant="contained" sx={{ borderRadius: 1.5, fontWeight: 900, textTransform: 'none', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', '&:hover': { background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' } }}>
-          Dogru
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
+// Receipt verification dialog removed

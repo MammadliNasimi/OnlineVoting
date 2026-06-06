@@ -12,7 +12,7 @@ import {
 import VotingHeader from './voting/VotingHeader';
 import VotingMainPanel from './voting/VotingMainPanel';
 import VotingSidebar from './voting/VotingSidebar';
-import { FaceDialog, HistoryDialog, ProfileDialog, ReceiptVerificationDialog } from './voting/VotingDialogs';
+import { FaceDialog, HistoryDialog, ProfileDialog } from './voting/VotingDialogs';
 import { getPublicEmailType } from './voting/utils';
 import useFaceRegistration from './voting/useFaceRegistration';
 
@@ -26,7 +26,6 @@ function SimpleVoting({ user, sessionId, onLogout }) {
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [showReceiptVerification, setShowReceiptVerification] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [queueMsg, setQueueMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -217,22 +216,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
     }
   });
 
-  const [verificationResult, setVerificationResult] = useState(null);
-
-  const verifyReceiptMutation = useMutation({
-    mutationFn: async (txHash) => {
-      const res = await axios.get(`${API_BASE}/vote/receipt/${txHash}`);
-      return res.data;
-    },
-    onSuccess: (data) => {
-      setVerificationResult(data);
-    },
-    onError: (err) => {
-      setVerificationResult({
-        error: err.response?.data?.error || err.message || 'Verification failed'
-      });
-    }
-  });
+  
 
   const handleElectionChange = (e) => {
     setSelectedElectionId(e.target.value);
@@ -389,18 +373,7 @@ function SimpleVoting({ user, sessionId, onLogout }) {
         onCopyWallet={handleCopyWallet}
       />
 
-      <ReceiptVerificationDialog
-        open={showReceiptVerification}
-        onClose={() => {
-          setShowReceiptVerification(false);
-          setVerificationResult(null);
-        }}
-        onVerify={(txHash) => {
-          verifyReceiptMutation.mutate(txHash);
-        }}
-        verificationResult={verificationResult}
-        isLoading={verifyReceiptMutation.isPending}
-      />
+      {/* Receipt verification dialog removed */}
     </Box>
     </>
   );
