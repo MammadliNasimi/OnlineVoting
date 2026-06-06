@@ -3,6 +3,10 @@ const router = express.Router();
 const { VoteController } = require('../controllers/vote.controller');
 const { authenticateJWT, requireAuth } = require('../middlewares/auth.middleware');
 
+// Unauthenticated routes
+router.get('/receipt/:txHash', VoteController.verifyReceipt);
+
+// Authenticated routes
 // Tum oylama endpoint'leri kimlik dogrulamasi gerektirir; oturum yoksa 401 doneriz.
 router.use(authenticateJWT, requireAuth);
 

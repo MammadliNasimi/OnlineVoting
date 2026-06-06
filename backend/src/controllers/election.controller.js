@@ -240,6 +240,48 @@ class ElectionController {
       res.status(500).json({ message: error.message });
     }
   }
+
+  async getGovernance(req, res) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const election = db.db.prepare('SELECT * FROM elections WHERE id = ?').get(id);
+      
+      if (!election) {
+        return res.status(404).json({ error: 'Election not found' });
+      }
+
+      // Blockchain contract info
+      const contractAddress = state.relayerService?.contractAddress;
+      const issuerAddress = state.credentialIssuer?.issuerWallet?.address;
+
+      // DAO governance model
+      const governanceInfo = {
+        electionID: election.id,
+        electionTitle: election.title,
+        issuerAddress,
+        contractAddress,
+        governanceModel: 'credential-issuer',
+        issuerRole: 'Backend-centralized issuer (v1) - can upgrade to multi-sig or DAO in v2',
+        blockchainNetwork: process.env.BLOCKCHAIN_NETWORK || 'Sepolia',
+        verificationModel: 'Nullifier + EIP-712 signature verification',
+        anonymityGuarantee: 'Email hash never stored on blockchain; only nullifier (hash of email+electionID)',
+        doubleVotePrevention: 'Nullifier checked against blockchain state',
+        candidatesLocked: election.candidates_locked === 1,
+        electionActive: election.is_active === 1,
+        createdAt: election.created_at,
+        documentation: {
+          architecture: 'See ARCHITECTURE.md for technical details',
+          deploymentGuide: 'See DAO_DEPLOYMENT_GUIDE.md for operational setup',
+          upgradeRoadmap: 'See ZKP_SSI_UPGRADE_ROADMAP.md for v2 with true ZKP+SSI'
+        }
+      };
+
+      res.json(governanceInfo);
+    } catch (error) {
+      console.error('Get governance error:', error);
+      res.status(500).json({ error: 'Failed to fetch governance info', message: error.message });
+    }
+  }
 }
 
 module.exports = new ElectionController();

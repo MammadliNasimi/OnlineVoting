@@ -3,6 +3,10 @@ const router = express.Router();
 const electionController = require('../controllers/election.controller');
 const { authenticateJWT, requireAdmin } = require('../middlewares/auth.middleware');
 
+// Public routes (no auth required)
+router.get('/:id/governance', electionController.getGovernance);
+
+// Admin routes (auth required)
 router.use(authenticateJWT, requireAdmin);
 
 router.put('/:id/toggle', electionController.toggleActive);

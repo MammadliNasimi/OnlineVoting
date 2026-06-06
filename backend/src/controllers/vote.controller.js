@@ -1,4 +1,7 @@
 const voteService = require('../services/vote.service');
+const db = require('../config/database-sqlite');
+const state = require('../config/state');
+const { ethers } = require('ethers');
 
 class VoteController {
   async getElections(req, res) {
@@ -58,6 +61,76 @@ class VoteController {
     } catch (error) {
       console.error('Get voting history error:', error);
       res.status(error.message === 'Unauthorized' ? 401 : 500).json({ message: 'Failed to fetch voting history' });
+    }
+  }
+
+  async verifyReceipt(req, res) {
+    try {
+      const txHash = req.params.txHash;
+      
+      // Validate txHash format
+      if (!txHash || !txHash.startsWith('0x') || txHash.length !== 66) {
+        return res.status(400).json({ error: 'Invalid transaction hash format' });
+      }
+
+      // Query local DB for vote record
+      const voteRecord = db.db.prepare(
+        'SELECT id, election_id, candidate_id, email_hash, tx_hash, created_at FROM votes WHERE tx_hash = ?'
+      ).get(txHash);
+
+      if (!voteRecord) {
+        return res.status(404).json({ 
+          error: 'Vote not found', 
+          message: 'No vote record with this transaction hash' 
+        });
+      }
+
+      // Verify on blockchain if available
+      let blockchainVerified = false;
+      let blockNumber = null;
+      let confirmations = 0;
+
+      if (state.relayerService && state.relayerService.provider) {
+        try {
+          const provider = state.relayerService.provider;
+          const receipt = await provider.getTransactionReceipt(txHash);
+
+          if (receipt && receipt.status === 1) {
+            blockchainVerified = true;
+            blockNumber = receipt.blockNumber;
+            
+            // Calculate confirmations
+            const currentBlock = await provider.getBlockNumber();
+            confirmations = Math.max(0, currentBlock - blockNumber);
+          }
+        } catch (error) {
+          console.warn('Blockchain verification failed:', error.message);
+          // Continue without blockchain verification
+        }
+      }
+
+      // Get election and candidate info
+      const election = db.db.prepare('SELECT id, title FROM elections WHERE id = ?')
+        .get(voteRecord.election_id);
+      const candidate = db.db.prepare('SELECT id, name FROM candidates WHERE election_id = ? AND id = ?')
+        .get(voteRecord.election_id, voteRecord.candidate_id);
+
+      res.json({
+        txHash,
+        verified: blockchainVerified,
+        electionID: voteRecord.election_id,
+        electionTitle: election?.title,
+        candidateID: voteRecord.candidate_id,
+        candidateName: candidate?.name,
+        nullifier: voteRecord.email_hash,  // Hashed for privacy
+        votedAt: voteRecord.created_at,
+        blockNumber,
+        confirmations,
+        status: blockchainVerified ? 'confirmed' : 'pending'
+      });
+    } catch (error) {
+      console.error('Verify receipt error:', error);
+      res.status(500).json({ error: 'Failed to verify receipt', message: error.message });
     }
   }
 }

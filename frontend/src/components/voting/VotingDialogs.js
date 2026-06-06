@@ -386,3 +386,91 @@ export function ProfileDialog({
     </Dialog>
   );
 }
+
+export function ReceiptVerificationDialog({ open, onClose, onVerify, verificationResult, isLoading }) {
+  const [txHash, setTxHash] = useState('');
+
+  const handleVerify = () => {
+    if (txHash.trim()) {
+      onVerify(txHash);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 900, color: '#111827' }}>
+        Oyunuzu Dogru (Blockchain)
+      </DialogTitle>
+      <DialogContent dividers sx={{ p: 2.5 }}>
+        <Box sx={{ display: 'grid', gap: 2 }}>
+          <Typography variant="body2" sx={{ color: '#475569' }}>
+            Oyunuzun blockchain'deki durumunu dogrulamak icin islem hash'ini (TX Hash) girin.
+          </Typography>
+          <TextField
+            fullWidth
+            label="Transaction Hash (0x...)"
+            placeholder="0x..."
+            value={txHash}
+            onChange={(e) => setTxHash(e.target.value)}
+            disabled={isLoading}
+            size="small"
+            helperText="Blockchain'e yazilan islemin unique ID'si"
+          />
+
+          {isLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={32} />
+            </Box>
+          )}
+
+          {verificationResult && !isLoading && (
+            <Box sx={{ p: 2, borderRadius: 2, backgroundColor: verificationResult.verified ? '#ecfdf5' : '#fef2f2', border: `1px solid ${verificationResult.verified ? '#d1fae5' : '#fee2e2'}` }}>
+              {verificationResult.verified ? (
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 900, color: '#065f46', mb: 1 }}>
+                    ✓ Dogrulanmis Oy
+                  </Typography>
+                  <Stack spacing={1}>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#047857' }}>Secim</Typography>
+                      <Typography variant="body2" sx={{ color: '#111827', fontWeight: 800 }}>{verificationResult.electionTitle}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#047857' }}>Aday</Typography>
+                      <Typography variant="body2" sx={{ color: '#111827', fontWeight: 800 }}>{verificationResult.candidateName}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#047857' }}>Oy Zamani</Typography>
+                      <Typography variant="body2" sx={{ color: '#111827', fontWeight: 800 }}>{new Date(verificationResult.votedAt).toLocaleString('tr-TR')}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#047857' }}>Blok Numarasi</Typography>
+                      <Typography variant="body2" sx={{ color: '#111827', fontWeight: 800 }}>{verificationResult.blockNumber} (Confirms: {verificationResult.confirmations})</Typography>
+                    </Box>
+                  </Stack>
+                </Box>
+              ) : (
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 900, color: '#7c2d12', mb: 1 }}>
+                    ✗ Bulunamadi
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#9a3412' }}>
+                    {verificationResult.error || 'Oy bulunamadi. Hash'i kontrol edin.'}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} sx={{ borderRadius: 1.5, fontWeight: 800, textTransform: 'none', color: '#7f1d1d', border: '1px solid rgba(239, 68, 68, 0.26)', backgroundColor: 'rgba(254, 226, 226, 0.86)', '&:hover': { borderColor: '#ef4444', backgroundColor: 'rgba(254, 202, 202, 0.95)' } }}>
+          Kapat
+        </Button>
+        <Button onClick={handleVerify} disabled={!txHash.trim() || isLoading} variant="contained" sx={{ borderRadius: 1.5, fontWeight: 900, textTransform: 'none', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', '&:hover': { background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' } }}>
+          Dogru
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}

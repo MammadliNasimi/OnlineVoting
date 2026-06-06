@@ -5,9 +5,10 @@ import HistoryIcon from '@mui/icons-material/History';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
+import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import { headerButtonSx, headerPrimaryButtonSx, panelSx } from './styles';
 
-function VotingHeader({ user, onLogout, onShowProfile, onShowFace, onShowHistory }) {
+function VotingHeader({ user, onLogout, onShowProfile, onShowFace, onShowHistory, onShowReceiptVerification }) {
   return (
     <Paper
       elevation={0}
@@ -58,6 +59,11 @@ function VotingHeader({ user, onLogout, onShowProfile, onShowFace, onShowHistory
           <Tooltip title="Oy gecmisi">
             <Button variant="outlined" startIcon={<HistoryIcon />} onClick={onShowHistory} sx={headerButtonSx}>
               Gecmis
+            </Button>
+          </Tooltip>
+          <Tooltip title="Oyu dogrula (txHash)">
+            <Button variant="outlined" startIcon={<VerifiedUserIcon />} onClick={onShowReceiptVerification} sx={headerButtonSx}>
+              Dogrula
             </Button>
           </Tooltip>
           <Tooltip title="Cikis yap">
