@@ -9,6 +9,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "benchmark": "node scripts/load-test/measure-performance.js",
+    "benchmark:report": "node scripts/load-test/generate-report.js",
+    "test:issuer": "node test-issuer.js",
     "postinstall": "echo \"Backend dependencies installed.\""
   },
   "dependencies": {
