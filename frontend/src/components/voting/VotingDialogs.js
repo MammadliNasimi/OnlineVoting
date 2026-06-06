@@ -147,7 +147,7 @@ export function HistoryDialog({ open, onClose, isLoadingHistory, votingHistory, 
       <DialogContent dividers sx={{ px: 2, py: 1.5 }}>
         {!EXPLORER_BASE_URL && votingHistory.length > 0 && (
           <Alert severity="info" sx={{ mb: 1.5, borderRadius: 1.5, fontSize: 12 }}>
-            Etherscan bağlantıları için üretim (Sepolia) ağına bağlanın.
+            Etherscan bağlantıları bulunamadı — yerel bir node üzerinde çalışıyorsunuz. Bu uyarı beklenir; Etherscan bağlantılarını görmek için uygulamayı Sepolia ağına bağlayın veya `REACT_APP_CHAIN_ID` ve explorer ayarlarını güncelleyin.
           </Alert>
         )}
         {isLoadingHistory ? (

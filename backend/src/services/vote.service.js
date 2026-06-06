@@ -2,7 +2,7 @@ const db = require('../config/database-sqlite');
 const state = require('../config/state');
 const { voteJobQueue } = require('./voteQueue.service');
 const { isDomainAllowed } = require('../utils/voteHelpers');
-const { generateProof } = require('./zkp/proofGenerator');
+const { generateProof } = require('../../services/zkp/proofGenerator');
 
 const REPEAT_VOTE_MAX_ATTEMPTS = 5;
 const REPEAT_VOTE_LOCK_MINUTES = 15;
@@ -158,12 +158,20 @@ class VoteService {
     };
 
     try {
+      // Custom stringify to handle BigInts
+      const stringifyWithBigInt = (obj) => JSON.stringify(obj, (_, value) => {
+        if (typeof value === 'bigint') {
+          return value.toString();
+        }
+        return value;
+      });
+
       voteJobQueue.add({
         userId: user.id,
         electionID: normalizedElectionId,
         candidateID: candidate.blockchain_candidate_id,
         burnerAddress: burnerAddress,
-        signature: JSON.stringify(completeVoteProof)
+        signature: stringifyWithBigInt(completeVoteProof)
       });
       // Geçerli oy akışında aynı seçim için eski tekrar-deneme sayaçlarını temizle.
       db.resetAuthAttempts(repeatVoteLockKey, 'repeat_vote_after_success');

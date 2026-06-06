@@ -168,6 +168,11 @@ class PerformanceTest {
       );
       const receipt = await tx.wait();
 
+      // Debug: log receipt
+      console.log('📋 Transaction receipt:');
+      console.log('   Status:', receipt.status);
+      console.log('   Logs count:', receipt.logs.length);
+
       // Extract election ID from event
       const event = receipt.logs.find(log => {
         try {
@@ -183,6 +188,18 @@ class PerformanceTest {
         this.currentElectionId = Number(parsed.args[0]);
         console.log(`✅ Election created: ID ${this.currentElectionId}`);
         return this.currentElectionId;
+      } else {
+        // Debug: try parsing all logs
+        console.log('   All logs:');
+        receipt.logs.forEach((log, idx) => {
+          try {
+            const parsed = this.contract.interface.parseLog(log);
+            console.log(`     [${idx}] ${parsed.name}`);
+          } catch(e) {
+            console.log(`     [${idx}] (unparseable)`);
+          }
+        });
+        throw new Error('ElectionCreated event not found in transaction receipt');
       }
     } catch (error) {
       console.error('❌ Election setup failed:', error.message);
@@ -358,6 +375,12 @@ class PerformanceTest {
     if (isTestMode) console.log('   Mode: TEST (quick validation)\n');
     else console.log('\n');
 
+    // Initialize database
+    const db = require('../../src/config/database-sqlite');
+    console.log('📦 Initializing database...');
+    await db.connect();
+    console.log('✅ Database connected\n');
+
     // Ensure report directory exists
     if (!fs.existsSync(REPORT_DIR)) {
       fs.mkdirSync(REPORT_DIR, { recursive: true });
@@ -389,8 +412,12 @@ class PerformanceTest {
       this.generateSummaryReport();
     } catch (error) {
       console.error('❌ Test suite failed:', error.message);
+      db.close();
       process.exit(1);
     }
+    
+    // Cleanup database
+    db.close();
   }
 
   generateSummaryReport() {

@@ -1,8 +1,9 @@
 const path = require('path');
 
-// Hem backend-local hem proje kökündeki .env'i destekle (host platform env'leri her zaman önceliklidir).
+// Hem backend-local hem proje kökündeki .env'i destekle.
+// Backend/.env local blockchain ayarlarını zorla öncelikli tutar; kök .env sadece eksikleri tamamlar.
+require('dotenv').config({ path: path.resolve(__dirname, '.env'), override: true });
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
-require('dotenv').config();
 
 const fs = require('fs');
 const http = require('http');
@@ -81,6 +82,20 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+
+// BigInt serialization middleware
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = function(data) {
+    return originalJson(JSON.parse(JSON.stringify(data, (_, value) => {
+      if (typeof value === 'bigint') {
+        return value.toString();
+      }
+      return value;
+    })));
+  };
+  next();
+});
 
 if (frontendBuildExists) {
   app.use(express.static(frontendBuildPath));

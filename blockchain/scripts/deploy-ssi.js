@@ -22,11 +22,8 @@ const path = require("path");
 const dotenv = require("dotenv");
 const envPath = path.resolve(__dirname, "../..", ".env");
 const result = dotenv.config({ path: envPath });
-
 if (result.error) {
-  console.error("❌ Error loading .env file:", result.error);
-  console.log("   Looking for .env at:", envPath);
-  process.exit(1);
+  console.log("ℹ️  No root .env file found; falling back to environment variables.");
 }
 
 function updateEnvVar(content, name, value) {
@@ -39,16 +36,9 @@ function updateEnvVar(content, name, value) {
 async function main() {
   console.log("\n🚀 DEPLOYING VOTINGSSI CONTRACT (Self-Sovereign Identity)...\n");
 
-  // Get issuer address from .env ADMIN_PRIVATE_KEY
-  const issuerPrivateKey = process.env.ADMIN_PRIVATE_KEY;
-  
-  if (!issuerPrivateKey) {
-    throw new Error("❌ ADMIN_PRIVATE_KEY not found in .env file");
-  }
-
-  // Create wallet from private key to get issuer address
-  const issuerWallet = new hre.ethers.Wallet(issuerPrivateKey);
-  const issuerAddress = issuerWallet.address;
+  // Get issuer from signers[0] (first Hardhat account = ADMIN)
+  const [issuer] = await hre.ethers.getSigners();
+  const issuerAddress = issuer.address;
 
   console.log("📝 Deployment Configuration:");
   console.log("   Issuer Address:", issuerAddress);
@@ -92,15 +82,22 @@ async function main() {
   console.log("   Vote TypeHash:", await votingContract.VOTE_TYPEHASH());
   console.log("");
 
-  // Update .env file with contract addresses
-  const rootEnvPath = path.resolve(__dirname, "../..", ".env");
-  let envContent = fs.readFileSync(rootEnvPath, "utf8");
-  envContent = updateEnvVar(envContent, 'CONTRACT_ADDRESS', contractAddress);
-  envContent = updateEnvVar(envContent, 'VOTING_CONTRACT_ADDRESS', contractAddress);
-  envContent = updateEnvVar(envContent, 'VERIFIER_ADDRESS', verifierAddress);
-  fs.writeFileSync(rootEnvPath, envContent);
-  console.log("📄 Updated .env with contract and verifier addresses");
-  console.log("");
+  // Update local .env only when not running in CI.
+  if (process.env.CI !== "true") {
+    const rootEnvPath = path.resolve(__dirname, "../..", ".env");
+    let envContent = "";
+    try {
+      envContent = fs.readFileSync(rootEnvPath, "utf8");
+    } catch (_e) {
+      envContent = "";
+    }
+    envContent = updateEnvVar(envContent, 'CONTRACT_ADDRESS', contractAddress);
+    envContent = updateEnvVar(envContent, 'VOTING_CONTRACT_ADDRESS', contractAddress);
+    envContent = updateEnvVar(envContent, 'VERIFIER_ADDRESS', verifierAddress);
+    fs.writeFileSync(rootEnvPath, envContent);
+    console.log("📄 Updated local .env with contract and verifier addresses");
+    console.log("");
+  }
 
   // Create sample election
   console.log("🗳️  Creating sample election...");

@@ -30,9 +30,16 @@ class ElectionController {
       const issuerWallet = state.credentialIssuer.issuerWallet.connect(provider);
       const contract = new ethers.Contract(contractAddress, contractABI, issuerWallet);
 
-      const chainElection = election.blockchain_election_id
-        ? await contract.elections(election.blockchain_election_id)
-        : { startTime: 0n, isActive: false };
+      // Try to fetch blockchain election, but if it fails (not found), treat as non-existent
+      let chainElection = { startTime: 0n, isActive: false };
+      if (election.blockchain_election_id) {
+        try {
+          chainElection = await contract.elections(election.blockchain_election_id);
+        } catch (err) {
+          console.log('⚠️  Could not fetch blockchain election - treating as new:', err.message);
+          chainElection = { startTime: 0n, isActive: false };
+        }
+      }
 
       const onChainExists = isAlreadyOnChain(election, chainElection);
 
