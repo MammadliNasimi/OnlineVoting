@@ -29,8 +29,6 @@ import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ShareIcon from '@mui/icons-material/Share';
-import VerifiedIcon from '@mui/icons-material/Verified';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { getPublicEmailType, formatVoteDate } from './utils';
 import { formatLocalDateTR } from '../../utils/dateTime';
 import { outlineButtonSx, primaryButtonSx } from './styles';
