@@ -75,7 +75,7 @@ class VoteController {
 
       // Query local DB for vote record
       const voteRecord = db.db.prepare(
-        'SELECT id, election_id, candidate_id, email_hash, tx_hash, created_at FROM votes WHERE tx_hash = ?'
+        'SELECT id, election_id, candidate_id, email_hash, transaction_hash, created_at FROM votes WHERE transaction_hash = ?'
       ).get(txHash);
 
       if (!voteRecord) {
