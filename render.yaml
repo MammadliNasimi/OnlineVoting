@@ -1,59 +1,64 @@
 # Render Blueprint - https://render.com/docs/blueprint-spec
-# Free plan kullanılıyor:
-#  - Persistent disk YOK (SQLite restart'ta sıfırlanır - admin yeniden oluşturulur)
-#  - 15 dk inaktivite sonra uyur (ilk istekte ~30sn cold start)
-#  - 750 saat/ay free instance
-#  - Kart bilgisi sorulmaz
+# Production deployment configuration for OnlineVoting v1
 
 services:
   - type: web
-    name: ssi-voting-backend
+    name: onlinevoting-backend
     runtime: node
     region: frankfurt
     plan: free
     rootDir: backend
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node server.js
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
+      # Node.js configuration
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
         value: "22"
       - key: HOST
         value: 0.0.0.0
-      # Render free: PORT'u kendisi atar, ama default 10000
       - key: PORT
-        value: 10000
-      # SQLite ephemeral - container içi (restart'ta sıfırlanır, free plan'da disk yok)
-      - key: DB_PATH
-        value: /opt/render/project/src/db/database.db
+        value: 3001
+
+      # Blockchain (Sepolia testnet by default)
       - key: BLOCKCHAIN_RPC_URL
-        value: https://ethereum-sepolia-rpc.publicnode.com
-      - key: RPC_URL
-        value: https://ethereum-sepolia-rpc.publicnode.com
+        sync: false
+      - key: BLOCKCHAIN_NETWORK
+        value: Sepolia
       - key: CHAIN_ID
         value: "11155111"
-      - key: VOTING_CONTRACT_ADDRESS
-        value: "0x62a8878de43d5d6fd9B199d92556843a57F39aae"
 
-      # --- AŞAĞIDAKİLERİ RENDER DASHBOARD'TAN MANUEL EKLE (sync: false) ---
-      - key: ADMIN_PRIVATE_KEY
+      # Smart contract (SET VIA DASHBOARD AFTER DEPLOYMENT)
+      - key: VOTING_CONTRACT_ADDRESS
+        sync: false
+      - key: ISSUER_PRIVATE_KEY
         sync: false
       - key: RELAYER_PRIVATE_KEY
         sync: false
+
+      # Security
       - key: JWT_SECRET
         generateValue: true
-      - key: SESSION_SECRET
-        generateValue: true
-      - key: WALLET_ENCRYPTION_KEY
-        generateValue: true
+      - key: JWT_EXPIRY
+        value: 24h
+      - key: RATE_LIMIT_VOTES
+        value: "10"
+      - key: RATE_LIMIT_AUTH
+        value: "5"
+
+      # Database (SQLite in-container)
+      - key: DATABASE_SQLITE
+        value: "true"
+      - key: SQLITE_PATH
+        value: ./votes.db
+
+      # Email (Brevo SMTP by default)
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
-        sync: false
-      - key: SMTP_SECURE
         sync: false
       - key: SMTP_USER
         sync: false
@@ -61,13 +66,15 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
-      - key: MAIL_PROVIDER
-        sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: RESEND_FROM
-        sync: false
-      - key: CORS_ORIGINS
-        sync: false   # Vercel deploy bittikten sonra gerçek URL'i gir
+      - key: SMTP_SECURE
+        value: "true"
+
+      # CORS
+      - key: CORS_ORIGIN
+        sync: false  # Set to your Vercel frontend URL
       - key: FRONTEND_URL
         sync: false
+
+      # Logging
+      - key: LOG_LEVEL
+        value: info
