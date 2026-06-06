@@ -89,18 +89,22 @@ class PerformanceTest {
     return ethers.keccak256(ethers.toUtf8Bytes(normalized + salt));
   }
 
-  getDomain() {
-    return {
-      name: 'VotingSSI',
-      version: '1.0',
-      chainId: 11155111, // Sepolia or hardhat
-      verifyingContract: CONTRACT_ADDRESS
-    };
+  async getDomain() {
+    if (!this.cachedDomain) {
+      const network = await this.provider.getNetwork();
+      this.cachedDomain = {
+        name: 'VotingSSI',
+        version: '1.0',
+        chainId: Number(network.chainId), // Dynamic: 31337 (Hardhat) or 11155111 (Sepolia)
+        verifyingContract: CONTRACT_ADDRESS
+      };
+    }
+    return this.cachedDomain;
   }
 
   async issueCredential(email, electionID, burnerAddress) {
     const emailHash = this.hashEmail(email);
-    const domain = this.getDomain();
+    const domain = await this.getDomain();
 
     const credentialProof = {
       emailHash: emailHash,
@@ -127,7 +131,7 @@ class PerformanceTest {
 
   async signVote(burnerWallet, candidateID, electionID) {
     const timestamp = Math.floor(Date.now() / 1000);
-    const domain = this.getDomain();
+    const domain = await this.getDomain();
 
     const types = {
       Vote: [

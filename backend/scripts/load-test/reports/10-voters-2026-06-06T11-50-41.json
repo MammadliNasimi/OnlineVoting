@@ -1,0 +1,89 @@
+{
+  "stats": {
+    "scenario": "10-voters",
+    "timestamp": "2026-06-06T11-50-41",
+    "total_voters": 10,
+    "successful_votes": 5,
+    "failed_votes": 5,
+    "success_rate": "50.00%",
+    "total_duration_seconds": "1.47",
+    "throughput_votes_per_second": "3.40",
+    "latency_p50_ms": 154,
+    "latency_p95_ms": 185,
+    "latency_p99_ms": 185,
+    "latency_min_ms": 147,
+    "latency_max_ms": 185,
+    "latency_avg_ms": "158.20",
+    "gas_cost_avg_eth": "0.00011834",
+    "gas_cost_min_eth": "0.00010114",
+    "gas_cost_max_eth": "0.00013250",
+    "gas_cost_total_eth": "0.00059170"
+  },
+  "measurements": [
+    {
+      "voter_id": 1,
+      "email": "voter1@university.edu",
+      "credential_time_ms": 1,
+      "signing_time_ms": 2,
+      "blockchain_time_ms": 153,
+      "total_time_ms": 156,
+      "gas_used": 104408,
+      "gas_price_wei": 1269041182,
+      "gas_cost_eth": 0.000132498051730256,
+      "tx_hash": "0x40a990f81b5de9f52e3c8ded46b2e571152c4ab2def87dfc52de1ba49ea84c10",
+      "timestamp": "2026-06-06T11:50:42.540Z"
+    },
+    {
+      "voter_id": 3,
+      "email": "voter3@university.edu",
+      "credential_time_ms": 1,
+      "signing_time_ms": 1,
+      "blockchain_time_ms": 145,
+      "total_time_ms": 147,
+      "gas_used": 104408,
+      "gas_price_wei": 1235528077,
+      "gas_cost_eth": 0.000128999015463416,
+      "tx_hash": "0x899f045da869abe29acf6ff9a20bd052ff78f827646c6b76e8e3836a211f82b8",
+      "timestamp": "2026-06-06T11:50:42.809Z"
+    },
+    {
+      "voter_id": 5,
+      "email": "voter5@university.edu",
+      "credential_time_ms": 1,
+      "signing_time_ms": 0,
+      "blockchain_time_ms": 148,
+      "total_time_ms": 149,
+      "gas_used": 104408,
+      "gas_price_wei": 1206189530,
+      "gas_cost_eth": 0.00012593583644824,
+      "tx_hash": "0xb9d82f570c0244f8bb1d470cfa7419e6f32bea76dac6a17aa8243e292a5700b9",
+      "timestamp": "2026-06-06T11:50:43.078Z"
+    },
+    {
+      "voter_id": 7,
+      "email": "voter7@university.edu",
+      "credential_time_ms": 1,
+      "signing_time_ms": 1,
+      "blockchain_time_ms": 152,
+      "total_time_ms": 154,
+      "gas_used": 87360,
+      "gas_price_wei": 1180505539,
+      "gas_cost_eth": 0.00010312896388704,
+      "tx_hash": "0xad103b27d77c8b5cc1f578ca11d4b2de15e40eeee64f5bf8a1908996e2f44dcd",
+      "timestamp": "2026-06-06T11:50:43.358Z"
+    },
+    {
+      "voter_id": 9,
+      "email": "voter9@university.edu",
+      "credential_time_ms": 3,
+      "signing_time_ms": 2,
+      "blockchain_time_ms": 180,
+      "total_time_ms": 185,
+      "gas_used": 87336,
+      "gas_price_wei": 1158008051,
+      "gas_cost_eth": 0.000101135791142136,
+      "tx_hash": "0x8c249a8a17c3420465fb0a2c7aa00bc7e87694367ad9a98968142457634f5f8a",
+      "timestamp": "2026-06-06T11:50:43.679Z"
+    }
+  ]
+}

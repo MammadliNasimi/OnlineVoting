@@ -1,0 +1,46 @@
+{
+  "test_date": "2026-06-06T11-50-41",
+  "scenarios": [
+    {
+      "scenario": "10-voters",
+      "timestamp": "2026-06-06T11-50-41",
+      "total_voters": 10,
+      "successful_votes": 5,
+      "failed_votes": 5,
+      "success_rate": "50.00%",
+      "total_duration_seconds": "1.47",
+      "throughput_votes_per_second": "3.40",
+      "latency_p50_ms": 154,
+      "latency_p95_ms": 185,
+      "latency_p99_ms": 185,
+      "latency_min_ms": 147,
+      "latency_max_ms": 185,
+      "latency_avg_ms": "158.20",
+      "gas_cost_avg_eth": "0.00011834",
+      "gas_cost_min_eth": "0.00010114",
+      "gas_cost_max_eth": "0.00013250",
+      "gas_cost_total_eth": "0.00059170"
+    },
+    {
+      "scenario": "50-voters",
+      "timestamp": "2026-06-06T11-50-41",
+      "total_voters": 50,
+      "successful_votes": 23,
+      "failed_votes": 27,
+      "success_rate": "46.00%",
+      "total_duration_seconds": "6.73",
+      "throughput_votes_per_second": "3.42",
+      "latency_p50_ms": 157,
+      "latency_p95_ms": 197,
+      "latency_p99_ms": 207,
+      "latency_min_ms": 142,
+      "latency_max_ms": 207,
+      "latency_avg_ms": "159.96",
+      "gas_cost_avg_eth": "0.00009134",
+      "gas_cost_min_eth": "0.00008795",
+      "gas_cost_max_eth": "0.00009943",
+      "gas_cost_total_eth": "0.00210078"
+    }
+  ],
+  "total_votes": 28
+}
