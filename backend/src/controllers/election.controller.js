@@ -269,7 +269,7 @@ class ElectionController {
         contractAddress,
         governanceModel: 'credential-issuer',
         issuerRole: 'Backend-centralized issuer (v1) - can upgrade to multi-sig or DAO in v2',
-        blockchainNetwork: process.env.BLOCKCHAIN_NETWORK || 'Sepolia',
+        blockchainNetwork: process.env.BLOCKCHAIN_NETWORK || 'Local Hardhat',
         verificationModel: 'Nullifier + EIP-712 signature verification',
         anonymityGuarantee: 'Email hash never stored on blockchain; only nullifier (hash of email+electionID)',
         doubleVotePrevention: 'Nullifier checked against blockchain state',

@@ -1,59 +1,19 @@
-const snarkjs = require('snarkjs');
-const path = require('path');
-const fs = require('fs');
-
-const USE_MOCK_PROOF = !fs.existsSync(path.resolve(__dirname, '../../zkp/build/nullifier.wasm'));
-
 /**
- * Generate a nullifier ZK proof using snarkjs + compiled circuit
- * Falls back to mock proof if circuit not compiled
+ * Generate a local mock nullifier proof.
+ *
+ * The project now runs the ZKP flow as a lightweight local prototype so the
+ * vote pipeline remains deterministic and easy to test without circuit builds.
  */
 async function generateProof(emailHashHex, electionID) {
-  if (USE_MOCK_PROOF) {
-    return generateMockProof(emailHashHex, electionID);
-  }
-  
-  // Real snarkjs proof generation (requires compiled circuit)
-  const buildDir = path.resolve(__dirname, '../../zkp/build');
-  const wasmPath = path.join(buildDir, 'nullifier.wasm');
-  const zkeyPath = path.join(buildDir, 'nullifier_final.zkey');
-
-  if (!fs.existsSync(wasmPath) || !fs.existsSync(zkeyPath)) {
-    console.warn('⚠️  Circuit artifacts not found, falling back to mock proof');
-    return generateMockProof(emailHashHex, electionID);
-  }
-
-  // Convert hex emailHash to decimal string for witness input
-  let emailHashDec;
-  try {
-    emailHashDec = BigInt(emailHashHex).toString();
-  } catch (err) {
-    throw new Error('Invalid emailHash hex input. Provide 0x-prefixed hex string.');
-  }
-
-  const input = {
-    emailHash: emailHashDec,
-    electionID: Number(electionID)
-  };
-
-  // Use snarkjs to produce proof (requires groth16 setup)
-  try {
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasmPath, zkeyPath);
-    console.log('✅ Real ZK proof generated');
-    return { proof, publicSignals };
-  } catch (err) {
-    console.warn('⚠️  Real proof generation failed, falling back to mock:', err.message);
-    return generateMockProof(emailHashHex, electionID);
-  }
+  return generateMockProof(emailHashHex, electionID);
 }
 
 /**
- * Generate a mock proof for testing (no circuit required)
+ * Generate a mock proof for local testing.
  * Structure matches snarkjs output: { proof: {a, b, c}, publicSignals: [...] }
  */
 function generateMockProof(emailHashHex, electionID) {
   // Mock nullifier = hash(emailHash + electionID)
-  // In real circuit, this would be computed by the circuit
   const nullifier = BigInt(emailHashHex) + BigInt(electionID);
   
   // Groth16 proof structure (mock - not cryptographically valid)
@@ -82,7 +42,7 @@ function generateMockProof(emailHashHex, electionID) {
   // Public signals: [nullifier]
   const publicSignals = [nullifier.toString()];
   
-  console.log('✅ Mock ZK proof generated (circuit not compiled; real proof after: snarkjs zkey export)');
+  console.log('✅ Mock ZK proof generated (local prototype)');
   return { proof: mockProof, publicSignals };
 }
 
