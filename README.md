@@ -1,12 +1,8 @@
 <div align="center">
   <h1>🗳️ OnlineVoting</h1>
   <p><strong>DAO & Web3 topluluklarına yönelik, anonimlik-korumalı blockchain oylama sistemi</strong></p>
-  <p><em>Credential-Issuer + Nullifier-Based Anonymity + EIP-712 (ZKP değil)</em></p>
+  <p><em>Yerel demo için Credential-Issuer + Nullifier-Based Anonymity + EIP-712</em></p>
   <p>TÜBİTAK 2209-A Araştırma Projesi kapsamında geliştirilmiştir.</p>
-
-  [![Live Demo](https://img.shields.io/badge/Live_Demo-onlinevoting--phi.vercel.app-22c55e?style=for-the-badge&logo=vercel)](https://onlinevoting-phi.vercel.app)
-  [![Backend](https://img.shields.io/badge/Backend-ssi--voting--backend.onrender.com-7c3aed?style=for-the-badge&logo=render)](https://ssi-voting-backend.onrender.com/api/health)
-  [![Network](https://img.shields.io/badge/Network-Sepolia_Testnet-orange?style=for-the-badge&logo=ethereum)](https://sepolia.etherscan.io/address/0x62a8878de43d5d6fd9B199d92556843a57F39aae)
 
   [![Node](https://img.shields.io/badge/Node.js-22+-43853d?style=flat-square&logo=nodedotjs)](https://nodejs.org/)
   [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev/)
@@ -19,7 +15,7 @@
 
 ## 📖 Genel Bakış
 
-**OnlineVoting**, DAO'lar ve Web3 topluluklarının iç yönetişim ve gözetim seçimlerine yönelik bir blockchain oylama sistemidir. Geleneksel ve merkezi elektronik oylama sistemlerindeki **şeffaflık eksikliği** ve **manipülasyon riski** sorunlarını çözmek için tasarlanmıştır.
+**OnlineVoting**, DAO'lar ve Web3 topluluklarının iç yönetişim ve gözetim seçimlerine yönelik bir blockchain oylama sistemidir. Bu depo şu anda **yerel çalışma ve akademik demo** odaklıdır; üretim yayınından çok tekrar üretilebilirlik ve teknik doğrulama hedeflenir.
 
 ### Anahtar Avantajlar:
 - **Anonimlik (Nullifier-Based)**: Seçmen kimliği blockchain'e yazılmaz; `nullifier = hash(email + electionID)` ile çift oy engellenir.
@@ -28,7 +24,7 @@
 - **Cüzdan Bağımsız**: Dış cüzdan eklentisine ihtiyaç yok; tarayıcıda otomatik burner wallet oluşturulur.
 - **DAO-Optimized**: Merkezi olmayan yönetişim modelleri için başlatan yetkisi multi-sig/DAO'ya uyarlanabilir.
 
-**Not**: Bu sistem ZKP (Zero-Knowledge Proof) kullanmaz. Anonimlik ve çift oy engelleme, nullifier hash + EIP-712 imzası kombinasyonundan sağlanır.
+**Not**: Bu demo ZKP'yi gerçek derleme hattı yerine local mock proof ile yürütür. Amaç, oy akışını ve nullifier mantığını bağımsız olarak göstermek ve test etmektir.
 
 ---
 
@@ -59,20 +55,18 @@ Seçmen ETH ödemez. **Relayer Service** tüm işlem ücretlerini üstlenir; oy 
 - E-posta domain whitelist (örn. yalnızca `ogr.akdeniz.edu.tr`)
 - Canlı oy durumu, kuyruk takibi ve sistem logları
 
-### 🔁 Seçim Yaşam Döngüsü (Güncel Davranış)
+### 🔁 Seçim Yaşam Döngüsü
 - **Durdur** işlemi seçim verisini silmez, yalnızca uygulama tarafında (`is_active=0`) pasife alır.
 - **Yeniden Başlat** işlemi, aktif olmayan seçimi tekrar açar.
-- Geçmiş sürümde on-chain `endElection` ile kapanmış seçimler için:
-  - Seçimde hiç oy yoksa sistem yeni on-chain election oluşturarak yeniden başlatabilir.
-  - Oy varsa veri bütünlüğü için yeniden başlatma engellenir ve yeni seçim açılması gerekir.
+- Demo akışı local Hardhat üzerinde çalışacak şekilde korunmuştur.
 
 ---
 
 ## 🏗️ Mimari
 
 ```
-┌─────────────────────┐     HTTPS / WSS     ┌─────────────────────┐     RPC      ┌────────────────────┐
-│   Vercel (React)    │ ──────────────────► │   Render (Node.js)  │ ───────────► │  Sepolia Testnet   │
+┌─────────────────────┐     HTTP / WSS      ┌─────────────────────┐     RPC      ┌────────────────────┐
+│   React (local)     │ ──────────────────► │   Node.js backend   │ ───────────► │  Hardhat local     │
 │                     │                     │                     │              │                    │
 │ • Burner Wallet     │                     │ • Auth + JWT        │              │ • VotingSSI.sol    │
 │ • EIP-712 İmza      │                     │ • Issuer Service    │              │ • Nullifier check  │
@@ -87,7 +81,7 @@ Seçmen ETH ödemez. **Relayer Service** tüm işlem ücretlerini üstlenir; oy 
 | **Backend** | Node.js, Express, Socket.io, JWT | Auth, Credential Issuer, Relayer, Vote Queue |
 | **Database** | SQLite (better-sqlite3) | Kullanıcı/seçim/oy meta verileri |
 | **Blockchain** | Solidity 0.8, Hardhat, Ethers v6 | EIP-712 destekli oylama sözleşmesi |
-| **Hosting** | Vercel + Render + Sepolia | Public deploy hattı |
+| **Hosting** | Local demo | Yerel geliştirme ve akademik sunum |
 
 ---
 
@@ -174,40 +168,9 @@ Tarayıcıda `http://localhost:3000` aç. Varsayılan admin: **`admin` / `admin1
 
 ---
 
-## 🌍 Production Deploy (Render + Vercel)
+## 🌍 Demo Kapsamı
 
-Sistem hâlihazırda canlıdır:
-- **Frontend:** [onlinevoting-phi.vercel.app](https://onlinevoting-phi.vercel.app)
-- **Backend:** [ssi-voting-backend.onrender.com](https://ssi-voting-backend.onrender.com/api/health)
-- **Sözleşme:** [Sepolia Etherscan](https://sepolia.etherscan.io/address/0x62a8878de43d5d6fd9B199d92556843a57F39aae)
-
-### Backend → Render
-
-1. https://render.com → **New + → Blueprint**
-2. Repo'yu bağla; Render `render.yaml` dosyasını otomatik algılar.
-3. Aşağıdaki secret'ları **Environment** sekmesinden ekle:
-   - `ADMIN_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY` (Sepolia için)
-   - `SMTP_*` (Gmail App Password önerilir)
-   - `CORS_ORIGINS`, `FRONTEND_URL` (Vercel deploy bittikten sonra)
-4. `JWT_SECRET`, `SESSION_SECRET`, `WALLET_ENCRYPTION_KEY` Render tarafından otomatik üretilir.
-
-### Frontend → Vercel
-
-1. https://vercel.com → **New Project** → repo'yu seç.
-2. **Root Directory:** `frontend`
-3. **Environment Variable:**  
-   `REACT_APP_API_URL` = `https://ssi-voting-backend.onrender.com`
-4. **Deploy** → URL'i not al ve Render `CORS_ORIGINS` / `FRONTEND_URL` değerlerini güncelle.
-
-> 💡 Vercel her preview deploy için unique URL üretir; backend bu URL'leri otomatik kabul edecek şekilde regex CORS ile yapılandırılmıştır.
-
-### Maliyet
-| Servis | Plan | Aylık |
-|--------|------|-------|
-| Vercel | Frontend | $0 |
-| Render Free | Backend | $0 |
-| Sepolia ETH | Faucet | $0 |
-| **Toplam** | | **$0** |
+Bu depo için hedef kurulum local demo'dur. Üretim deploy, testnet faucet ve public hosting adımları bu sürümde kapsam dışıdır.
 
 ---
 
@@ -243,8 +206,7 @@ OnlineVoting/
 ├── blockchain/                 # Hardhat + Solidity
 │   ├── contracts/VotingSSI.sol
 │   └── scripts/deploy-ssi.js
-├── render.yaml                 # Render Blueprint (backend)
-└── frontend/vercel.json        # Vercel SPA config
+└── backend/zkp/                # Local mock proof helpers
 ```
 
 ---

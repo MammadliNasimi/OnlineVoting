@@ -5,7 +5,7 @@ const wallet = new ethers.Wallet(localKey);
 const contractIssuer = '0x80EB754C33e220e8bB0A9cdEC8A2740C1fd1BEE0';
 
 console.log('Local ADMIN_PRIVATE_KEY Wallet Address:', wallet.address);
-console.log('Contract Issuer Address (Sepolia):    ', contractIssuer);
+console.log('Contract Issuer Address (local demo):  ', contractIssuer);
 
 if (wallet.address.toLowerCase() === contractIssuer.toLowerCase()) {
   console.log('\n✅ ADDRESSES MATCH!');

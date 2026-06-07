@@ -5,7 +5,7 @@
  * Metrics:
  * - Throughput: votes/second
  * - Latency: p50, p95, p99 (signature → blockchain confirmation)
- * - Gas cost: per vote (Sepolia testnet)
+ * - Gas cost: per vote (local hardhat network)
  * - Relayer overhead: time between submission and confirmation
  * - ZKP generation time: proof generation latency (Adım 2)
  * 
@@ -19,7 +19,7 @@ const { generateProof } = require('../../services/zkp/proofGenerator');
 // Check test mode early BEFORE loading env
 const isTestMode = process.argv.includes('--test');
 
-// Load .env: test mode uses backend/.env (Hardhat accounts), production uses root/.env (Sepolia)
+// Load .env: test mode uses backend/.env (Hardhat accounts)
 const envPath = isTestMode 
   ? path.join(__dirname, '../../.env')  // backend/.env for test
   : path.join(__dirname, '../../../.env'); // root/.env for production
@@ -97,7 +97,7 @@ class PerformanceTest {
       this.cachedDomain = {
         name: 'VotingSSI',
         version: '1.0',
-        chainId: Number(network.chainId), // Dynamic: 31337 (Hardhat) or 11155111 (Sepolia)
+        chainId: Number(network.chainId), // Dynamic: local Hardhat chain id
         verifyingContract: CONTRACT_ADDRESS
       };
     }
