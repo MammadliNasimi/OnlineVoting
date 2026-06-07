@@ -268,7 +268,7 @@ class ElectionController {
         issuerAddress,
         contractAddress,
         governanceModel: 'credential-issuer',
-        issuerRole: 'Backend-centralized issuer (v1) - can upgrade to multi-sig or DAO in v2',
+        issuerRole: 'Backend-centralized issuer in the current prototype; can be upgraded to multi-sig or DAO in a future version',
         blockchainNetwork: process.env.BLOCKCHAIN_NETWORK || 'Local Hardhat',
         verificationModel: 'Nullifier + EIP-712 signature verification',
         anonymityGuarantee: 'Email hash never stored on blockchain; only nullifier (hash of email+electionID)',
@@ -277,9 +277,7 @@ class ElectionController {
         electionActive: election.is_active === 1,
         createdAt: election.created_at,
         documentation: {
-          architecture: 'See ARCHITECTURE.md for technical details',
-          deploymentGuide: 'See DAO_DEPLOYMENT_GUIDE.md for operational setup',
-          upgradeRoadmap: 'See ZKP_SSI_UPGRADE_ROADMAP.md for v2 with true ZKP+SSI'
+          architecture: 'See the repository README for the local prototype overview'
         }
       };
 
