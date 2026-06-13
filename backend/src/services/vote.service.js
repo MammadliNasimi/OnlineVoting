@@ -16,6 +16,27 @@ class VoteService {
     return now >= start && now <= end;
   }
 
+  async filterElectionsByOnChainStatus(elections) {
+    if (!state.relayerService) return elections;
+
+    const eligible = [];
+    for (const election of elections) {
+      if (!election.blockchain_election_id) continue;
+      try {
+        const status = await state.relayerService.getOnChainElectionStatus(election.blockchain_election_id);
+        if (status.isVotable) {
+          eligible.push(election);
+        } else {
+          db.db.prepare('UPDATE elections SET is_active = 0 WHERE id = ?').run(election.id);
+        }
+      } catch {
+        // Zincir sorgusu basarisizsa DB penceresine guven; oy aninda tekrar kontrol edilir.
+        eligible.push(election);
+      }
+    }
+    return eligible;
+  }
+
   async getElections(user) {
     if (!state.useDatabase) throw new Error('Database not available');
     if (!user) throw new Error('Unauthorized');
@@ -24,7 +45,8 @@ class VoteService {
     const userDomain = userEmail ? userEmail.split('@')[1]?.toLowerCase() : null;
     const allElections = db.getAllElections();
     const activeElections = allElections.filter(e => e.is_active === 1 && this.isElectionWithinWindow(e));
-    return activeElections.filter(election => isDomainAllowed(user.role, userDomain, election));
+    const domainFiltered = activeElections.filter(election => isDomainAllowed(user.role, userDomain, election));
+    return this.filterElectionsByOnChainStatus(domainFiltered);
   }
 
   async getElectionCandidates(electionId, user) {
@@ -38,6 +60,17 @@ class VoteService {
     if (!user || user.role !== 'admin') {
       if (election.is_active !== 1 || !this.isElectionWithinWindow(election)) {
         return [];
+      }
+      if (election.blockchain_election_id && state.relayerService) {
+        try {
+          const status = await state.relayerService.getOnChainElectionStatus(election.blockchain_election_id);
+          if (!status.isVotable) {
+            db.db.prepare('UPDATE elections SET is_active = 0 WHERE id = ?').run(election.id);
+            return [];
+          }
+        } catch {
+          // Zincir sorgusu basarisizsa DB penceresine guven.
+        }
       }
       const userDetails = user ? await db.findUserByName(user.name) : null;
       const userDomain = userDetails?.email ? userDetails.email.split('@')[1]?.toLowerCase() : null;
@@ -88,6 +121,20 @@ class VoteService {
       // On-chain'de bulunmayan adaya oy atılamaz (DB-only kayıt edilmiş, seçim aktive
       // edilmeden eklenmiş ama senkronizasyon kopuk vs.).
       throw new Error('Bu aday on-chain seçim listesinde bulunmadığı için oy verilemiyor. Yöneticiyle iletişime geçin.');
+    }
+
+    if (!election.blockchain_election_id) {
+      throw new Error('Seçim henüz blockchain\'e kaydedilmemiş. Yöneticiyle iletişime geçin.');
+    }
+
+    await state.relayerService.assertElectionVotable(election.blockchain_election_id);
+
+    const emailHash = state.credentialIssuer.hashEmail(email);
+    const nullifierUsed = await state.relayerService.checkNullifier(emailHash, election.blockchain_election_id);
+    if (nullifierUsed) {
+      const err = new Error('Bu seçim için zaten oy kullandınız.');
+      err.code = 'ALREADY_VOTED';
+      throw err;
     }
 
     // Zaten basariyla oy atilmis mi? (DB tarafi, asil engel on-chain nullifier).

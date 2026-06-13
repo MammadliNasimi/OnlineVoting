@@ -3,6 +3,7 @@ const db = require('../config/database-sqlite');
 const { createMailTransporter } = require('../utils/helpers');
 const { getEligibleVoters, sendBulkEmail } = require('./announcementService');
 const { electionEnded: electionEndedTemplate } = require('./emailTemplates');
+const blockchainSync = require('./blockchainSync.service');
 
 class CronService {
     start() {
@@ -12,6 +13,14 @@ class CronService {
         cron.schedule('*/5 * * * *', async () => {
             console.log('🔍 Zamanlanmış Görev: Biten seçimler kontrol ediliyor...');
             this.checkEndedElections();
+            try {
+                const result = await blockchainSync.syncActiveElectionsWithChain();
+                if (result.deactivated.length > 0) {
+                    console.log(`⛓️ Chain sync: ${result.deactivated.length} seçim on-chain durumuna göre kapatıldı.`);
+                }
+            } catch (err) {
+                console.error('Chain sync cron error:', err.message);
+            }
         });
 
         // Saatte bir OTP / sifre sifirlama kayitlarini temizle (tablo şişmesin).

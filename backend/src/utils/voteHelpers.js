@@ -9,6 +9,15 @@ function parseContractError(err) {
   if (msg.includes('0x274cf401') || msg.includes('InvalidSignatures')) {
     return 'İmza doğrulaması başarısız. Sunucu/kontrat adresi veya chain ayarları uyuşmuyor olabilir.';
   }
+  if (msg.includes('InvalidZKProof') || msg.includes('ZK proof')) {
+    return 'ZK proof doğrulaması başarısız. Lütfen yöneticiye bildirin.';
+  }
+  if (msg.includes('require(false)') || msg.includes('CALL_EXCEPTION')) {
+    return 'Blockchain işlemi reddedildi. Seçim süresi dolmuş olabilir, daha önce oy kullanmış olabilirsiniz veya imza doğrulaması başarısız.';
+  }
+  if (msg.includes('blockchain üzerinde sona ermiş') || msg.includes('blockchain üzerinde aktif değil')) {
+    return msg;
+  }
   if (msg.includes('Rate limit') || msg.includes('Rate limit aşıldı') || msg.includes('limitine ulaşıldı')) {
     return 'Çok sık oy gönderme denemesi yapıldı. Lütfen bir süre bekleyip tekrar deneyin.';
   }

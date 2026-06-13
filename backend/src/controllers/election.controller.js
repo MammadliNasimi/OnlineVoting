@@ -44,6 +44,14 @@ class ElectionController {
       const onChainExists = isAlreadyOnChain(election, chainElection);
 
       if (newActive === 1) {
+        const nowSec = Math.floor(Date.now() / 1000);
+        const endTimeCheck = Math.floor(new Date(election.end_date).getTime() / 1000);
+        if (endTimeCheck <= nowSec) {
+          return res.status(400).json({
+            message: 'Seçim bitiş tarihi geçmiş. On-chain oluşturmak için bitiş tarihini güncelleyin.'
+          });
+        }
+
         // İlk aktivasyon: on-chain'de hiç yoksa createElection çağır.
         if (!onChainExists) {
           const candidates = db.db.prepare('SELECT * FROM candidates WHERE election_id = ? ORDER BY id').all(id);

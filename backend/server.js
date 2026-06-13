@@ -155,6 +155,18 @@ async function startServer() {
     const rpcUrl = cleanEnv(process.env.BLOCKCHAIN_RPC_URL) || DEFAULT_RPC_URL;
     if (relayerPrivateKey && contractAddress) {
       state.relayerService = new RelayerService(relayerPrivateKey, contractAddress, rpcUrl);
+      try {
+        const blockchainSync = require('./src/services/blockchainSync.service');
+        blockchainSync.syncActiveElectionsWithChain()
+          .then((result) => {
+            if (result.deactivated.length > 0) {
+              logger.info(`Chain sync at startup: ${result.deactivated.length} election(s) deactivated.`);
+            }
+          })
+          .catch((err) => logger.warn('Chain sync at startup failed:', err.message));
+      } catch (syncErr) {
+        logger.warn('Chain sync module load failed:', syncErr.message);
+      }
     }
 
     server.listen(PORT, HOST, () => {

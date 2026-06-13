@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { CHAIN_ID, CONTRACT_ADDRESS } from './config';
 
 // PIN sistemi kaldırıldı: burner cüzdan doğrudan localStorage'da tutulur.
 const LEGACY_KEY = 'voting_burner_wallet';
@@ -45,8 +46,8 @@ export const signVoteClientSide = async (candidateID, electionID) => {
   const domain = {
     name: 'VotingSSI',
     version: '1.0',
-    chainId: parseInt(process.env.REACT_APP_CHAIN_ID || '31337', 10),
-    verifyingContract: process.env.REACT_APP_CONTRACT_ADDRESS || '0x5FbDB2315678afecb367f032d93F642f64180aa3'
+    chainId: CHAIN_ID,
+    verifyingContract: CONTRACT_ADDRESS
   };
 
   const types = {

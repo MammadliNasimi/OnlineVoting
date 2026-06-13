@@ -63,6 +63,65 @@ class RelayerService {
         return true;
     }
 
+    async getOnChainElectionStatus(blockchainElectionId) {
+        const id = Number(blockchainElectionId);
+        if (!Number.isFinite(id) || id <= 0) {
+            return {
+                exists: false,
+                isActive: false,
+                hasStarted: false,
+                hasEnded: true,
+                candidateCount: 0,
+                isVotable: false
+            };
+        }
+
+        const [election, candidateCount] = await Promise.all([
+            this.contract.elections(id),
+            this.contract.getCandidateCount(id)
+        ]);
+
+        const startTime = Number(election.startTime);
+        const endTime = Number(election.endTime);
+        const now = Math.floor(Date.now() / 1000);
+        const exists = startTime > 0;
+        const isActive = Boolean(election.isActive);
+        const hasStarted = now >= startTime;
+        const hasEnded = now > endTime;
+        const count = Number(candidateCount);
+
+        return {
+            exists,
+            isActive,
+            startTime,
+            endTime,
+            hasStarted,
+            hasEnded,
+            candidateCount: count,
+            isVotable: exists && isActive && hasStarted && !hasEnded && count > 0
+        };
+    }
+
+    async assertElectionVotable(blockchainElectionId) {
+        const status = await this.getOnChainElectionStatus(blockchainElectionId);
+        if (!status.exists) {
+            throw new Error('Seçim henüz blockchain üzerinde oluşturulmamış.');
+        }
+        if (!status.isActive) {
+            throw new Error('Bu seçim blockchain üzerinde aktif değil.');
+        }
+        if (!status.hasStarted) {
+            throw new Error('Seçim henüz başlamadı.');
+        }
+        if (status.hasEnded) {
+            throw new Error('Bu seçim blockchain üzerinde sona ermiş.');
+        }
+        if (status.candidateCount === 0) {
+            throw new Error('Bu seçimde on-chain aday bulunmuyor.');
+        }
+        return status;
+    }
+
     async checkNullifier(emailHash, electionID) {
         try {
             const nullifier = ethers.keccak256(
@@ -195,6 +254,8 @@ class RelayerService {
                 throw new Error('Election has already ended');
             } else if (error.message.includes('Proof expired') || error.message.includes('ProofExpired')) {
                 throw new Error('Credential expired - please request a new one');
+            } else if (error.message.includes('InvalidZKProof') || error.message.includes('require(false)')) {
+                throw new Error('ZK proof doğrulaması başarısız — kontrat reddetti');
             }
 
             throw error;
